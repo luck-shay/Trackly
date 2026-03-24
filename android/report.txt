@@ -1,0 +1,112 @@
+﻿> Task :gradle:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :gradle:compileKotlin UP-TO-DATE
+> Task :gradle:compileJava NO-SOURCE
+> Task :gradle:compileGroovy NO-SOURCE
+> Task :gradle:pluginDescriptors UP-TO-DATE
+> Task :gradle:processResources UP-TO-DATE
+> Task :gradle:classes UP-TO-DATE
+> Task :gradle:jar UP-TO-DATE
+
+> Task :app:signingReport
+Variant: debug
+Config: debug
+Store: C:\Users\Lakshay\.android\debug.keystore
+Alias: AndroidDebugKey
+MD5: 48:B3:79:41:DD:32:10:84:48:63:21:DE:7A:86:17:EF
+SHA1: 22:3D:69:1D:C1:56:0D:00:20:0D:C3:65:25:1D:14:DD:9D:FC:4F:A2
+SHA-256: 9C:E3:04:DF:24:9A:D9:DF:BA:41:E5:06:D4:12:F0:BC:45:03:FA:7E:14:35:DF:AD:3D:A5:C4:9F:61:51:51:6F
+Valid until: Friday, 25 December 2054
+----------
+Variant: release
+Config: debug
+Store: C:\Users\Lakshay\.android\debug.keystore
+Alias: AndroidDebugKey
+MD5: 48:B3:79:41:DD:32:10:84:48:63:21:DE:7A:86:17:EF
+SHA1: 22:3D:69:1D:C1:56:0D:00:20:0D:C3:65:25:1D:14:DD:9D:FC:4F:A2
+SHA-256: 9C:E3:04:DF:24:9A:D9:DF:BA:41:E5:06:D4:12:F0:BC:45:03:FA:7E:14:35:DF:AD:3D:A5:C4:9F:61:51:51:6F
+Valid until: Friday, 25 December 2054
+----------
+Variant: profile
+Config: debug
+Store: C:\Users\Lakshay\.android\debug.keystore
+Alias: AndroidDebugKey
+MD5: 48:B3:79:41:DD:32:10:84:48:63:21:DE:7A:86:17:EF
+SHA1: 22:3D:69:1D:C1:56:0D:00:20:0D:C3:65:25:1D:14:DD:9D:FC:4F:A2
+SHA-256: 9C:E3:04:DF:24:9A:D9:DF:BA:41:E5:06:D4:12:F0:BC:45:03:FA:7E:14:35:DF:AD:3D:A5:C4:9F:61:51:51:6F
+Valid until: Friday, 25 December 2054
+----------
+Variant: debugAndroidTest
+Config: debug
+Store: C:\Users\Lakshay\.android\debug.keystore
+Alias: AndroidDebugKey
+MD5: 48:B3:79:41:DD:32:10:84:48:63:21:DE:7A:86:17:EF
+SHA1: 22:3D:69:1D:C1:56:0D:00:20:0D:C3:65:25:1D:14:DD:9D:FC:4F:A2
+SHA-256: 9C:E3:04:DF:24:9A:D9:DF:BA:41:E5:06:D4:12:F0:BC:45:03:FA:7E:14:35:DF:AD:3D:A5:C4:9F:61:51:51:6F
+Valid until: Friday, 25 December 2054
+----------
+
+> Task :cloud_firestore:signingReport
+Variant: debugAndroidTest
+Config: debug
+Store: C:\Users\Lakshay\.android\debug.keystore
+Alias: AndroidDebugKey
+MD5: 48:B3:79:41:DD:32:10:84:48:63:21:DE:7A:86:17:EF
+SHA1: 22:3D:69:1D:C1:56:0D:00:20:0D:C3:65:25:1D:14:DD:9D:FC:4F:A2
+SHA-256: 9C:E3:04:DF:24:9A:D9:DF:BA:41:E5:06:D4:12:F0:BC:45:03:FA:7E:14:35:DF:AD:3D:A5:C4:9F:61:51:51:6F
+Valid until: Friday, 25 December 2054
+----------
+
+> Task :firebase_auth:signingReport
+Variant: debugAndroidTest
+Config: debug
+Store: C:\Users\Lakshay\.android\debug.keystore
+Alias: AndroidDebugKey
+MD5: 48:B3:79:41:DD:32:10:84:48:63:21:DE:7A:86:17:EF
+SHA1: 22:3D:69:1D:C1:56:0D:00:20:0D:C3:65:25:1D:14:DD:9D:FC:4F:A2
+SHA-256: 9C:E3:04:DF:24:9A:D9:DF:BA:41:E5:06:D4:12:F0:BC:45:03:FA:7E:14:35:DF:AD:3D:A5:C4:9F:61:51:51:6F
+Valid until: Friday, 25 December 2054
+----------
+
+> Task :firebase_core:signingReport
+Variant: debugAndroidTest
+Config: debug
+Store: C:\Users\Lakshay\.android\debug.keystore
+Alias: AndroidDebugKey
+MD5: 48:B3:79:41:DD:32:10:84:48:63:21:DE:7A:86:17:EF
+SHA1: 22:3D:69:1D:C1:56:0D:00:20:0D:C3:65:25:1D:14:DD:9D:FC:4F:A2
+SHA-256: 9C:E3:04:DF:24:9A:D9:DF:BA:41:E5:06:D4:12:F0:BC:45:03:FA:7E:14:35:DF:AD:3D:A5:C4:9F:61:51:51:6F
+Valid until: Friday, 25 December 2054
+----------
+
+> Task :google_sign_in_android:signingReport
+Variant: debugAndroidTest
+Config: debug
+Store: C:\Users\Lakshay\.android\debug.keystore
+Alias: AndroidDebugKey
+MD5: 48:B3:79:41:DD:32:10:84:48:63:21:DE:7A:86:17:EF
+SHA1: 22:3D:69:1D:C1:56:0D:00:20:0D:C3:65:25:1D:14:DD:9D:FC:4F:A2
+SHA-256: 9C:E3:04:DF:24:9A:D9:DF:BA:41:E5:06:D4:12:F0:BC:45:03:FA:7E:14:35:DF:AD:3D:A5:C4:9F:61:51:51:6F
+Valid until: Friday, 25 December 2054
+----------
+
+> Task :path_provider_android:signingReport
+Variant: debugAndroidTest
+Config: debug
+Store: C:\Users\Lakshay\.android\debug.keystore
+Alias: AndroidDebugKey
+MD5: 48:B3:79:41:DD:32:10:84:48:63:21:DE:7A:86:17:EF
+SHA1: 22:3D:69:1D:C1:56:0D:00:20:0D:C3:65:25:1D:14:DD:9D:FC:4F:A2
+SHA-256: 9C:E3:04:DF:24:9A:D9:DF:BA:41:E5:06:D4:12:F0:BC:45:03:FA:7E:14:35:DF:AD:3D:A5:C4:9F:61:51:51:6F
+Valid until: Friday, 25 December 2054
+----------
+
+[Incubating] Problems report is available at: file:///D:/GitHub/trackly/build/reports/problems/problems-report.html
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 9.0.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/8.14/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD SUCCESSFUL in 2s
+10 actionable tasks: 6 executed, 4 up-to-date
