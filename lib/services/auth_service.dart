@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
@@ -11,29 +12,38 @@ class AuthService {
   // Sign in with Google
   Future<UserCredential?> signInWithGoogle() async {
     try {
-      // Trigger the Google Authentication flow
-      final GoogleSignInAccount googleUser = await _googleSignIn.authenticate();
+      if (kIsWeb) {
+        // Use Firebase Popup which preserves custom button UI on Web
+        final GoogleAuthProvider googleProvider = GoogleAuthProvider();
+        return await _auth.signInWithPopup(googleProvider);
+      } else {
+        // Trigger the Google Authentication flow
+        final GoogleSignInAccount googleUser = await _googleSignIn.authenticate();
+        
+        // Obtain the auth details
+        final GoogleSignInAuthentication googleAuth = googleUser.authentication;
 
-      // Obtain the auth details
-      final GoogleSignInAuthentication googleAuth =
-          await googleUser.authentication;
+        // Create a new credential
+        final OAuthCredential credential = GoogleAuthProvider.credential(
+          idToken: googleAuth.idToken,
+        );
 
-      // Create a new credential
-      final OAuthCredential credential = GoogleAuthProvider.credential(
-        idToken: googleAuth.idToken,
-      );
-
-      // Sign in to Firebase Auth
-      return await _auth.signInWithCredential(credential);
+        // Sign in to Firebase Auth
+        return await _auth.signInWithCredential(credential);
+      }
     } catch (e) {
       print('Error signing in with Google: $e');
-      return null;
+      rethrow;
     }
   }
 
   // Sign out
   Future<void> signOut() async {
-    await _googleSignIn.signOut();
+    try {
+      await _googleSignIn.signOut();
+    } catch (e) {
+      print('Error signing out of Google: $e');
+    }
     await _auth.signOut();
   }
 }

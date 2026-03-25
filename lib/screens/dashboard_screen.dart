@@ -6,6 +6,8 @@ import '../widgets/habit_card.dart';
 import '../services/database_service.dart';
 import 'create_habit_screen.dart';
 import 'calendar_screen.dart';
+import 'profile_screen.dart';
+import 'profile_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -74,48 +76,78 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         ),
                       ).animate().fade(duration: 400.ms).slideX(begin: -0.1),
                       const SizedBox(height: 6),
-                      Text(
-                        'Your Habits',
-                        style: GoogleFonts.outfit(
-                          fontSize: 38,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: -1,
-                          height: 1.1,
-                        ),
-                      ).animate().fade(duration: 500.ms, delay: 100.ms).slideX(begin: -0.1),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.track_changes_rounded,
+                            size: 32,
+                            color: Theme.of(context).colorScheme.primary,
+                          ).animate().fade(duration: 500.ms, delay: 100.ms).scaleXY(begin: 0.8),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Your Habits',
+                            style: GoogleFonts.outfit(
+                              fontSize: 38,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: -1,
+                              height: 1.1,
+                            ),
+                          ).animate().fade(duration: 500.ms, delay: 100.ms).slideX(begin: -0.1),
+                        ],
+                      ),
                     ],
                   ),
-                  StreamBuilder<List<Habit>>(
-                    stream: _db.streamHabits(),
-                    builder: (context, snapshot) {
-                      final habits = snapshot.data ?? [];
-                      return Container(
-                        decoration: BoxDecoration(
-                          color: Theme.of(context).colorScheme.surface,
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: Colors.white10),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.2),
-                              blurRadius: 10,
-                              offset: const Offset(0, 4),
+                  Row(
+                    children: [
+                      StreamBuilder<List<Habit>>(
+                        stream: _db.streamHabits(),
+                        builder: (context, snapshot) {
+                          final habits = snapshot.data ?? [];
+                          return Container(
+                            decoration: BoxDecoration(
+                              color: Theme.of(context).colorScheme.surface,
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: Colors.white10),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.2),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ]
                             ),
-                          ]
-                        ),
-                        child: IconButton(
-                          icon: const Icon(Icons.calendar_month_rounded, size: 28),
-                          color: Colors.white70,
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => CalendarScreen(habits: habits),
-                              ),
-                            );
-                          },
-                        ),
-                      ).animate().scale(delay: 200.ms, curve: Curves.easeOutBack);
-                    }
+                            child: IconButton(
+                              icon: const Icon(Icons.calendar_month_rounded, size: 28),
+                              color: Colors.white70,
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => CalendarScreen(habits: habits),
+                                  ),
+                                );
+                              },
+                            ),
+                          ).animate().scale(delay: 200.ms, curve: Curves.easeOutBack);
+                        }
+                      ),
+                      const SizedBox(width: 12),
+                      GestureDetector(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const ProfileScreen(),
+                            ),
+                          );
+                        },
+                        child: CircleAvatar(
+                          radius: 24,
+                          backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                          child: Icon(Icons.track_changes_rounded, color: Theme.of(context).colorScheme.primary),
+                        ).animate().scale(delay: 300.ms, curve: Curves.easeOutBack),
+                      ),
+                    ],
                   ),
                 ],
               ),

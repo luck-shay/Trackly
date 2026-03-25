@@ -16,10 +16,26 @@ class _LoginScreenState extends State<LoginScreen> {
 
   void _handleGoogleSignIn() async {
     setState(() => _isLoading = true);
-    await _authService.signInWithGoogle();
     
-    if (mounted) {
-      setState(() => _isLoading = false);
+    try {
+      await _authService.signInWithGoogle();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Sign in failed. Check console for details.\nError: ${e.toString().split('\n').first}',
+              style: const TextStyle(color: Colors.white),
+            ),
+            backgroundColor: Colors.red.shade800,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -35,10 +51,13 @@ class _LoginScreenState extends State<LoginScreen> {
             children: [
               const Spacer(),
               Icon(
-                Icons.track_changes_rounded,
-                size: 100,
-                color: Theme.of(context).colorScheme.primary,
-              ).animate().fade(duration: 500.ms).scaleXY(begin: 0.8, curve: Curves.easeOutBack),
+                    Icons.track_changes_rounded,
+                    size: 100,
+                    color: Theme.of(context).colorScheme.primary,
+                  )
+                  .animate()
+                  .fade(duration: 500.ms)
+                  .scaleXY(begin: 0.8, curve: Curves.easeOutBack),
               const SizedBox(height: 32),
               Text(
                 'Trackly',
@@ -61,9 +80,11 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               ).animate().fade(delay: 200.ms).slideY(begin: 0.1),
               const Spacer(),
-              
+
               if (_isLoading)
-                const Center(child: CircularProgressIndicator(color: Color(0xFF00E676)))
+                const Center(
+                  child: CircularProgressIndicator(color: Color(0xFF00E676)),
+                )
               else
                 ElevatedButton(
                   onPressed: _handleGoogleSignIn,
@@ -79,7 +100,14 @@ class _LoginScreenState extends State<LoginScreen> {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Text('G', style: GoogleFonts.outfit(fontSize: 24, fontWeight: FontWeight.w900, color: Colors.black)),
+                      Text(
+                        'G',
+                        style: GoogleFonts.outfit(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w900,
+                          color: Colors.black,
+                        ),
+                      ),
                       const SizedBox(width: 12),
                       Text(
                         'Continue with Google',

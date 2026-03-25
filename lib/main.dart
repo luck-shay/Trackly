@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -9,10 +10,15 @@ import 'screens/login_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
-  await GoogleSignIn.instance.initialize();
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
+  if (!kIsWeb) {
+    await GoogleSignIn.instance.initialize(
+      serverClientId:
+          '852142844109-k39c43icuhgd4nqheh3j33rird17a2bu.apps.googleusercontent.com',
+    );
+  }
+
   runApp(const MyApp());
 }
 
@@ -34,10 +40,11 @@ class MyApp extends StatelessWidget {
           surface: Color(0xFF1A1A1A),
           onSurface: Colors.white,
         ),
-        textTheme: GoogleFonts.outfitTextTheme(ThemeData.dark().textTheme).copyWith(
-          titleLarge: GoogleFonts.outfit(fontWeight: FontWeight.bold),
-          bodyMedium: GoogleFonts.inter(),
-        ),
+        textTheme: GoogleFonts.outfitTextTheme(ThemeData.dark().textTheme)
+            .copyWith(
+              titleLarge: GoogleFonts.outfit(fontWeight: FontWeight.bold),
+              bodyMedium: GoogleFonts.inter(),
+            ),
         appBarTheme: const AppBarTheme(
           backgroundColor: Colors.transparent,
           elevation: 0,
@@ -60,7 +67,9 @@ class MyApp extends StatelessWidget {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Scaffold(
               backgroundColor: Color(0xFF101010),
-              body: Center(child: CircularProgressIndicator(color: Color(0xFF00E676))),
+              body: Center(
+                child: CircularProgressIndicator(color: Color(0xFF00E676)),
+              ),
             );
           }
           if (snapshot.hasData && snapshot.data != null) {
