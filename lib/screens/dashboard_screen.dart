@@ -7,7 +7,6 @@ import '../services/database_service.dart';
 import 'create_habit_screen.dart';
 import 'calendar_screen.dart';
 import 'profile_screen.dart';
-import 'profile_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
