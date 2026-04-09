@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import '../services/auth_service.dart';
 import '../models/habit.dart';
 import '../widgets/habit_card.dart';
 import '../services/database_service.dart';
 import 'create_habit_screen.dart';
 import 'calendar_screen.dart';
 import 'profile_screen.dart';
+import 'friends_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -18,21 +21,41 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen> {
   final DatabaseService _db = DatabaseService();
 
+  @override
+  void initState() {
+    super.initState();
+    _checkAndSyncUser();
+  }
+
+  Future<void> _checkAndSyncUser() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      await AuthService().syncUserToFirestore(user);
+    }
+  }
+
   Future<void> _toggleHabitCompletion(Habit habit) async {
     DateTime now = DateTime.now();
     bool foundToday = false;
+    final userId = _db.userId;
     
-    for (int i = 0; i < habit.completionDates.length; i++) {
-        var date = habit.completionDates[i];
+    if (!habit.completions.containsKey(userId)) {
+      habit.completions[userId] = [];
+    }
+    
+    final userCompletions = habit.completions[userId]!;
+    
+    for (int i = 0; i < userCompletions.length; i++) {
+        var date = userCompletions[i];
         if (date.year == now.year && date.month == now.month && date.day == now.day) {
-          habit.completionDates.removeAt(i);
+          userCompletions.removeAt(i);
           foundToday = true;
           break;
         }
     }
     
     if (!foundToday) {
-      habit.completionDates.add(now);
+      userCompletions.add(now);
     }
 
     // Save back to Firestore
@@ -62,8 +85,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         dateStr.toUpperCase(),
@@ -83,19 +107,27 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             color: Theme.of(context).colorScheme.primary,
                           ).animate().fade(duration: 500.ms, delay: 100.ms).scaleXY(begin: 0.8),
                           const SizedBox(width: 8),
-                          Text(
-                            'Your Habits',
-                            style: GoogleFonts.outfit(
-                              fontSize: 38,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: -1,
-                              height: 1.1,
+                          Expanded(
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              alignment: Alignment.centerLeft,
+                              child: Text(
+                                'Your Habits',
+                                style: GoogleFonts.outfit(
+                                  fontSize: 38,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: -1,
+                                  height: 1.1,
+                                ),
+                              ),
                             ),
                           ).animate().fade(duration: 500.ms, delay: 100.ms).slideX(begin: -0.1),
                         ],
                       ),
                     ],
                   ),
+                  ),
+                  const SizedBox(width: 8),
                   Row(
                     children: [
                       StreamBuilder<List<Habit>>(
@@ -130,6 +162,26 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           ).animate().scale(delay: 200.ms, curve: Curves.easeOutBack);
                         }
                       ),
+                      const SizedBox(width: 8),
+                      Container(
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.surface,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: Colors.white10),
+                        ),
+                        child: IconButton(
+                          icon: const Icon(Icons.people_alt_rounded, size: 28),
+                          color: Colors.white70,
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const FriendsScreen(),
+                              ),
+                            );
+                          },
+                        ),
+                      ).animate().scale(delay: 250.ms, curve: Curves.easeOutBack),
                       const SizedBox(width: 12),
                       GestureDetector(
                         onTap: () {
@@ -225,6 +277,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         },
                         child: HabitCard(
                           habit: habit,
+                          currentUserId: _db.userId,
                           onCheck: () => _toggleHabitCompletion(habit),
                         ).animate().fade(delay: (50 * index).ms).slideY(begin: 0.2),
                       );

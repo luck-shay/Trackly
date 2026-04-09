@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../models/habit.dart';
+import '../models/user_profile.dart';
+import '../services/social_service.dart';
 
 class CreateHabitScreen extends StatefulWidget {
   const CreateHabitScreen({super.key});
@@ -15,16 +18,20 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
   String _title = '';
   String _description = '';
   int _targetDays = 7;
+  final List<String> _selectedFriends = [];
 
   void _saveHabit() {
     if (_formKey.currentState!.validate()) {
       _formKey.currentState!.save();
+      final currentUserId = FirebaseAuth.instance.currentUser?.uid ?? '';
+      
       final newHabit = Habit(
         id: DateTime.now().millisecondsSinceEpoch.toString(),
         title: _title,
         description: _description,
         createdAt: DateTime.now(),
         targetDaysPerWeek: _targetDays,
+        participants: [currentUserId, ..._selectedFriends].toSet().toList(),
       );
       Navigator.pop(context, newHabit);
     }
@@ -172,6 +179,51 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
                 ),
               ).animate().fade(delay: 350.ms),
               
+              const SizedBox(height: 40),
+              
+              Text(
+                'SHARE WITH FRIENDS',
+                style: GoogleFonts.inter(
+                  fontSize: 12, 
+                  fontWeight: FontWeight.bold, 
+                  color: Colors.grey[500],
+                  letterSpacing: 1.2
+                ),
+              ).animate().fade(delay: 400.ms),
+              const SizedBox(height: 12),
+              
+              StreamBuilder<List<UserProfile>>(
+                stream: SocialService().streamFriends(),
+                builder: (context, snapshot) {
+                   if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                     return Text('No friends to share with.', style: GoogleFonts.inter(color: Colors.grey[600])).animate().fade(delay: 450.ms);
+                   }
+                   return Wrap(
+                     spacing: 8,
+                     runSpacing: 8,
+                     children: snapshot.data!.map((friend) {
+                        final isSelected = _selectedFriends.contains(friend.uid);
+                        return FilterChip(
+                          label: Text(friend.displayName, style: GoogleFonts.inter(color: isSelected ? Colors.black : Colors.white)),
+                          selected: isSelected,
+                          selectedColor: Theme.of(context).colorScheme.primary,
+                          backgroundColor: Theme.of(context).colorScheme.surface,
+                          checkmarkColor: Colors.black,
+                          onSelected: (selected) {
+                             setState(() {
+                               if (selected) {
+                                 _selectedFriends.add(friend.uid);
+                               } else {
+                                 _selectedFriends.remove(friend.uid);
+                               }
+                             });
+                          },
+                        );
+                     }).toList(),
+                   ).animate().fade(delay: 450.ms);
+                }
+              ),
+
               const SizedBox(height: 60),
 
               // Save Button

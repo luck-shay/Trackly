@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:table_calendar/table_calendar.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../models/habit.dart';
 
 class CalendarScreen extends StatefulWidget {
@@ -19,8 +20,10 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
   // Determine which habits were completed on a given day
   List<Habit> _getEventsForDay(DateTime day) {
+    final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
     return widget.habits.where((habit) {
-      return habit.completionDates.any((d) => 
+      final userCompletions = habit.completions[uid] ?? [];
+      return userCompletions.any((d) => 
         d.year == day.year && d.month == day.month && d.day == day.day
       );
     }).toList();
@@ -181,7 +184,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
               style: GoogleFonts.outfit(fontWeight: FontWeight.w600, fontSize: 18),
             ),
             trailing: Text(
-              '${habit.currentStreak} 🔥',
+              '${habit.currentStreakFor(FirebaseAuth.instance.currentUser?.uid ?? '')} 🔥',
               style: GoogleFonts.outfit(
                 color: Colors.orange,
                 fontWeight: FontWeight.bold,

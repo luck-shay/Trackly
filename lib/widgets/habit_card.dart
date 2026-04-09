@@ -6,11 +6,13 @@ import '../models/habit.dart';
 class HabitCard extends StatefulWidget {
   final Habit habit;
   final VoidCallback onCheck;
+  final String currentUserId;
 
   const HabitCard({
     super.key,
     required this.habit,
     required this.onCheck,
+    required this.currentUserId,
   });
 
   @override
@@ -36,7 +38,9 @@ class _HabitCardState extends State<HabitCard> with SingleTickerProviderStateMix
   Widget build(BuildContext context) {
     bool completedToday = false;
     DateTime now = DateTime.now();
-    for (var date in widget.habit.completionDates) {
+    final userCompletions = widget.habit.completions[widget.currentUserId] ?? [];
+    
+    for (var date in userCompletions) {
       if (date.year == now.year && date.month == now.month && date.day == now.day) {
         completedToday = true;
         break;
@@ -116,15 +120,26 @@ class _HabitCardState extends State<HabitCard> with SingleTickerProviderStateMix
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        widget.habit.title,
-                        style: GoogleFonts.outfit(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w600,
-                          color: completedToday ? Colors.grey[300] : Colors.white,
-                          decoration: completedToday ? TextDecoration.lineThrough : null,
-                          decorationColor: Theme.of(context).colorScheme.primary,
-                        ),
+                      Row(
+                        children: [
+                          if (widget.habit.participants.length > 1) ...[
+                            Icon(Icons.people_alt_rounded, color: Theme.of(context).colorScheme.secondary, size: 16),
+                            const SizedBox(width: 6),
+                          ],
+                          Flexible(
+                            child: Text(
+                              widget.habit.title,
+                              style: GoogleFonts.outfit(
+                                fontSize: 20,
+                                fontWeight: FontWeight.w600,
+                                color: completedToday ? Colors.grey[300] : Colors.white,
+                                decoration: completedToday ? TextDecoration.lineThrough : null,
+                                decorationColor: Theme.of(context).colorScheme.primary,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
                       ),
                       if (widget.habit.description.isNotEmpty) ...[
                         const SizedBox(height: 4),
@@ -145,7 +160,7 @@ class _HabitCardState extends State<HabitCard> with SingleTickerProviderStateMix
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   decoration: BoxDecoration(
-                    color: widget.habit.currentStreak > 0 
+                    color: widget.habit.currentStreakFor(widget.currentUserId) > 0 
                         ? Colors.orange.withOpacity(0.1)
                         : Colors.white.withOpacity(0.05),
                     borderRadius: BorderRadius.circular(12),
@@ -154,19 +169,19 @@ class _HabitCardState extends State<HabitCard> with SingleTickerProviderStateMix
                     children: [
                       Icon(
                         Icons.local_fire_department_rounded, 
-                        color: widget.habit.currentStreak > 0 ? Colors.orange : Colors.grey[600], 
+                        color: widget.habit.currentStreakFor(widget.currentUserId) > 0 ? Colors.orange : Colors.grey[600], 
                         size: 20
                       )
                       .animate(
-                        target: (widget.habit.currentStreak >= 2 && completedToday) ? 1 : 0,
+                        target: (widget.habit.currentStreakFor(widget.currentUserId) >= 2 && completedToday) ? 1 : 0,
                       ).scaleXY(end: 1.2, duration: 200.ms).then().scaleXY(end: 1.0, duration: 200.ms),
                       const SizedBox(width: 4),
                       Text(
-                        '${widget.habit.currentStreak}',
+                        '${widget.habit.currentStreakFor(widget.currentUserId)}',
                         style: GoogleFonts.outfit(
                           fontWeight: FontWeight.w700,
                           fontSize: 16,
-                          color: widget.habit.currentStreak > 0 ? Colors.orange : Colors.grey[600],
+                          color: widget.habit.currentStreakFor(widget.currentUserId) > 0 ? Colors.orange : Colors.grey[600],
                         ),
                       ),
                     ],

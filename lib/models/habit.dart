@@ -3,7 +3,8 @@ class Habit {
   final String title;
   final String description;
   final DateTime createdAt;
-  List<DateTime> completionDates;
+  Map<String, List<DateTime>> completions;
+  List<String> participants;
   final int targetDaysPerWeek;
 
   Habit({
@@ -11,20 +12,24 @@ class Habit {
     required this.title,
     this.description = '',
     required this.createdAt,
-    List<DateTime>? completionDates,
+    Map<String, List<DateTime>>? completions,
+    List<String>? participants,
     this.targetDaysPerWeek = 7,
-  }) : completionDates = completionDates ?? [];
+  })  : completions = completions ?? {},
+        participants = participants ?? [];
 
-  // Calculate current streak based on completion dates
-  int get currentStreak {
-    if (completionDates.isEmpty) return 0;
+  // Calculate current streak based on completion dates for a specific user
+  int currentStreakFor(String userId) {
+    if (!completions.containsKey(userId) || completions[userId]!.isEmpty) return 0;
     
     int streak = 0;
     DateTime now = DateTime.now();
     DateTime today = DateTime(now.year, now.month, now.day);
     
+    List<DateTime> userCompletions = completions[userId]!;
+    
     // Sort descending
-    List<DateTime> sorted = List.from(completionDates)
+    List<DateTime> sorted = List.from(userCompletions)
       ..sort((a, b) => b.compareTo(a));
     
     // Normalize to dates only
@@ -55,21 +60,29 @@ class Habit {
       'title': title,
       'description': description,
       'createdAt': createdAt.toIso8601String(),
-      'completionDates': completionDates.map((d) => d.toIso8601String()).toList(),
+      'completions': completions.map((key, value) => MapEntry(key, value.map((d) => d.toIso8601String()).toList())),
+      'participants': participants,
       'targetDaysPerWeek': targetDaysPerWeek,
     };
   }
 
   // Parse from Firestore Map
-  factory Habit.fromMap(Map<String, dynamic> map) {
+  factory Habit.fromMap(Map<String, dynamic> map, {String? id}) {
+     Map<String, List<DateTime>> parsedCompletions = {};
+     if (map['completions'] != null) {
+       final rawCompletions = Map<String, dynamic>.from(map['completions']);
+       rawCompletions.forEach((key, value) {
+         parsedCompletions[key] = (value as List<dynamic>).map((d) => DateTime.parse(d as String)).toList();
+       });
+     }
+
     return Habit(
-      id: map['id'] ?? '',
+      id: id ?? map['id'] ?? '',
       title: map['title'] ?? '',
       description: map['description'] ?? '',
       createdAt: map['createdAt'] != null ? DateTime.parse(map['createdAt']) : DateTime.now(),
-      completionDates: (map['completionDates'] as List<dynamic>?)
-          ?.map((d) => DateTime.parse(d as String))
-          .toList() ?? [],
+      completions: parsedCompletions,
+      participants: List<String>.from(map['participants'] ?? []),
       targetDaysPerWeek: map['targetDaysPerWeek']?.toInt() ?? 7,
     );
   }
