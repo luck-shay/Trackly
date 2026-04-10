@@ -2,6 +2,7 @@ class UserProfile {
   final String uid;
   final String email;
   final String displayName;
+  final String? username;
   final String? photoUrl;
   final List<String> friends;
 
@@ -9,6 +10,7 @@ class UserProfile {
     required this.uid,
     required this.email,
     required this.displayName,
+    this.username,
     this.photoUrl,
     List<String>? friends,
   }) : friends = friends ?? [];
@@ -18,6 +20,7 @@ class UserProfile {
       'uid': uid,
       'email': email,
       'displayName': displayName,
+      'username': username,
       'photoUrl': photoUrl,
       'friends': friends,
     };
@@ -28,6 +31,7 @@ class UserProfile {
       uid: map['uid'] ?? '',
       email: map['email'] ?? '',
       displayName: map['displayName'] ?? '',
+      username: map['username'],
       photoUrl: map['photoUrl'],
       friends: List<String>.from(map['friends'] ?? []),
     );

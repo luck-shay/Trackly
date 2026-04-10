@@ -20,7 +20,7 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
   int _targetDays = 7;
   final List<String> _selectedFriends = [];
 
-  void _saveHabit() {
+  void _saveHabit() async {
     if (_formKey.currentState!.validate()) {
       _formKey.currentState!.save();
       final currentUserId = FirebaseAuth.instance.currentUser?.uid ?? '';
@@ -31,9 +31,17 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
         description: _description,
         createdAt: DateTime.now(),
         targetDaysPerWeek: _targetDays,
-        participants: [currentUserId, ..._selectedFriends].toSet().toList(),
+        participants: [currentUserId], // Do not forcefully inject friends!
       );
-      Navigator.pop(context, newHabit);
+      
+      // Send invitations to selected friends
+      for (final friendUid in _selectedFriends) {
+        await SocialService().sendHabitInvite(habitId: newHabit.id, toUserId: friendUid);
+      }
+      
+      if (mounted) {
+        Navigator.pop(context, newHabit);
+      }
     }
   }
 

@@ -38,4 +38,13 @@ class DatabaseService {
         .doc(habitId)
         .delete();
   }
+
+  // Get a habit by ID
+  Future<Habit?> getHabitById(String habitId) async {
+    final doc = await _db.collection('habits').doc(habitId).get();
+    if (doc.exists && doc.data() != null) {
+      return Habit.fromMap(doc.data()!, id: doc.id);
+    }
+    return null;
+  }
 }

@@ -7,9 +7,6 @@ import '../models/habit.dart';
 import '../widgets/habit_card.dart';
 import '../services/database_service.dart';
 import 'create_habit_screen.dart';
-import 'calendar_screen.dart';
-import 'profile_screen.dart';
-import 'friends_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -58,7 +55,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
       userCompletions.add(now);
     }
 
-    // Save back to Firestore
     await _db.saveHabit(habit);
   }
 
@@ -81,125 +77,79 @@ class _DashboardScreenState extends State<DashboardScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Padding(
-              padding: const EdgeInsets.only(left: 24.0, right: 24.0, top: 40.0, bottom: 20.0),
+              padding: const EdgeInsets.only(left: 24.0, right: 24.0, top: 20.0, bottom: 20.0),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        dateStr.toUpperCase(),
-                        style: GoogleFonts.inter(
-                          color: Theme.of(context).colorScheme.primary,
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 1.2,
-                        ),
-                      ).animate().fade(duration: 400.ms).slideX(begin: -0.1),
-                      const SizedBox(height: 6),
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.track_changes_rounded,
-                            size: 32,
+                      children: [
+                        Text(
+                          dateStr.toUpperCase(),
+                          style: GoogleFonts.inter(
                             color: Theme.of(context).colorScheme.primary,
-                          ).animate().fade(duration: 500.ms, delay: 100.ms).scaleXY(begin: 0.8),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: FittedBox(
-                              fit: BoxFit.scaleDown,
-                              alignment: Alignment.centerLeft,
-                              child: Text(
-                                'Your Habits',
-                                style: GoogleFonts.outfit(
-                                  fontSize: 38,
-                                  fontWeight: FontWeight.w800,
-                                  letterSpacing: -1,
-                                  height: 1.1,
-                                ),
-                              ),
-                            ),
-                          ).animate().fade(duration: 500.ms, delay: 100.ms).slideX(begin: -0.1),
-                        ],
-                      ),
-                    ],
-                  ),
-                  ),
-                  const SizedBox(width: 8),
-                  Row(
-                    children: [
-                      StreamBuilder<List<Habit>>(
-                        stream: _db.streamHabits(),
-                        builder: (context, snapshot) {
-                          final habits = snapshot.data ?? [];
-                          return Container(
-                            decoration: BoxDecoration(
-                              color: Theme.of(context).colorScheme.surface,
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(color: Colors.white10),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.2),
-                                  blurRadius: 10,
-                                  offset: const Offset(0, 4),
-                                ),
-                              ]
-                            ),
-                            child: IconButton(
-                              icon: const Icon(Icons.calendar_month_rounded, size: 28),
-                              color: Colors.white70,
-                              onPressed: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => CalendarScreen(habits: habits),
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 1.2,
+                          ),
+                        ).animate().fade(duration: 400.ms).slideX(begin: -0.1),
+                        const SizedBox(height: 6),
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.track_changes_rounded,
+                              size: 32,
+                              color: Theme.of(context).colorScheme.primary,
+                            ).animate().fade(duration: 500.ms, delay: 100.ms).scaleXY(begin: 0.8),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                alignment: Alignment.centerLeft,
+                                child: Text(
+                                  'Your Habits',
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 38,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: -1,
+                                    height: 1.1,
                                   ),
-                                );
-                              },
-                            ),
-                          ).animate().scale(delay: 200.ms, curve: Curves.easeOutBack);
-                        }
-                      ),
-                      const SizedBox(width: 8),
-                      Container(
-                        decoration: BoxDecoration(
-                          color: Theme.of(context).colorScheme.surface,
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: Colors.white10),
-                        ),
-                        child: IconButton(
-                          icon: const Icon(Icons.people_alt_rounded, size: 28),
-                          color: Colors.white70,
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => const FriendsScreen(),
+                                ),
                               ),
-                            );
-                          },
+                            ).animate().fade(duration: 500.ms, delay: 100.ms).slideX(begin: -0.1),
+                          ],
                         ),
-                      ).animate().scale(delay: 250.ms, curve: Curves.easeOutBack),
-                      const SizedBox(width: 12),
-                      GestureDetector(
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const ProfileScreen(),
-                            ),
-                          );
-                        },
-                        child: CircleAvatar(
-                          radius: 24,
-                          backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.1),
-                          child: Icon(Icons.track_changes_rounded, color: Theme.of(context).colorScheme.primary),
-                        ).animate().scale(delay: 300.ms, curve: Curves.easeOutBack),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
+                  // Removed top right buttons since they are now in the bottom nav bar!
+                  FloatingActionButton(
+                    mini: true,
+                    elevation: 0,
+                    backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.2),
+                    foregroundColor: Theme.of(context).colorScheme.primary,
+                    onPressed: () async {
+                      final newHabit = await Navigator.push<Habit>(
+                        context,
+                        PageRouteBuilder(
+                          pageBuilder: (context, animation, secondaryAnimation) => const CreateHabitScreen(),
+                          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                            const begin = Offset(0.0, 1.0);
+                            const end = Offset.zero;
+                            const curve = Curves.easeOutCubic;
+                            var tween = Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
+                            return SlideTransition(position: animation.drive(tween), child: child);
+                          },
+                          transitionDuration: const Duration(milliseconds: 400),
+                        ),
+                      );
+                      if (newHabit != null) {
+                        await _db.saveHabit(newHabit);
+                      }
+                    },
+                    child: const Icon(Icons.add),
+                  ).animate().scale(delay: 300.ms, curve: Curves.easeOutBack),
                 ],
               ),
             ),
@@ -250,7 +200,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     );
                   }
 
-                  // Sort habits logically or sequentially
                   habits.sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
                   return ListView.builder(
@@ -289,29 +238,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () async {
-          final newHabit = await Navigator.push<Habit>(
-            context,
-            PageRouteBuilder(
-              pageBuilder: (context, animation, secondaryAnimation) => const CreateHabitScreen(),
-              transitionsBuilder: (context, animation, secondaryAnimation, child) {
-                const begin = Offset(0.0, 1.0);
-                const end = Offset.zero;
-                const curve = Curves.easeOutCubic;
-                var tween = Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
-                return SlideTransition(position: animation.drive(tween), child: child);
-              },
-              transitionDuration: const Duration(milliseconds: 400),
-            ),
-          );
-          if (newHabit != null) {
-            await _db.saveHabit(newHabit);
-          }
-        },
-        child: const Icon(Icons.add, size: 36),
-      ).animate().scale(delay: 500.ms, curve: Curves.easeOutBack),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
     );
   }
 }

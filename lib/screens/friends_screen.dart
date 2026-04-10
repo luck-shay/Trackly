@@ -3,7 +3,9 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/social_service.dart';
+import '../services/database_service.dart';
 import '../models/user_profile.dart';
+import '../models/habit.dart';
 import 'friend_profile_screen.dart';
 
 class FriendsScreen extends StatefulWidget {
@@ -15,6 +17,7 @@ class FriendsScreen extends StatefulWidget {
 
 class _FriendsScreenState extends State<FriendsScreen> {
   final SocialService _social = SocialService();
+  final DatabaseService _db = DatabaseService();
   final TextEditingController _searchController = TextEditingController();
   List<UserProfile> _searchResults = [];
   bool _isSearching = false;
@@ -25,8 +28,8 @@ class _FriendsScreenState extends State<FriendsScreen> {
       _isSearching = true;
       _hasSearched = true;
     });
-    final email = _searchController.text.trim();
-    if (email.isEmpty) {
+    final query = _searchController.text.trim();
+    if (query.isEmpty) {
       setState(() {
         _isSearching = false;
         _searchResults = [];
@@ -34,7 +37,7 @@ class _FriendsScreenState extends State<FriendsScreen> {
       });
       return;
     }
-    final results = await _social.searchUsersByEmail(email);
+    final results = await _social.searchUsersByUsername(query);
     setState(() {
       _searchResults = results;
       _isSearching = false;
@@ -51,10 +54,19 @@ class _FriendsScreenState extends State<FriendsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Friends', style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
+        automaticallyImplyLeading: false,
+        title: Text(
+          'Friends',
+          style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
+        ),
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24.0),
+        padding: const EdgeInsets.only(
+          left: 24.0,
+          right: 24.0,
+          top: 24.0,
+          bottom: 120.0,
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -69,10 +81,13 @@ class _FriendsScreenState extends State<FriendsScreen> {
                 controller: _searchController,
                 style: GoogleFonts.inter(color: Colors.white),
                 decoration: InputDecoration(
-                  hintText: 'Search by exact email...',
+                  hintText: 'Search by @username...',
                   hintStyle: GoogleFonts.inter(color: Colors.grey[600]),
                   border: InputBorder.none,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 16,
+                  ),
                   suffixIcon: IconButton(
                     icon: const Icon(Icons.search, color: Colors.white70),
                     onPressed: _searchUsers,
@@ -86,28 +101,62 @@ class _FriendsScreenState extends State<FriendsScreen> {
             if (_isSearching)
               const Center(child: CircularProgressIndicator())
             else if (_searchResults.isNotEmpty) ...[
-              Text('Search Results', style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.w600)),
+              Text(
+                'Search Results',
+                style: GoogleFonts.outfit(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
               const SizedBox(height: 12),
-              ..._searchResults.map((user) => ListTile(
-                leading: CircleAvatar(
-                  backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.2),
-                  backgroundImage: user.photoUrl != null ? NetworkImage(user.photoUrl!) : null,
-                  child: user.photoUrl == null ? const Icon(Icons.person, color: Colors.white) : null,
-                ),
-                title: Text(user.displayName, style: GoogleFonts.inter(fontWeight: FontWeight.bold)),
-                subtitle: Text(user.email, style: GoogleFonts.inter(fontSize: 12, color: Colors.grey)),
-                trailing: IconButton(
-                  icon: const Icon(Icons.person_add_rounded, color: Color(0xFF00E676)),
-                  onPressed: () async {
-                    await _social.sendFriendRequest(user.uid);
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Friend request sent to ${user.displayName}')),
-                      );
-                    }
-                  },
-                ),
-              )).toList(),
+              ..._searchResults
+                  .map(
+                    (user) => ListTile(
+                      leading: CircleAvatar(
+                        backgroundColor: Theme.of(
+                          context,
+                        ).colorScheme.primary.withOpacity(0.2),
+                        backgroundImage: user.photoUrl != null
+                            ? NetworkImage(user.photoUrl!)
+                            : null,
+                        child: user.photoUrl == null
+                            ? const Icon(Icons.person, color: Colors.white)
+                            : null,
+                      ),
+                      title: Text(
+                        user.displayName,
+                        style: GoogleFonts.inter(fontWeight: FontWeight.bold),
+                      ),
+                      subtitle: Text(
+                        user.username != null
+                            ? '@${user.username}'
+                            : user.email,
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          color: Colors.grey,
+                        ),
+                      ),
+                      trailing: IconButton(
+                        icon: const Icon(
+                          Icons.person_add_rounded,
+                          color: Color(0xFF00E676),
+                        ),
+                        onPressed: () async {
+                          await _social.sendFriendRequest(user.uid);
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  'Friend request sent to ${user.displayName}',
+                                ),
+                              ),
+                            );
+                          }
+                        },
+                      ),
+                    ),
+                  )
+                  .toList(),
               const Divider(color: Colors.white10, height: 48),
             ] else if (_hasSearched && _searchController.text.isNotEmpty) ...[
               Container(
@@ -122,7 +171,7 @@ class _FriendsScreenState extends State<FriendsScreen> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
-                        'No user found globally with the exact email "${_searchController.text}".',
+                        'No user found with the exact username "${_searchController.text}".',
                         style: GoogleFonts.inter(color: Colors.redAccent),
                       ),
                     ),
@@ -132,7 +181,105 @@ class _FriendsScreenState extends State<FriendsScreen> {
               const SizedBox(height: 32),
             ],
 
-            // Pending Requests
+            // Goal Invites
+            StreamBuilder<QuerySnapshot>(
+              stream: _social.streamHabitInvites(),
+              builder: (context, snapshot) {
+                if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                  return const SizedBox.shrink();
+                }
+
+                final invites = snapshot.data!.docs;
+
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Goal Invites',
+                      style: GoogleFonts.outfit(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    ...invites.map((doc) {
+                      final req = doc.data() as Map<String, dynamic>;
+                      final fromUid = req['from'] as String;
+                      final habitId = req['habitId'] as String;
+
+                      return FutureBuilder(
+                        future: Future.wait([
+                          _social.getUserProfile(fromUid),
+                          _db.getHabitById(habitId),
+                        ]),
+                        builder:
+                            (
+                              ctx,
+                              AsyncSnapshot<List<dynamic>> combinedSnapshot,
+                            ) {
+                              if (!combinedSnapshot.hasData)
+                                return const SizedBox.shrink();
+
+                              final user =
+                                  combinedSnapshot.data![0] as UserProfile?;
+                              final habit = combinedSnapshot.data![1] as Habit?;
+
+                              if (user == null || habit == null)
+                                return const SizedBox.shrink();
+
+                              return ListTile(
+                                leading: CircleAvatar(
+                                  backgroundColor: Theme.of(
+                                    context,
+                                  ).colorScheme.secondary.withOpacity(0.2),
+                                  child: const Icon(
+                                    Icons.track_changes_rounded,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                                title: Text(
+                                  habit.title,
+                                  style: GoogleFonts.outfit(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 18,
+                                  ),
+                                ),
+                                subtitle: Text(
+                                  'Invited by ${user.displayName}',
+                                  style: GoogleFonts.inter(color: Colors.grey),
+                                ),
+                                trailing: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    IconButton(
+                                      icon: const Icon(
+                                        Icons.check_circle,
+                                        color: Color(0xFF00E676),
+                                      ),
+                                      onPressed: () => _social
+                                          .acceptHabitInvite(doc.id, habitId),
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(
+                                        Icons.cancel,
+                                        color: Colors.redAccent,
+                                      ),
+                                      onPressed: () =>
+                                          _social.declineHabitInvite(doc.id),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
+                      );
+                    }),
+                    const Divider(color: Colors.white10, height: 48),
+                  ],
+                );
+              },
+            ),
+
+            // Pending Friend Requests
             StreamBuilder<QuerySnapshot>(
               stream: _social.streamIncomingFriendRequests(),
               builder: (context, snapshot) {
@@ -145,50 +292,85 @@ class _FriendsScreenState extends State<FriendsScreen> {
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Friend Requests', style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.w600)),
+                    Text(
+                      'Friend Requests',
+                      style: GoogleFonts.outfit(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                     const SizedBox(height: 12),
                     ...requests.map((doc) {
                       final req = doc.data() as Map<String, dynamic>;
                       final fromUid = req['from'];
-                      
+
                       return FutureBuilder<UserProfile?>(
                         future: _social.getUserProfile(fromUid),
                         builder: (ctx, userSnapshot) {
-                          if (!userSnapshot.hasData) return const SizedBox.shrink();
+                          if (!userSnapshot.hasData)
+                            return const SizedBox.shrink();
                           final user = userSnapshot.data!;
                           return ListTile(
                             leading: CircleAvatar(
                               backgroundColor: Colors.orange.withOpacity(0.2),
-                              backgroundImage: user.photoUrl != null ? NetworkImage(user.photoUrl!) : null,
-                              child: user.photoUrl == null ? const Icon(Icons.person, color: Colors.white) : null,
+                              backgroundImage: user.photoUrl != null
+                                  ? NetworkImage(user.photoUrl!)
+                                  : null,
+                              child: user.photoUrl == null
+                                  ? const Icon(
+                                      Icons.person,
+                                      color: Colors.white,
+                                    )
+                                  : null,
                             ),
-                            title: Text(user.displayName, style: GoogleFonts.inter(fontWeight: FontWeight.bold)),
+                            title: Text(
+                              user.displayName,
+                              style: GoogleFonts.inter(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                             subtitle: const Text('Wants to be friends'),
                             trailing: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 IconButton(
-                                  icon: const Icon(Icons.check_circle, color: Color(0xFF00E676)),
-                                  onPressed: () => _social.acceptFriendRequest(doc.id, fromUid),
+                                  icon: const Icon(
+                                    Icons.check_circle,
+                                    color: Color(0xFF00E676),
+                                  ),
+                                  onPressed: () => _social.acceptFriendRequest(
+                                    doc.id,
+                                    fromUid,
+                                  ),
                                 ),
                                 IconButton(
-                                  icon: const Icon(Icons.cancel, color: Colors.redAccent),
-                                  onPressed: () => _social.declineFriendRequest(doc.id),
+                                  icon: const Icon(
+                                    Icons.cancel,
+                                    color: Colors.redAccent,
+                                  ),
+                                  onPressed: () =>
+                                      _social.declineFriendRequest(doc.id),
                                 ),
                               ],
                             ),
                           );
-                        }
+                        },
                       );
                     }).toList(),
                     const Divider(color: Colors.white10, height: 48),
                   ],
                 );
-              }
+              },
             ),
 
             // Friends List
-            Text('My Friends', style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.w600)),
+            Text(
+              'My Friends',
+              style: GoogleFonts.outfit(
+                fontSize: 20,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
             const SizedBox(height: 12),
             StreamBuilder<List<UserProfile>>(
               stream: _social.streamFriends(),
@@ -197,7 +379,7 @@ class _FriendsScreenState extends State<FriendsScreen> {
                   return const Center(child: CircularProgressIndicator());
                 }
                 final friends = snapshot.data ?? [];
-                
+
                 if (friends.isEmpty) {
                   return Center(
                     child: Padding(
@@ -212,23 +394,49 @@ class _FriendsScreenState extends State<FriendsScreen> {
                 }
 
                 return Column(
-                  children: friends.map((friend) => ListTile(
-                    leading: CircleAvatar(
-                      backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.2),
-                      backgroundImage: friend.photoUrl != null ? NetworkImage(friend.photoUrl!) : null,
-                      child: friend.photoUrl == null ? const Icon(Icons.person, color: Colors.white) : null,
-                    ),
-                    title: Text(friend.displayName, style: GoogleFonts.inter(fontWeight: FontWeight.bold)),
-                    subtitle: Text(friend.email, style: GoogleFonts.inter(fontSize: 12, color: Colors.grey)),
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (context) => FriendProfileScreen(friend: friend)),
-                      );
-                    },
-                  )).toList(),
+                  children: friends
+                      .map(
+                        (friend) => ListTile(
+                          leading: CircleAvatar(
+                            backgroundColor: Theme.of(
+                              context,
+                            ).colorScheme.primary.withOpacity(0.2),
+                            backgroundImage: friend.photoUrl != null
+                                ? NetworkImage(friend.photoUrl!)
+                                : null,
+                            child: friend.photoUrl == null
+                                ? const Icon(Icons.person, color: Colors.white)
+                                : null,
+                          ),
+                          title: Text(
+                            friend.displayName,
+                            style: GoogleFonts.inter(
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          subtitle: Text(
+                            friend.username != null
+                                ? '@${friend.username}'
+                                : friend.email,
+                            style: GoogleFonts.inter(
+                              fontSize: 12,
+                              color: Colors.grey,
+                            ),
+                          ),
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) =>
+                                    FriendProfileScreen(friend: friend),
+                              ),
+                            );
+                          },
+                        ),
+                      )
+                      .toList(),
                 ).animate().fade().slideY(begin: 0.1);
-              }
+              },
             ),
           ],
         ),
