@@ -6,12 +6,14 @@ import '../models/habit.dart';
 class HabitCard extends StatefulWidget {
   final Habit habit;
   final VoidCallback onCheck;
+  final VoidCallback? onCardTap;
   final String currentUserId;
 
   const HabitCard({
     super.key,
     required this.habit,
     required this.onCheck,
+    this.onCardTap,
     required this.currentUserId,
   });
 
@@ -78,9 +80,7 @@ class _HabitCardState extends State<HabitCard> with SingleTickerProviderStateMix
         borderRadius: BorderRadius.circular(24),
         child: InkWell(
           borderRadius: BorderRadius.circular(24),
-          onTap: () {
-            widget.onCheck();
-          },
+          onTap: widget.onCardTap,
           child: Padding(
             padding: const EdgeInsets.all(20.0),
             child: Row(

@@ -7,6 +7,7 @@ import '../models/habit.dart';
 import '../widgets/habit_card.dart';
 import '../services/database_service.dart';
 import 'create_habit_screen.dart';
+import 'habit_leaderboard_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -228,6 +229,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           habit: habit,
                           currentUserId: _db.userId,
                           onCheck: () => _toggleHabitCompletion(habit),
+                          onCardTap: () {
+                            if (habit.participants.length > 1) {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => HabitLeaderboardScreen(habit: habit),
+                                ),
+                              );
+                            }
+                          },
                         ).animate().fade(delay: (50 * index).ms).slideY(begin: 0.2),
                       );
                     },
