@@ -29,7 +29,10 @@ class _HabitLeaderboardView extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('Leaderboard', style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
+        title: Text(
+          'Leaderboard',
+          style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
+        ),
       ),
       body: Column(
         children: [
@@ -40,10 +43,16 @@ class _HabitLeaderboardView extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.primary.withOpacity(0.2),
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.primary.withOpacity(0.2),
                     shape: BoxShape.circle,
                   ),
-                  child: Icon(Icons.leaderboard_rounded, color: Theme.of(context).colorScheme.primary, size: 32),
+                  child: Icon(
+                    Icons.leaderboard_rounded,
+                    color: Theme.of(context).colorScheme.primary,
+                    size: 32,
+                  ),
                 ),
                 const SizedBox(width: 16),
                 Expanded(
@@ -52,12 +61,18 @@ class _HabitLeaderboardView extends StatelessWidget {
                     children: [
                       Text(
                         habit.title,
-                        style: GoogleFonts.outfit(fontSize: 24, fontWeight: FontWeight.bold),
+                        style: GoogleFonts.outfit(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                       const SizedBox(height: 4),
                       Text(
                         '${habit.participants.length} Participant${habit.participants.length != 1 ? 's' : ''}',
-                        style: GoogleFonts.inter(color: Colors.grey[500], fontSize: 14),
+                        style: GoogleFonts.inter(
+                          color: Colors.grey[500],
+                          fontSize: 14,
+                        ),
                       ),
                     ],
                   ),
@@ -73,7 +88,9 @@ class _HabitLeaderboardView extends StatelessWidget {
                   return const Center(child: CircularProgressIndicator());
                 }
                 if (provider.error != null) {
-                  return Center(child: Text('Error loading leaderboard: ${provider.error}'));
+                  return Center(
+                    child: Text('Error loading leaderboard: ${provider.error}'),
+                  );
                 }
 
                 final participants = provider.participants;
@@ -88,88 +105,147 @@ class _HabitLeaderboardView extends StatelessWidget {
                   itemBuilder: (context, index) {
                     final user = participants[index];
                     final streak = habit.currentStreakFor(user.uid);
-                    
+
                     Color medalColor;
                     Widget? rankBadge;
-                    
+
                     if (index == 0) {
                       medalColor = const Color(0xFFFFD700); // Gold
-                      rankBadge = const Text('🥇', style: TextStyle(fontSize: 24));
+                      rankBadge = const Text(
+                        '🥇',
+                        style: TextStyle(fontSize: 24),
+                      );
                     } else if (index == 1) {
                       medalColor = const Color(0xFFC0C0C0); // Silver
-                      rankBadge = const Text('🥈', style: TextStyle(fontSize: 24));
+                      rankBadge = const Text(
+                        '🥈',
+                        style: TextStyle(fontSize: 24),
+                      );
                     } else if (index == 2) {
                       medalColor = const Color(0xFFCD7F32); // Bronze
-                      rankBadge = const Text('🥉', style: TextStyle(fontSize: 24));
+                      rankBadge = const Text(
+                        '🥉',
+                        style: TextStyle(fontSize: 24),
+                      );
                     } else {
                       medalColor = Colors.grey[800]!;
                       rankBadge = Container(
                         width: 24,
                         alignment: Alignment.center,
-                        child: Text('#${index + 1}', style: GoogleFonts.inter(fontWeight: FontWeight.bold, color: Colors.grey[500])),
+                        child: Text(
+                          '#${index + 1}',
+                          style: GoogleFonts.inter(
+                            fontWeight: FontWeight.bold,
+                            color: Colors.grey[500],
+                          ),
+                        ),
                       );
                     }
 
                     return Container(
-                      margin: const EdgeInsets.only(bottom: 12),
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.surface,
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: index == 0 ? medalColor.withOpacity(0.5) : Colors.white.withOpacity(0.05)),
-                        boxShadow: index == 0 ? [
-                          BoxShadow(
-                            color: medalColor.withOpacity(0.1),
-                            blurRadius: 10,
-                            spreadRadius: 2,
-                          )
-                        ] : null,
-                      ),
-                      child: ListTile(
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                        leading: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            rankBadge,
-                            const SizedBox(width: 16),
-                            CircleAvatar(
-                              backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.1),
-                              backgroundImage: user.photoUrl != null ? NetworkImage(user.photoUrl!) : null,
-                              child: user.photoUrl == null ? Icon(Icons.person, color: Theme.of(context).colorScheme.primary) : null,
-                            ),
-                          ],
-                        ),
-                        title: Text(
-                          user.displayName,
-                          style: GoogleFonts.inter(fontWeight: FontWeight.bold, color: index == 0 ? medalColor : Colors.white),
-                        ),
-                        subtitle: Text(
-                          user.username != null ? '@${user.username}' : user.email,
-                          style: GoogleFonts.inter(fontSize: 12, color: Colors.grey[500]),
-                        ),
-                        trailing: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          margin: const EdgeInsets.only(bottom: 12),
                           decoration: BoxDecoration(
-                            color: streak > 0 ? Colors.orange.withOpacity(0.1) : Colors.black26,
-                            borderRadius: BorderRadius.circular(12),
+                            color: Theme.of(context).colorScheme.surface,
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: index == 0
+                                  ? medalColor.withOpacity(0.5)
+                                  : Colors.white.withOpacity(0.05),
+                            ),
+                            boxShadow: index == 0
+                                ? [
+                                    BoxShadow(
+                                      color: medalColor.withOpacity(0.1),
+                                      blurRadius: 10,
+                                      spreadRadius: 2,
+                                    ),
+                                  ]
+                                : null,
                           ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.local_fire_department_rounded, color: streak > 0 ? Colors.orange : Colors.grey[600], size: 20),
-                              const SizedBox(width: 4),
-                              Text(
-                                '$streak',
-                                style: GoogleFonts.outfit(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 18,
-                                  color: streak > 0 ? Colors.orange : Colors.grey[600],
+                          child: ListTile(
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 20,
+                              vertical: 8,
+                            ),
+                            leading: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                rankBadge,
+                                const SizedBox(width: 16),
+                                CircleAvatar(
+                                  backgroundColor: Theme.of(
+                                    context,
+                                  ).colorScheme.primary.withOpacity(0.1),
+                                  backgroundImage: user.photoUrl != null
+                                      ? NetworkImage(user.photoUrl!)
+                                      : null,
+                                  child: user.photoUrl == null
+                                      ? Icon(
+                                          Icons.person,
+                                          color: Theme.of(
+                                            context,
+                                          ).colorScheme.primary,
+                                        )
+                                      : null,
                                 ),
+                              ],
+                            ),
+                            title: Text(
+                              user.displayName,
+                              style: GoogleFonts.inter(
+                                fontWeight: FontWeight.bold,
+                                color: index == 0 ? medalColor : Colors.white,
                               ),
-                            ],
+                            ),
+                            subtitle: Text(
+                              user.username != null
+                                  ? '@${user.username}'
+                                  : user.email,
+                              style: GoogleFonts.inter(
+                                fontSize: 12,
+                                color: Colors.grey[500],
+                              ),
+                            ),
+                            trailing: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 8,
+                              ),
+                              decoration: BoxDecoration(
+                                color: streak > 0
+                                    ? Colors.orange.withOpacity(0.1)
+                                    : Colors.black26,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.local_fire_department_rounded,
+                                    color: streak > 0
+                                        ? Colors.orange
+                                        : Colors.grey[600],
+                                    size: 20,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    '$streak',
+                                    style: GoogleFonts.outfit(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 18,
+                                      color: streak > 0
+                                          ? Colors.orange
+                                          : Colors.grey[600],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                           ),
-                        ),
-                      ),
-                    ).animate().fade(delay: (100 * index).ms).slideX(begin: 0.1);
+                        )
+                        .animate()
+                        .fade(delay: (100 * index).ms)
+                        .slideX(begin: 0.1);
                   },
                 );
               },
