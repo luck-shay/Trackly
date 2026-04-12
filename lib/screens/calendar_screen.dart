@@ -24,7 +24,6 @@ class CalendarScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final db = DatabaseService();
-    final calendarProvider = context.watch<CalendarProvider>();
 
     return Scaffold(
       appBar: AppBar(
@@ -56,53 +55,57 @@ class CalendarScreen extends StatelessWidget {
                     )
                   ]
                 ),
-                child: TableCalendar<Habit>(
-                  firstDay: DateTime.utc(2020, 10, 16),
-                  lastDay: DateTime.utc(2030, 3, 14),
-                  focusedDay: calendarProvider.focusedDay,
-                  selectedDayPredicate: (day) {
-                    return isSameDay(calendarProvider.selectedDay, day);
-                  },
-                  onDaySelected: (selectedDay, focusedDay) {
-                    if (!isSameDay(calendarProvider.selectedDay, selectedDay)) {
-                      context.read<CalendarProvider>().selectDay(selectedDay, focusedDay);
-                    }
-                  },
-                  eventLoader: (day) => _getEventsForDay(day, habits),
-                  headerStyle: HeaderStyle(
-                    formatButtonVisible: false,
-                    titleCentered: true,
-                    titleTextStyle: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.bold),
-                  ),
-                  daysOfWeekStyle: DaysOfWeekStyle(
-                    weekdayStyle: GoogleFonts.inter(color: Colors.grey[500]!, fontWeight: FontWeight.w600),
-                    weekendStyle: GoogleFonts.inter(color: Colors.grey[600]!, fontWeight: FontWeight.w600),
-                  ),
-                  calendarStyle: CalendarStyle(
-                    defaultTextStyle: GoogleFonts.inter(color: Colors.white),
-                    weekendTextStyle: GoogleFonts.inter(color: Colors.grey[400]!),
-                    outsideTextStyle: GoogleFonts.inter(color: Colors.grey[800]!),
-                    markerDecoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.primary,
-                      shape: BoxShape.circle,
-                    ),
-                    todayDecoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.primary.withOpacity(0.2),
-                      shape: BoxShape.circle,
-                    ),
-                    todayTextStyle: GoogleFonts.inter(
-                      color: Theme.of(context).colorScheme.primary,
-                      fontWeight: FontWeight.bold,
-                    ),
-                    selectedDecoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.primary,
-                      shape: BoxShape.circle,
-                    ),
-                    selectedTextStyle: GoogleFonts.inter(
-                      color: Colors.black,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
+                child: Consumer<CalendarProvider>(
+                  builder: (context, calendarProvider, child) {
+                    return TableCalendar<Habit>(
+                      firstDay: DateTime.utc(2020, 10, 16),
+                      lastDay: DateTime.utc(2030, 3, 14),
+                      focusedDay: calendarProvider.focusedDay,
+                      selectedDayPredicate: (day) {
+                        return isSameDay(calendarProvider.selectedDay, day);
+                      },
+                      onDaySelected: (selectedDay, focusedDay) {
+                        if (!isSameDay(calendarProvider.selectedDay, selectedDay)) {
+                          context.read<CalendarProvider>().selectDay(selectedDay, focusedDay);
+                        }
+                      },
+                      eventLoader: (day) => _getEventsForDay(day, habits),
+                      headerStyle: HeaderStyle(
+                        formatButtonVisible: false,
+                        titleCentered: true,
+                        titleTextStyle: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.bold),
+                      ),
+                      daysOfWeekStyle: DaysOfWeekStyle(
+                        weekdayStyle: GoogleFonts.inter(color: Colors.grey[500]!, fontWeight: FontWeight.w600),
+                        weekendStyle: GoogleFonts.inter(color: Colors.grey[600]!, fontWeight: FontWeight.w600),
+                      ),
+                      calendarStyle: CalendarStyle(
+                        defaultTextStyle: GoogleFonts.inter(color: Colors.white),
+                        weekendTextStyle: GoogleFonts.inter(color: Colors.grey[400]!),
+                        outsideTextStyle: GoogleFonts.inter(color: Colors.grey[800]!),
+                        markerDecoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.primary,
+                          shape: BoxShape.circle,
+                        ),
+                        todayDecoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.primary.withOpacity(0.2),
+                          shape: BoxShape.circle,
+                        ),
+                        todayTextStyle: GoogleFonts.inter(
+                          color: Theme.of(context).colorScheme.primary,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        selectedDecoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.primary,
+                          shape: BoxShape.circle,
+                        ),
+                        selectedTextStyle: GoogleFonts.inter(
+                          color: Colors.black,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    );
+                  }
                 ),
               ).animate().fade().scaleXY(begin: 0.95),
               const SizedBox(height: 8.0),
@@ -122,14 +125,19 @@ class CalendarScreen extends StatelessWidget {
                 ),
               ),
               Expanded(
-                child: calendarProvider.selectedDay == null 
-                  ? Center(
-                      child: Text(
-                        'Select a day to view your progress.',
-                        style: GoogleFonts.inter(color: Colors.grey[600]),
-                      ),
-                    ).animate().fade(delay: 300.ms)
-                  : _buildEventList(context, _getEventsForDay(calendarProvider.selectedDay!, habits)),
+                child: Consumer<CalendarProvider>(
+                  builder: (context, calendarProvider, child) {
+                    if (calendarProvider.selectedDay == null) {
+                      return Center(
+                        child: Text(
+                          'Select a day to view your progress.',
+                          style: GoogleFonts.inter(color: Colors.grey[600]),
+                        ),
+                      ).animate().fade(delay: 300.ms);
+                    }
+                    return _buildEventList(context, _getEventsForDay(calendarProvider.selectedDay!, habits));
+                  }
+                ),
               ),
               const SizedBox(height: 120), // Spacer for bottom layout
             ],

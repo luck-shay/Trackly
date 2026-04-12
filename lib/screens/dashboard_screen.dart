@@ -2,62 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:provider/provider.dart';
 import '../services/auth_service.dart';
-import '../models/habit.dart';
 import '../widgets/habit_card.dart';
-import '../services/database_service.dart';
+import '../providers/habits_provider.dart';
 import 'create_habit_screen.dart';
 import 'habit_leaderboard_screen.dart';
 
-class DashboardScreen extends StatefulWidget {
+class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key});
-
-  @override
-  State<DashboardScreen> createState() => _DashboardScreenState();
-}
-
-class _DashboardScreenState extends State<DashboardScreen> {
-  final DatabaseService _db = DatabaseService();
-
-  @override
-  void initState() {
-    super.initState();
-    _checkAndSyncUser();
-  }
-
-  Future<void> _checkAndSyncUser() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
-      await AuthService().syncUserToFirestore(user);
-    }
-  }
-
-  Future<void> _toggleHabitCompletion(Habit habit) async {
-    DateTime now = DateTime.now();
-    bool foundToday = false;
-    final userId = _db.userId;
-    
-    if (!habit.completions.containsKey(userId)) {
-      habit.completions[userId] = [];
-    }
-    
-    final userCompletions = habit.completions[userId]!;
-    
-    for (int i = 0; i < userCompletions.length; i++) {
-        var date = userCompletions[i];
-        if (date.year == now.year && date.month == now.month && date.day == now.day) {
-          userCompletions.removeAt(i);
-          foundToday = true;
-          break;
-        }
-    }
-    
-    if (!foundToday) {
-      userCompletions.add(now);
-    }
-
-    await _db.saveHabit(habit);
-  }
 
   String _formatDate(DateTime date) {
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -71,6 +24,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget build(BuildContext context) {
     final today = DateTime.now();
     final dateStr = _formatDate(today);
+
+    // Sync user if necessary once on load (normally done at app start)
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        AuthService().syncUserToFirestore(user);
+      }
+    });
 
     return Scaffold(
       body: SafeArea(
@@ -124,14 +85,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       ],
                     ),
                   ),
-                  // Removed top right buttons since they are now in the bottom nav bar!
                   FloatingActionButton(
                     mini: true,
                     elevation: 0,
                     backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.2),
                     foregroundColor: Theme.of(context).colorScheme.primary,
-                    onPressed: () async {
-                      final newHabit = await Navigator.push<Habit>(
+                    onPressed: () {
+                      Navigator.push(
                         context,
                         PageRouteBuilder(
                           pageBuilder: (context, animation, secondaryAnimation) => CreateHabitScreen(),
@@ -145,9 +105,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           transitionDuration: const Duration(milliseconds: 400),
                         ),
                       );
-                      if (newHabit != null) {
-                        await _db.saveHabit(newHabit);
-                      }
                     },
                     child: const Icon(Icons.add),
                   ).animate().scale(delay: 300.ms, curve: Curves.easeOutBack),
@@ -155,18 +112,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
             ),
             Expanded(
-              child: StreamBuilder<List<Habit>>(
-                stream: _db.streamHabits(),
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
+              child: Consumer<HabitsProvider>(
+                builder: (context, provider, child) {
+                  if (provider.isLoading) {
                     return const Center(child: CircularProgressIndicator(color: Color(0xFF00E676)));
                   }
 
-                  if (snapshot.hasError) {
-                    return Center(child: Text('Error: ${snapshot.error}', style: TextStyle(color: Colors.red)));
+                  if (provider.error != null) {
+                    return Center(child: Text('Error: ${provider.error}', style: const TextStyle(color: Colors.red)));
                   }
 
-                  final habits = snapshot.data ?? [];
+                  final habits = provider.habits;
 
                   if (habits.isEmpty) {
                     return Center(
@@ -201,14 +157,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     );
                   }
 
-                  habits.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-
                   return ListView.builder(
                     physics: const BouncingScrollPhysics(),
                     padding: const EdgeInsets.only(top: 8, bottom: 120),
                     itemCount: habits.length,
                     itemBuilder: (context, index) {
                       final habit = habits[index];
+                      // Provide a unique global key directly to the container to stabilize the entry animation
                       return Dismissible(
                         key: Key(habit.id),
                         direction: DismissDirection.endToStart,
@@ -223,12 +178,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           child: const Icon(Icons.delete_sweep_rounded, color: Colors.white, size: 32),
                         ),
                         onDismissed: (direction) {
-                          _db.deleteHabit(habit.id);
+                          provider.deleteHabit(habit.id);
                         },
                         child: HabitCard(
                           habit: habit,
-                          currentUserId: _db.userId,
-                          onCheck: () => _toggleHabitCompletion(habit),
+                          currentUserId: provider.userId,
+                          onCheck: () => provider.toggleHabitCompletion(habit),
                           onCardTap: () {
                             if (habit.participants.length > 1) {
                               Navigator.push(
@@ -239,7 +194,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               );
                             }
                           },
-                        ).animate().fade(delay: (50 * index).ms).slideY(begin: 0.2),
+                        ).animate(key: ValueKey('anim_${habit.id}')).fade().slideY(begin: 0.2), // Removed dynamic index delay to prevent re-shuffling stutters
                       );
                     },
                   );
@@ -252,3 +207,4 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 }
+

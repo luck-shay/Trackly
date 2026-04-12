@@ -18,6 +18,26 @@ class Habit {
   })  : completions = completions ?? {},
         participants = participants ?? [];
 
+  Habit copyWith({
+    String? id,
+    String? title,
+    String? description,
+    DateTime? createdAt,
+    Map<String, List<DateTime>>? completions,
+    List<String>? participants,
+    int? targetDaysPerWeek,
+  }) {
+    return Habit(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      description: description ?? this.description,
+      createdAt: createdAt ?? this.createdAt,
+      completions: completions ?? this.completions,
+      participants: participants ?? this.participants,
+      targetDaysPerWeek: targetDaysPerWeek ?? this.targetDaysPerWeek,
+    );
+  }
+
   // Calculate current streak based on completion dates for a specific user
   int currentStreakFor(String userId) {
     if (!completions.containsKey(userId) || completions[userId]!.isEmpty) return 0;

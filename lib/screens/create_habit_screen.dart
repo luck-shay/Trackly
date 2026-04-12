@@ -13,7 +13,6 @@ class CreateHabitScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final habitProvider = context.watch<CreateHabitProvider>();
     String title = '';
     String description = '';
 
@@ -49,29 +48,33 @@ class CreateHabitScreen extends StatelessWidget {
                 ),
               ).animate().fade(delay: 100.ms),
               const SizedBox(height: 12),
-              TextFormField(
-                style: GoogleFonts.inter(fontSize: 18),
-                decoration: InputDecoration(
-                  hintText: 'e.g. Morning Run',
-                  hintStyle: TextStyle(color: Colors.grey[700]),
-                  filled: true,
-                  fillColor: Theme.of(context).colorScheme.surface,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide.none,
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide(color: Theme.of(context).colorScheme.primary),
-                  ),
-                ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please give your habit a name.';
-                  }
-                  return null;
-                },
-                onSaved: (value) => title = value!,
+              Consumer<CreateHabitProvider>(
+                builder: (context, provider, child) {
+                  return TextFormField(
+                    style: GoogleFonts.inter(fontSize: 18),
+                    decoration: InputDecoration(
+                      hintText: provider.currentPlaceholder,
+                      hintStyle: TextStyle(color: Colors.grey[700]),
+                      filled: true,
+                      fillColor: Theme.of(context).colorScheme.surface,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide.none,
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide(color: Theme.of(context).colorScheme.primary),
+                      ),
+                    ),
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Please give your habit a name.';
+                      }
+                      return null;
+                    },
+                    onSaved: (value) => title = value!,
+                  );
+                }
               ).animate().fade(delay: 150.ms).slideX(begin: 0.05),
               
               const SizedBox(height: 32),
@@ -116,40 +119,48 @@ class CreateHabitScreen extends StatelessWidget {
                       letterSpacing: 1.2
                     ),
                   ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      '${habitProvider.targetDays} days / week',
-                      style: GoogleFonts.inter(
-                        color: Theme.of(context).colorScheme.primary,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
+                  Consumer<CreateHabitProvider>(
+                    builder: (context, provider, child) {
+                      return Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          '${provider.targetDays} days / week',
+                          style: GoogleFonts.inter(
+                            color: Theme.of(context).colorScheme.primary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      );
+                    }
                   )
                 ],
               ).animate().fade(delay: 300.ms),
               const SizedBox(height: 16),
-              SliderTheme(
-                data: SliderTheme.of(context).copyWith(
-                  activeTrackColor: Theme.of(context).colorScheme.primary,
-                  inactiveTrackColor: Theme.of(context).colorScheme.surface,
-                  thumbColor: Theme.of(context).colorScheme.primary,
-                  overlayColor: Theme.of(context).colorScheme.primary.withOpacity(0.2),
-                  trackHeight: 8.0,
-                ),
-                child: Slider(
-                  value: habitProvider.targetDays.toDouble(),
-                  min: 1,
-                  max: 7,
-                  divisions: 6,
-                  onChanged: (double value) {
-                    context.read<CreateHabitProvider>().setTargetDays(value.toInt());
-                  },
-                ),
+              Consumer<CreateHabitProvider>(
+                builder: (context, provider, child) {
+                  return SliderTheme(
+                    data: SliderTheme.of(context).copyWith(
+                      activeTrackColor: Theme.of(context).colorScheme.primary,
+                      inactiveTrackColor: Theme.of(context).colorScheme.surface,
+                      thumbColor: Theme.of(context).colorScheme.primary,
+                      overlayColor: Theme.of(context).colorScheme.primary.withOpacity(0.2),
+                      trackHeight: 8.0,
+                    ),
+                    child: Slider(
+                      value: provider.targetDays.toDouble(),
+                      min: 1,
+                      max: 7,
+                      divisions: 6,
+                      onChanged: (double value) {
+                        provider.setTargetDays(value.toInt());
+                      },
+                    ),
+                  );
+                }
               ).animate().fade(delay: 350.ms),
               
               const SizedBox(height: 40),
@@ -171,22 +182,26 @@ class CreateHabitScreen extends StatelessWidget {
                    if (!snapshot.hasData || snapshot.data!.isEmpty) {
                      return Text('No friends to share with.', style: GoogleFonts.inter(color: Colors.grey[600])).animate().fade(delay: 450.ms);
                    }
-                   return Wrap(
-                     spacing: 8,
-                     runSpacing: 8,
-                     children: snapshot.data!.map((friend) {
-                        final isSelected = habitProvider.selectedFriends.contains(friend.uid);
-                        return FilterChip(
-                          label: Text(friend.displayName, style: GoogleFonts.inter(color: isSelected ? Colors.black : Colors.white)),
-                          selected: isSelected,
-                          selectedColor: Theme.of(context).colorScheme.primary,
-                          backgroundColor: Theme.of(context).colorScheme.surface,
-                          checkmarkColor: Colors.black,
-                          onSelected: (_) {
-                            context.read<CreateHabitProvider>().toggleFriend(friend.uid);
-                          },
-                        );
-                     }).toList(),
+                   return Consumer<CreateHabitProvider>(
+                     builder: (context, provider, child) {
+                       return Wrap(
+                         spacing: 8,
+                         runSpacing: 8,
+                         children: snapshot.data!.map((friend) {
+                            final isSelected = provider.selectedFriends.contains(friend.uid);
+                            return FilterChip(
+                              label: Text(friend.displayName, style: GoogleFonts.inter(color: isSelected ? Colors.black : Colors.white)),
+                              selected: isSelected,
+                              selectedColor: Theme.of(context).colorScheme.primary,
+                              backgroundColor: Theme.of(context).colorScheme.surface,
+                              checkmarkColor: Colors.black,
+                              onSelected: (_) {
+                                provider.toggleFriend(friend.uid);
+                              },
+                            );
+                         }).toList(),
+                       );
+                     }
                    ).animate().fade(delay: 450.ms);
                 }
               ),

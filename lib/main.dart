@@ -9,6 +9,7 @@ import 'screens/login_screen.dart';
 import 'screens/main_layout_screen.dart';
 import 'package:provider/provider.dart';
 import 'providers/navigation_provider.dart';
+import 'providers/habits_provider.dart';
 import 'providers/calendar_provider.dart';
 import 'providers/friends_provider.dart';
 import 'providers/create_habit_provider.dart';
@@ -39,6 +40,7 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => NavigationProvider()),
         ChangeNotifierProvider(create: (_) => CalendarProvider()),
         ChangeNotifierProvider(create: (_) => FriendsProvider()),
+        ChangeNotifierProvider(create: (_) => HabitsProvider()),
         ChangeNotifierProvider(create: (_) => CreateHabitProvider()),
         ChangeNotifierProvider(create: (_) => ProfileProvider()),
         ChangeNotifierProvider(create: (_) => LoginProvider()),

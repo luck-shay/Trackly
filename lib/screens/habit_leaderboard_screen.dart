@@ -1,35 +1,32 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:provider/provider.dart';
 import '../models/habit.dart';
-import '../models/user_profile.dart';
-import '../services/social_service.dart';
+import '../providers/habit_leaderboard_provider.dart';
 
-class HabitLeaderboardScreen extends StatefulWidget {
+class HabitLeaderboardScreen extends StatelessWidget {
   final Habit habit;
 
   const HabitLeaderboardScreen({super.key, required this.habit});
 
   @override
-  State<HabitLeaderboardScreen> createState() => _HabitLeaderboardScreenState();
+  Widget build(BuildContext context) {
+    return ChangeNotifierProvider(
+      create: (_) => HabitLeaderboardProvider(habit),
+      child: const _HabitLeaderboardView(),
+    );
+  }
 }
 
-class _HabitLeaderboardScreenState extends State<HabitLeaderboardScreen> {
-  final SocialService _social = SocialService();
-
-  Future<List<UserProfile>> _fetchParticipants() async {
-    List<UserProfile> list = [];
-    for (String uid in widget.habit.participants) {
-      final profile = await _social.getUserProfile(uid);
-      if (profile != null) {
-        list.add(profile);
-      }
-    }
-    return list;
-  }
+class _HabitLeaderboardView extends StatelessWidget {
+  const _HabitLeaderboardView();
 
   @override
   Widget build(BuildContext context) {
+    final provider = context.watch<HabitLeaderboardProvider>();
+    final habit = provider.habit;
+
     return Scaffold(
       appBar: AppBar(
         title: Text('Leaderboard', style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
@@ -54,12 +51,12 @@ class _HabitLeaderboardScreenState extends State<HabitLeaderboardScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        widget.habit.title,
+                        habit.title,
                         style: GoogleFonts.outfit(fontSize: 24, fontWeight: FontWeight.bold),
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        '${widget.habit.participants.length} Participant${widget.habit.participants.length != 1 ? 's' : ''}',
+                        '${habit.participants.length} Participant${habit.participants.length != 1 ? 's' : ''}',
                         style: GoogleFonts.inter(color: Colors.grey[500], fontSize: 14),
                       ),
                     ],
@@ -70,35 +67,27 @@ class _HabitLeaderboardScreenState extends State<HabitLeaderboardScreen> {
           ),
           const Divider(color: Colors.white10),
           Expanded(
-            child: FutureBuilder<List<UserProfile>>(
-              future: _fetchParticipants(),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
+            child: Builder(
+              builder: (context) {
+                if (provider.isLoading) {
                   return const Center(child: CircularProgressIndicator());
                 }
-                if (snapshot.hasError || !snapshot.hasData) {
-                  return const Center(child: Text('Error loading leaderboard.'));
+                if (provider.error != null) {
+                  return Center(child: Text('Error loading leaderboard: ${provider.error}'));
                 }
 
-                final participants = snapshot.data!;
+                final participants = provider.participants;
 
-                // Sort descending by current streak
-                participants.sort((a, b) {
-                  final streakA = widget.habit.currentStreakFor(a.uid);
-                  final streakB = widget.habit.currentStreakFor(b.uid);
-                  // If tie, sort alphabetically by names
-                  if (streakA == streakB) {
-                    return a.displayName.compareTo(b.displayName);
-                  }
-                  return streakB.compareTo(streakA);
-                });
+                if (participants.isEmpty) {
+                  return const Center(child: Text('No participants found.'));
+                }
 
                 return ListView.builder(
                   padding: const EdgeInsets.all(16.0),
                   itemCount: participants.length,
                   itemBuilder: (context, index) {
                     final user = participants[index];
-                    final streak = widget.habit.currentStreakFor(user.uid);
+                    final streak = habit.currentStreakFor(user.uid);
                     
                     Color medalColor;
                     Widget? rankBadge;

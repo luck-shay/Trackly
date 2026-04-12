@@ -83,109 +83,144 @@ class _HabitCardState extends State<HabitCard> with SingleTickerProviderStateMix
           onTap: widget.onCardTap,
           child: Padding(
             padding: const EdgeInsets.all(20.0),
-            child: Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Animated Checkbox
-                GestureDetector(
-                  onTap: () {
-                    widget.onCheck();
-                  },
-                  child: AnimatedContainer(
-                    duration: 200.ms,
-                    curve: Curves.easeOutCubic,
-                    width: 32,
-                    height: 32,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: completedToday 
-                          ? Theme.of(context).colorScheme.primary 
-                          : Colors.transparent,
-                      border: Border.all(
-                        color: completedToday 
-                            ? Theme.of(context).colorScheme.primary 
-                            : Colors.grey[600]!,
-                        width: 2,
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    // Animated Checkbox
+                    GestureDetector(
+                      onTap: () {
+                        widget.onCheck();
+                      },
+                      child: AnimatedContainer(
+                        duration: 200.ms,
+                        curve: Curves.easeOutCubic,
+                        width: 32,
+                        height: 32,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: completedToday 
+                              ? Theme.of(context).colorScheme.primary 
+                              : Colors.transparent,
+                          border: Border.all(
+                            color: completedToday 
+                                ? Theme.of(context).colorScheme.primary 
+                                : Colors.grey[600]!,
+                            width: 2,
+                          ),
+                        ),
+                        child: Center(
+                          child: completedToday
+                              ? const Icon(Icons.check_rounded, color: Colors.black, size: 20)
+                                  .animate().scale(duration: 200.ms, curve: Curves.easeOutBack)
+                              : null,
+                        ),
                       ),
                     ),
-                    child: Center(
-                      child: completedToday
-                          ? const Icon(Icons.check_rounded, color: Colors.black, size: 20)
-                              .animate().scale(duration: 200.ms, curve: Curves.easeOutBack)
-                          : null,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 20),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
+                    const SizedBox(width: 20),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          if (widget.habit.participants.length > 1) ...[
-                            Icon(Icons.people_alt_rounded, color: Theme.of(context).colorScheme.secondary, size: 16),
-                            const SizedBox(width: 6),
-                          ],
-                          Flexible(
-                            child: Text(
-                              widget.habit.title,
-                              style: GoogleFonts.outfit(
-                                fontSize: 20,
-                                fontWeight: FontWeight.w600,
-                                color: completedToday ? Colors.grey[300] : Colors.white,
-                                decoration: completedToday ? TextDecoration.lineThrough : null,
-                                decorationColor: Theme.of(context).colorScheme.primary,
+                          Row(
+                            children: [
+                              if (widget.habit.participants.length > 1) ...[
+                                Icon(Icons.people_alt_rounded, color: Theme.of(context).colorScheme.secondary, size: 16),
+                                const SizedBox(width: 6),
+                              ],
+                              Flexible(
+                                child: Text(
+                                  widget.habit.title,
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.w600,
+                                    color: completedToday ? Colors.grey[300] : Colors.white,
+                                    decoration: completedToday ? TextDecoration.lineThrough : null,
+                                    decorationColor: Theme.of(context).colorScheme.primary,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                               ),
+                            ],
+                          ),
+                          if (widget.habit.description.isNotEmpty) ...[
+                            const SizedBox(height: 4),
+                            Text(
+                              widget.habit.description,
+                              style: GoogleFonts.inter(
+                                fontSize: 14,
+                                color: Colors.grey[500],
+                              ),
+                              maxLines: 1,
                               overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                    // Streak indicator
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: widget.habit.currentStreakFor(widget.currentUserId) > 0 
+                            ? Colors.orange.withOpacity(0.1)
+                            : Colors.white.withOpacity(0.05),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.local_fire_department_rounded, 
+                            color: widget.habit.currentStreakFor(widget.currentUserId) > 0 ? Colors.orange : Colors.grey[600], 
+                            size: 20
+                          )
+                          .animate(
+                            target: (widget.habit.currentStreakFor(widget.currentUserId) >= 2 && completedToday) ? 1 : 0,
+                          ).scaleXY(end: 1.2, duration: 200.ms).then().scaleXY(end: 1.0, duration: 200.ms),
+                          const SizedBox(width: 4),
+                          Text(
+                            '${widget.habit.currentStreakFor(widget.currentUserId)}',
+                            style: GoogleFonts.outfit(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 16,
+                              color: widget.habit.currentStreakFor(widget.currentUserId) > 0 ? Colors.orange : Colors.grey[600],
                             ),
                           ),
                         ],
                       ),
-                      if (widget.habit.description.isNotEmpty) ...[
-                        const SizedBox(height: 4),
-                        Text(
-                          widget.habit.description,
-                          style: GoogleFonts.inter(
-                            fontSize: 14,
-                            color: Colors.grey[500],
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
-                // Streak indicator
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: widget.habit.currentStreakFor(widget.currentUserId) > 0 
-                        ? Colors.orange.withOpacity(0.1)
-                        : Colors.white.withOpacity(0.05),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.local_fire_department_rounded, 
-                        color: widget.habit.currentStreakFor(widget.currentUserId) > 0 ? Colors.orange : Colors.grey[600], 
-                        size: 20
-                      )
-                      .animate(
-                        target: (widget.habit.currentStreakFor(widget.currentUserId) >= 2 && completedToday) ? 1 : 0,
-                      ).scaleXY(end: 1.2, duration: 200.ms).then().scaleXY(end: 1.0, duration: 200.ms),
-                      const SizedBox(width: 4),
-                      Text(
-                        '${widget.habit.currentStreakFor(widget.currentUserId)}',
-                        style: GoogleFonts.outfit(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 16,
-                          color: widget.habit.currentStreakFor(widget.currentUserId) > 0 ? Colors.orange : Colors.grey[600],
+                const SizedBox(height: 16),
+                // 7-Day History Bubbles
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: List.generate(7, (index) {
+                    final day = now.subtract(Duration(days: 6 - index));
+                    final isCompleted = userCompletions.any((d) => 
+                      d.year == day.year && d.month == day.month && d.day == day.day
+                    );
+                    
+                    return Container(
+                      margin: const EdgeInsets.only(left: 6),
+                      width: 14,
+                      height: 14,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: isCompleted 
+                            ? Theme.of(context).colorScheme.primary 
+                            : Colors.transparent,
+                        border: Border.all(
+                          color: isCompleted 
+                              ? Theme.of(context).colorScheme.primary 
+                              : Colors.grey[700]!,
+                          width: 1.5,
                         ),
                       ),
-                    ],
-                  ),
+                    );
+                  }),
                 ),
               ],
             ),
