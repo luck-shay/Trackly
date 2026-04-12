@@ -2,36 +2,33 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
 
+import '../providers/navigation_provider.dart';
 import 'dashboard_screen.dart';
 import 'calendar_screen.dart';
 import 'friends_screen.dart';
 import 'profile_screen.dart';
 
-class MainLayoutScreen extends StatefulWidget {
-  const MainLayoutScreen({super.key});
-
-  @override
-  State<MainLayoutScreen> createState() => _MainLayoutScreenState();
-}
-
-class _MainLayoutScreenState extends State<MainLayoutScreen> {
-  int _currentIndex = 0;
+class MainLayoutScreen extends StatelessWidget {
+  MainLayoutScreen({super.key});
 
   final List<Widget> _screens = [
     const DashboardScreen(),
     const CalendarScreen(),
     const FriendsScreen(),
-    const ProfileScreen(),
+    ProfileScreen(),
   ];
 
   @override
   Widget build(BuildContext context) {
+    final currentIndex = context.watch<NavigationProvider>().currentIndex;
+
     return Scaffold(
       extendBody: true,
       body: Stack(
         children: [
-          IndexedStack(index: _currentIndex, children: _screens),
+          IndexedStack(index: currentIndex, children: _screens),
 
           Positioned(
             left: 24,
@@ -55,17 +52,19 @@ class _MainLayoutScreenState extends State<MainLayoutScreen> {
                         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                         children: [
                           _buildNavItem(
+                            context,
                             Icons.track_changes_rounded,
                             'Habits',
                             0,
                           ),
                           _buildNavItem(
+                            context,
                             Icons.calendar_month_rounded,
                             'History',
                             1,
                           ),
-                          _buildNavItem(Icons.people_alt_rounded, 'Friends', 2),
-                          _buildNavItem(Icons.person_rounded, 'Profile', 3),
+                          _buildNavItem(context, Icons.people_alt_rounded, 'Friends', 2),
+                          _buildNavItem(context, Icons.person_rounded, 'Profile', 3),
                         ],
                       ),
                     ),
@@ -81,17 +80,15 @@ class _MainLayoutScreenState extends State<MainLayoutScreen> {
     );
   }
 
-  Widget _buildNavItem(IconData icon, String label, int index) {
-    final isSelected = _currentIndex == index;
+  Widget _buildNavItem(BuildContext context, IconData icon, String label, int index) {
+    final isSelected = context.watch<NavigationProvider>().currentIndex == index;
     final color = isSelected
         ? Theme.of(context).colorScheme.primary
         : Colors.white60;
 
     return GestureDetector(
       onTap: () {
-        setState(() {
-          _currentIndex = index;
-        });
+        context.read<NavigationProvider>().setIndex(index);
       },
       behavior: HitTestBehavior.opaque,
       child: AnimatedContainer(

@@ -134,7 +134,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       final newHabit = await Navigator.push<Habit>(
                         context,
                         PageRouteBuilder(
-                          pageBuilder: (context, animation, secondaryAnimation) => const CreateHabitScreen(),
+                          pageBuilder: (context, animation, secondaryAnimation) => CreateHabitScreen(),
                           transitionsBuilder: (context, animation, secondaryAnimation, child) {
                             const begin = Offset(0.0, 1.0);
                             const end = Offset.zero;

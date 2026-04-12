@@ -1,46 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import '../services/auth_service.dart';
+import 'package:provider/provider.dart';
+import '../providers/login_provider.dart';
 
-class LoginScreen extends StatefulWidget {
+class LoginScreen extends StatelessWidget {
   const LoginScreen({super.key});
 
   @override
-  State<LoginScreen> createState() => _LoginScreenState();
-}
-
-class _LoginScreenState extends State<LoginScreen> {
-  final AuthService _authService = AuthService();
-  bool _isLoading = false;
-
-  void _handleGoogleSignIn() async {
-    setState(() => _isLoading = true);
-    
-    try {
-      await _authService.signInWithGoogle();
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Sign in failed. Check console for details.\nError: ${e.toString().split('\n').first}',
-              style: const TextStyle(color: Colors.white),
-            ),
-            backgroundColor: Colors.red.shade800,
-            duration: const Duration(seconds: 4),
-          ),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
-    }
-  }
-
-  @override
   Widget build(BuildContext context) {
+    final loginProvider = context.watch<LoginProvider>();
+
     return Scaffold(
       body: SafeArea(
         child: Padding(
@@ -81,13 +51,30 @@ class _LoginScreenState extends State<LoginScreen> {
               ).animate().fade(delay: 200.ms).slideY(begin: 0.1),
               const Spacer(),
 
-              if (_isLoading)
+              if (loginProvider.isLoading)
                 const Center(
                   child: CircularProgressIndicator(color: Color(0xFF00E676)),
                 )
               else
                 ElevatedButton(
-                  onPressed: _handleGoogleSignIn,
+                  onPressed: () async {
+                    try {
+                      await context.read<LoginProvider>().signInWithGoogle();
+                    } catch (e) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              'Sign in failed. Error: ${e.toString().split('\n').first}',
+                              style: const TextStyle(color: Colors.white),
+                            ),
+                            backgroundColor: Colors.red.shade800,
+                            duration: const Duration(seconds: 4),
+                          ),
+                        );
+                      }
+                    }
+                  },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.white,
                     foregroundColor: Colors.black,

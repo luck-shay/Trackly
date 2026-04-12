@@ -2,56 +2,23 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:provider/provider.dart';
 import '../services/social_service.dart';
 import '../services/database_service.dart';
 import '../models/user_profile.dart';
 import '../models/habit.dart';
+import '../providers/friends_provider.dart';
 import 'friend_profile_screen.dart';
 
-class FriendsScreen extends StatefulWidget {
+class FriendsScreen extends StatelessWidget {
   const FriendsScreen({super.key});
 
   @override
-  State<FriendsScreen> createState() => _FriendsScreenState();
-}
-
-class _FriendsScreenState extends State<FriendsScreen> {
-  final SocialService _social = SocialService();
-  final DatabaseService _db = DatabaseService();
-  final TextEditingController _searchController = TextEditingController();
-  List<UserProfile> _searchResults = [];
-  bool _isSearching = false;
-  bool _hasSearched = false;
-
-  void _searchUsers() async {
-    setState(() {
-      _isSearching = true;
-      _hasSearched = true;
-    });
-    final query = _searchController.text.trim();
-    if (query.isEmpty) {
-      setState(() {
-        _isSearching = false;
-        _searchResults = [];
-        _hasSearched = false;
-      });
-      return;
-    }
-    final results = await _social.searchUsersByUsername(query);
-    setState(() {
-      _searchResults = results;
-      _isSearching = false;
-    });
-  }
-
-  @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
+    final social = SocialService();
+    final db = DatabaseService();
+    final friendsProvider = context.watch<FriendsProvider>();
+
     return Scaffold(
       appBar: AppBar(
         automaticallyImplyLeading: false,
@@ -77,8 +44,8 @@ class _FriendsScreenState extends State<FriendsScreen> {
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(color: Colors.white10),
               ),
-              child: TextField(
-                controller: _searchController,
+              child: TextFormField(
+                initialValue: friendsProvider.lastQuery,
                 style: GoogleFonts.inter(color: Colors.white),
                 decoration: InputDecoration(
                   hintText: 'Search by @username...',
@@ -88,19 +55,16 @@ class _FriendsScreenState extends State<FriendsScreen> {
                     horizontal: 20,
                     vertical: 16,
                   ),
-                  suffixIcon: IconButton(
-                    icon: const Icon(Icons.search, color: Colors.white70),
-                    onPressed: _searchUsers,
-                  ),
+                  suffixIcon: const Icon(Icons.search, color: Colors.white70),
                 ),
-                onSubmitted: (_) => _searchUsers(),
+                onFieldSubmitted: (val) => context.read<FriendsProvider>().searchUsers(val),
               ),
             ),
             const SizedBox(height: 24),
 
-            if (_isSearching)
+            if (friendsProvider.isSearching)
               const Center(child: CircularProgressIndicator())
-            else if (_searchResults.isNotEmpty) ...[
+            else if (friendsProvider.searchResults.isNotEmpty) ...[
               Text(
                 'Search Results',
                 style: GoogleFonts.outfit(
@@ -109,7 +73,7 @@ class _FriendsScreenState extends State<FriendsScreen> {
                 ),
               ),
               const SizedBox(height: 12),
-              ..._searchResults
+              ...friendsProvider.searchResults
                   .map(
                     (user) => ListTile(
                       leading: CircleAvatar(
@@ -142,7 +106,7 @@ class _FriendsScreenState extends State<FriendsScreen> {
                           color: Color(0xFF00E676),
                         ),
                         onPressed: () async {
-                          await _social.sendFriendRequest(user.uid);
+                          await social.sendFriendRequest(user.uid);
                           if (context.mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
@@ -158,7 +122,7 @@ class _FriendsScreenState extends State<FriendsScreen> {
                   )
                   .toList(),
               const Divider(color: Colors.white10, height: 48),
-            ] else if (_hasSearched && _searchController.text.isNotEmpty) ...[
+            ] else if (friendsProvider.hasSearched && friendsProvider.lastQuery.isNotEmpty) ...[
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
@@ -171,7 +135,7 @@ class _FriendsScreenState extends State<FriendsScreen> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
-                        'No user found with the exact username "${_searchController.text}".',
+                        'No user found with the exact username "${friendsProvider.lastQuery}".',
                         style: GoogleFonts.inter(color: Colors.redAccent),
                       ),
                     ),
@@ -183,7 +147,7 @@ class _FriendsScreenState extends State<FriendsScreen> {
 
             // Goal Invites
             StreamBuilder<QuerySnapshot>(
-              stream: _social.streamHabitInvites(),
+              stream: social.streamHabitInvites(),
               builder: (context, snapshot) {
                 if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
                   return const SizedBox.shrink();
@@ -209,8 +173,8 @@ class _FriendsScreenState extends State<FriendsScreen> {
 
                       return FutureBuilder(
                         future: Future.wait([
-                          _social.getUserProfile(fromUid),
-                          _db.getHabitById(habitId),
+                          social.getUserProfile(fromUid),
+                          db.getHabitById(habitId),
                         ]),
                         builder:
                             (
@@ -256,7 +220,7 @@ class _FriendsScreenState extends State<FriendsScreen> {
                                         Icons.check_circle,
                                         color: Color(0xFF00E676),
                                       ),
-                                      onPressed: () => _social
+                                      onPressed: () => social
                                           .acceptHabitInvite(doc.id, habitId),
                                     ),
                                     IconButton(
@@ -265,7 +229,7 @@ class _FriendsScreenState extends State<FriendsScreen> {
                                         color: Colors.redAccent,
                                       ),
                                       onPressed: () =>
-                                          _social.declineHabitInvite(doc.id),
+                                          social.declineHabitInvite(doc.id),
                                     ),
                                   ],
                                 ),
@@ -281,7 +245,7 @@ class _FriendsScreenState extends State<FriendsScreen> {
 
             // Pending Friend Requests
             StreamBuilder<QuerySnapshot>(
-              stream: _social.streamIncomingFriendRequests(),
+              stream: social.streamIncomingFriendRequests(),
               builder: (context, snapshot) {
                 if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
                   return const SizedBox.shrink();
@@ -305,7 +269,7 @@ class _FriendsScreenState extends State<FriendsScreen> {
                       final fromUid = req['from'];
 
                       return FutureBuilder<UserProfile?>(
-                        future: _social.getUserProfile(fromUid),
+                        future: social.getUserProfile(fromUid),
                         builder: (ctx, userSnapshot) {
                           if (!userSnapshot.hasData)
                             return const SizedBox.shrink();
@@ -338,7 +302,7 @@ class _FriendsScreenState extends State<FriendsScreen> {
                                     Icons.check_circle,
                                     color: Color(0xFF00E676),
                                   ),
-                                  onPressed: () => _social.acceptFriendRequest(
+                                  onPressed: () => social.acceptFriendRequest(
                                     doc.id,
                                     fromUid,
                                   ),
@@ -349,7 +313,7 @@ class _FriendsScreenState extends State<FriendsScreen> {
                                     color: Colors.redAccent,
                                   ),
                                   onPressed: () =>
-                                      _social.declineFriendRequest(doc.id),
+                                      social.declineFriendRequest(doc.id),
                                 ),
                               ],
                             ),
@@ -373,7 +337,7 @@ class _FriendsScreenState extends State<FriendsScreen> {
             ),
             const SizedBox(height: 12),
             StreamBuilder<List<UserProfile>>(
-              stream: _social.streamFriends(),
+              stream: social.streamFriends(),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());

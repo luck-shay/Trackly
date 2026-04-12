@@ -2,81 +2,25 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:provider/provider.dart';
 import '../services/auth_service.dart';
-import '../services/social_service.dart';
 import '../models/user_profile.dart';
+import '../providers/profile_provider.dart';
 
-class ProfileScreen extends StatefulWidget {
-  const ProfileScreen({super.key});
+class ProfileScreen extends StatelessWidget {
+  ProfileScreen({super.key});
 
-  @override
-  State<ProfileScreen> createState() => _ProfileScreenState();
-}
-
-class _ProfileScreenState extends State<ProfileScreen> {
-  final SocialService _social = SocialService();
-  final String userId = FirebaseAuth.instance.currentUser?.uid ?? '';
-  
-  bool _isEditing = false;
   final _nameController = TextEditingController();
   final _usernameController = TextEditingController();
-  
-  bool _isCheckingUsername = false;
-  String? _usernameError;
-  
-  @override
-  void dispose() {
-    _nameController.dispose();
-    _usernameController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _saveProfile() async {
-    final newName = _nameController.text.trim();
-    final newUsername = _usernameController.text.trim().toLowerCase();
-    
-    if (newName.isEmpty) {
-      setState(() => _usernameError = 'Name cannot be empty.');
-      return;
-    }
-    if (newUsername.isEmpty) {
-      setState(() => _usernameError = 'Username cannot be empty.');
-      return;
-    }
-    
-    setState(() {
-      _isCheckingUsername = true;
-      _usernameError = null;
-    });
-
-    final isAvailable = await _social.isUsernameAvailable(newUsername);
-    if (!isAvailable) {
-      setState(() {
-         _usernameError = 'Username is already taken.';
-         _isCheckingUsername = false;
-      });
-      return;
-    }
-
-    await _social.updateProfile(displayName: newName, username: newUsername);
-    
-    setState(() {
-       _isCheckingUsername = false;
-       _isEditing = false;
-    });
-    
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Profile updated successfully!'), backgroundColor: Colors.green),
-      );
-    }
-  }
+  final String userId = FirebaseAuth.instance.currentUser?.uid ?? '';
 
   @override
   Widget build(BuildContext context) {
+    final profileProvider = context.watch<ProfileProvider>();
+
     return Scaffold(
       appBar: AppBar(
-        automaticallyImplyLeading: false, // Hidden back button for main tab
+        automaticallyImplyLeading: false, 
         title: Text('Profile', style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
       ),
       body: StreamBuilder<DocumentSnapshot>(
@@ -91,7 +35,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
           final profile = UserProfile.fromMap(snapshot.data!.data() as Map<String, dynamic>);
           
-          if (!_isEditing) {
+          if (!profileProvider.isEditing) {
             _nameController.text = profile.displayName;
             _usernameController.text = profile.username ?? '';
           }
@@ -111,7 +55,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
                 const SizedBox(height: 32),
                 
-                if (!_isEditing) ...[
+                if (!profileProvider.isEditing) ...[
                   Text(
                     profile.displayName,
                     style: GoogleFonts.outfit(fontSize: 32, fontWeight: FontWeight.bold),
@@ -139,20 +83,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       side: const BorderSide(color: Colors.white10),
                     ),
                     onPressed: () {
-                      setState(() => _isEditing = true);
+                      context.read<ProfileProvider>().startEditing();
                     },
                   ),
                 ] else ...[
-                  _buildTextField('Display Name', _nameController, Icons.badge_rounded),
+                  _buildTextField(context, 'Display Name', _nameController, Icons.badge_rounded),
                   const SizedBox(height: 16),
-                  _buildTextField('Username', _usernameController, Icons.alternate_email_rounded, prefix: '@'),
-                  if (_usernameError != null)
+                  _buildTextField(context, 'Username', _usernameController, Icons.alternate_email_rounded, prefix: '@'),
+                  if (profileProvider.usernameError != null)
                     Padding(
                       padding: const EdgeInsets.only(top: 8.0),
-                      child: Text(_usernameError!, style: GoogleFonts.inter(color: Colors.redAccent, fontSize: 13)),
+                      child: Text(profileProvider.usernameError!, style: GoogleFonts.inter(color: Colors.redAccent, fontSize: 13)),
                     ),
                   const SizedBox(height: 32),
-                  if (_isCheckingUsername)
+                  if (profileProvider.isCheckingUsername)
                     const CircularProgressIndicator()
                   else
                     Row(
@@ -160,10 +104,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       children: [
                         TextButton(
                           onPressed: () {
-                            setState(() {
-                              _isEditing = false;
-                              _usernameError = null;
-                            });
+                            context.read<ProfileProvider>().cancelEditing();
                           },
                           child: Text('Cancel', style: GoogleFonts.inter(color: Colors.grey)),
                         ),
@@ -175,7 +116,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                           ),
-                          onPressed: _saveProfile,
+                          onPressed: () async {
+                              final success = await context.read<ProfileProvider>().saveProfile(
+                                  _nameController.text, 
+                                  _usernameController.text
+                              );
+                              if (success && context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('Profile updated successfully!'), backgroundColor: Colors.green),
+                                );
+                              }
+                          },
                           child: Text('Save', style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
                         ),
                       ],
@@ -200,7 +151,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     }
                   },
                 ),
-                const SizedBox(height: 120), // Padding for Nav Bar
+                const SizedBox(height: 120), 
               ],
             ),
             ),
@@ -210,7 +161,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildTextField(String label, TextEditingController controller, IconData icon, {String? prefix}) {
+  Widget _buildTextField(BuildContext context, String label, TextEditingController controller, IconData icon, {String? prefix}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [

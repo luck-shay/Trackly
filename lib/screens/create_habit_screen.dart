@@ -1,52 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import '../models/habit.dart';
+import 'package:provider/provider.dart';
 import '../models/user_profile.dart';
 import '../services/social_service.dart';
+import '../providers/create_habit_provider.dart';
 
-class CreateHabitScreen extends StatefulWidget {
-  const CreateHabitScreen({super.key});
+class CreateHabitScreen extends StatelessWidget {
+  CreateHabitScreen({super.key});
 
-  @override
-  State<CreateHabitScreen> createState() => _CreateHabitScreenState();
-}
-
-class _CreateHabitScreenState extends State<CreateHabitScreen> {
   final _formKey = GlobalKey<FormState>();
-  String _title = '';
-  String _description = '';
-  int _targetDays = 7;
-  final List<String> _selectedFriends = [];
-
-  void _saveHabit() async {
-    if (_formKey.currentState!.validate()) {
-      _formKey.currentState!.save();
-      final currentUserId = FirebaseAuth.instance.currentUser?.uid ?? '';
-      
-      final newHabit = Habit(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
-        title: _title,
-        description: _description,
-        createdAt: DateTime.now(),
-        targetDaysPerWeek: _targetDays,
-        participants: [currentUserId], // Do not forcefully inject friends!
-      );
-      
-      // Send invitations to selected friends
-      for (final friendUid in _selectedFriends) {
-        await SocialService().sendHabitInvite(habitId: newHabit.id, toUserId: friendUid);
-      }
-      
-      if (mounted) {
-        Navigator.pop(context, newHabit);
-      }
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
+    final habitProvider = context.watch<CreateHabitProvider>();
+    String title = '';
+    String description = '';
+
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
@@ -69,7 +39,6 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
               ).animate().fade().slideY(begin: 0.1),
               const SizedBox(height: 32),
               
-              // Name Input
               Text(
                 'HABIT NAME',
                 style: GoogleFonts.inter(
@@ -102,12 +71,11 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
                   }
                   return null;
                 },
-                onSaved: (value) => _title = value!,
+                onSaved: (value) => title = value!,
               ).animate().fade(delay: 150.ms).slideX(begin: 0.05),
               
               const SizedBox(height: 32),
               
-              // Description Input
               Text(
                 'DESCRIPTION (OPTIONAL)',
                 style: GoogleFonts.inter(
@@ -131,12 +99,11 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
                   ),
                 ),
                 maxLines: 3,
-                onSaved: (value) => _description = value ?? '',
+                onSaved: (value) => description = value ?? '',
               ).animate().fade(delay: 250.ms).slideX(begin: 0.05),
 
               const SizedBox(height: 40),
               
-              // Target Days
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -156,7 +123,7 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
-                      '$_targetDays days / week',
+                      '${habitProvider.targetDays} days / week',
                       style: GoogleFonts.inter(
                         color: Theme.of(context).colorScheme.primary,
                         fontWeight: FontWeight.w600,
@@ -175,14 +142,12 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
                   trackHeight: 8.0,
                 ),
                 child: Slider(
-                  value: _targetDays.toDouble(),
+                  value: habitProvider.targetDays.toDouble(),
                   min: 1,
                   max: 7,
                   divisions: 6,
                   onChanged: (double value) {
-                    setState(() {
-                      _targetDays = value.toInt();
-                    });
+                    context.read<CreateHabitProvider>().setTargetDays(value.toInt());
                   },
                 ),
               ).animate().fade(delay: 350.ms),
@@ -210,21 +175,15 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
                      spacing: 8,
                      runSpacing: 8,
                      children: snapshot.data!.map((friend) {
-                        final isSelected = _selectedFriends.contains(friend.uid);
+                        final isSelected = habitProvider.selectedFriends.contains(friend.uid);
                         return FilterChip(
                           label: Text(friend.displayName, style: GoogleFonts.inter(color: isSelected ? Colors.black : Colors.white)),
                           selected: isSelected,
                           selectedColor: Theme.of(context).colorScheme.primary,
                           backgroundColor: Theme.of(context).colorScheme.surface,
                           checkmarkColor: Colors.black,
-                          onSelected: (selected) {
-                             setState(() {
-                               if (selected) {
-                                 _selectedFriends.add(friend.uid);
-                               } else {
-                                 _selectedFriends.remove(friend.uid);
-                               }
-                             });
+                          onSelected: (_) {
+                            context.read<CreateHabitProvider>().toggleFriend(friend.uid);
                           },
                         );
                      }).toList(),
@@ -234,12 +193,22 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
 
               const SizedBox(height: 60),
 
-              // Save Button
               SizedBox(
                 width: double.infinity,
                 height: 56,
                 child: ElevatedButton(
-                  onPressed: _saveHabit,
+                  onPressed: () async {
+                    if (_formKey.currentState!.validate()) {
+                      _formKey.currentState!.save();
+                      final newHabit = await context.read<CreateHabitProvider>().saveHabit(
+                        title: title,
+                        description: description,
+                      );
+                      if (context.mounted) {
+                        Navigator.pop(context, newHabit);
+                      }
+                    }
+                  },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Theme.of(context).colorScheme.primary,
                     foregroundColor: Colors.black,

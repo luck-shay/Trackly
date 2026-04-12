@@ -3,20 +3,13 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:provider/provider.dart';
 import '../models/habit.dart';
 import '../services/database_service.dart';
+import '../providers/calendar_provider.dart';
 
-class CalendarScreen extends StatefulWidget {
+class CalendarScreen extends StatelessWidget {
   const CalendarScreen({super.key});
-
-  @override
-  State<CalendarScreen> createState() => _CalendarScreenState();
-}
-
-class _CalendarScreenState extends State<CalendarScreen> {
-  final DatabaseService _db = DatabaseService();
-  DateTime _focusedDay = DateTime.now();
-  DateTime? _selectedDay;
 
   List<Habit> _getEventsForDay(DateTime day, List<Habit> habits) {
     final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
@@ -30,13 +23,16 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final db = DatabaseService();
+    final calendarProvider = context.watch<CalendarProvider>();
+
     return Scaffold(
       appBar: AppBar(
         automaticallyImplyLeading: false,
         title: Text('Activity History', style: GoogleFonts.outfit(fontWeight: FontWeight.w600)),
       ),
       body: StreamBuilder<List<Habit>>(
-        stream: _db.streamHabits(),
+        stream: db.streamHabits(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
              return const Center(child: CircularProgressIndicator());
@@ -63,16 +59,13 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 child: TableCalendar<Habit>(
                   firstDay: DateTime.utc(2020, 10, 16),
                   lastDay: DateTime.utc(2030, 3, 14),
-                  focusedDay: _focusedDay,
+                  focusedDay: calendarProvider.focusedDay,
                   selectedDayPredicate: (day) {
-                    return isSameDay(_selectedDay, day);
+                    return isSameDay(calendarProvider.selectedDay, day);
                   },
                   onDaySelected: (selectedDay, focusedDay) {
-                    if (!isSameDay(_selectedDay, selectedDay)) {
-                      setState(() {
-                        _selectedDay = selectedDay;
-                        _focusedDay = focusedDay;
-                      });
+                    if (!isSameDay(calendarProvider.selectedDay, selectedDay)) {
+                      context.read<CalendarProvider>().selectDay(selectedDay, focusedDay);
                     }
                   },
                   eventLoader: (day) => _getEventsForDay(day, habits),
@@ -129,14 +122,14 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 ),
               ),
               Expanded(
-                child: _selectedDay == null 
+                child: calendarProvider.selectedDay == null 
                   ? Center(
                       child: Text(
                         'Select a day to view your progress.',
                         style: GoogleFonts.inter(color: Colors.grey[600]),
                       ),
                     ).animate().fade(delay: 300.ms)
-                  : _buildEventList(_getEventsForDay(_selectedDay!, habits)),
+                  : _buildEventList(context, _getEventsForDay(calendarProvider.selectedDay!, habits)),
               ),
               const SizedBox(height: 120), // Spacer for bottom layout
             ],
@@ -146,7 +139,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
     );
   }
 
-  Widget _buildEventList(List<Habit> completedHabits) {
+  Widget _buildEventList(BuildContext context, List<Habit> completedHabits) {
     if (completedHabits.isEmpty) {
       return Center(
         child: Column(
