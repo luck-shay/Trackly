@@ -14,6 +14,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "852142844109-idvaj5ji016ojlpt35soedeg78u5k4tu.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.trackly",
+            "certificate_hash": "8c10136460c0508898025d033cddd0b675d9e5fe"
+          }
+        },
+        {
           "client_id": "852142844109-pccubgbd42l35rjj556s9qj8f22pdm14.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
