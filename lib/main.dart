@@ -7,41 +7,75 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'firebase_options.dart';
 import 'screens/login_screen.dart';
 import 'screens/main_layout_screen.dart';
+import 'services/notification_service.dart';
 import 'package:provider/provider.dart';
 import 'providers/navigation_provider.dart';
 import 'providers/habits_provider.dart';
-import 'providers/calendar_provider.dart';
 import 'providers/friends_provider.dart';
-import 'providers/create_habit_provider.dart';
 import 'providers/profile_provider.dart';
 import 'providers/login_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  Object? bootstrapError;
 
-  if (!kIsWeb) {
-    await GoogleSignIn.instance.initialize(
-      serverClientId:
-          '852142844109-k39c43icuhgd4nqheh3j33rird17a2bu.apps.googleusercontent.com',
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+
+    if (!kIsWeb) {
+      // Notification setup should never prevent the app from booting.
+      try {
+        await NotificationService().initialize();
+      } catch (notificationError, notificationStackTrace) {
+        FlutterError.reportError(
+          FlutterErrorDetails(
+            exception: notificationError,
+            stack: notificationStackTrace,
+            library: 'trackly notifications bootstrap',
+          ),
+        );
+      }
+
+      await GoogleSignIn.instance.initialize(
+        serverClientId:
+            '852142844109-k39c43icuhgd4nqheh3j33rird17a2bu.apps.googleusercontent.com',
+      );
+    }
+  } catch (error, stackTrace) {
+    bootstrapError = error;
+    FlutterError.reportError(
+      FlutterErrorDetails(
+        exception: error,
+        stack: stackTrace,
+        library: 'trackly bootstrap',
+      ),
     );
   }
 
-  runApp(const MyApp());
+  runApp(MyApp(bootstrapError: bootstrapError));
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  final Object? bootstrapError;
+
+  const MyApp({super.key, this.bootstrapError});
 
   @override
   Widget build(BuildContext context) {
+    if (bootstrapError != null) {
+      return MaterialApp(
+        debugShowCheckedModeBanner: false,
+        home: _BootstrapErrorScreen(error: bootstrapError!),
+      );
+    }
+
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => NavigationProvider()),
-        ChangeNotifierProvider(create: (_) => CalendarProvider()),
         ChangeNotifierProvider(create: (_) => FriendsProvider()),
         ChangeNotifierProvider(create: (_) => HabitsProvider()),
-        ChangeNotifierProvider(create: (_) => CreateHabitProvider()),
         ChangeNotifierProvider(create: (_) => ProfileProvider()),
         ChangeNotifierProvider(create: (_) => LoginProvider()),
       ],
@@ -100,3 +134,46 @@ class MyApp extends StatelessWidget {
   }
 }
 
+class _BootstrapErrorScreen extends StatelessWidget {
+  final Object error;
+
+  const _BootstrapErrorScreen({required this.error});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFF101010),
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.error_outline_rounded,
+                color: Colors.redAccent,
+                size: 56,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Trackly could not start',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.outfit(
+                  fontSize: 28,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Please verify Firebase configuration and try again.\n$error',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.inter(color: Colors.white70, height: 1.5),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}

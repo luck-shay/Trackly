@@ -34,9 +34,11 @@ class FriendsProvider extends ChangeNotifier {
     _hasSearched = true;
     notifyListeners();
 
-    _searchResults = await _social.searchUsersByUsername(_lastQuery);
-    
-    _isSearching = false;
-    notifyListeners();
+    try {
+      _searchResults = await _social.searchUsersByUsername(_lastQuery);
+    } finally {
+      _isSearching = false;
+      notifyListeners();
+    }
   }
 }

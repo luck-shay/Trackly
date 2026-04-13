@@ -73,13 +73,12 @@ class FriendsScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 12),
-              ...friendsProvider.searchResults
-                  .map(
+              ...friendsProvider.searchResults.map(
                     (user) => ListTile(
                       leading: CircleAvatar(
                         backgroundColor: Theme.of(
                           context,
-                        ).colorScheme.primary.withOpacity(0.2),
+                        ).colorScheme.primary.withValues(alpha: 0.2),
                         backgroundImage: user.photoUrl != null
                             ? NetworkImage(user.photoUrl!)
                             : null,
@@ -119,14 +118,13 @@ class FriendsScreen extends StatelessWidget {
                         },
                       ),
                     ),
-                  )
-                  .toList(),
+                  ),
               const Divider(color: Colors.white10, height: 48),
             ] else if (friendsProvider.hasSearched && friendsProvider.lastQuery.isNotEmpty) ...[
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: Colors.red.withOpacity(0.1),
+                  color: Colors.red.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Row(
@@ -181,21 +179,23 @@ class FriendsScreen extends StatelessWidget {
                               ctx,
                               AsyncSnapshot<List<dynamic>> combinedSnapshot,
                             ) {
-                              if (!combinedSnapshot.hasData)
+                              if (!combinedSnapshot.hasData) {
                                 return const SizedBox.shrink();
+                              }
 
                               final user =
                                   combinedSnapshot.data![0] as UserProfile?;
                               final habit = combinedSnapshot.data![1] as Habit?;
 
-                              if (user == null || habit == null)
+                              if (user == null || habit == null) {
                                 return const SizedBox.shrink();
+                              }
 
                               return ListTile(
                                 leading: CircleAvatar(
                                   backgroundColor: Theme.of(
                                     context,
-                                  ).colorScheme.secondary.withOpacity(0.2),
+                                  ).colorScheme.secondary.withValues(alpha: 0.2),
                                   child: const Icon(
                                     Icons.track_changes_rounded,
                                     color: Colors.white,
@@ -220,16 +220,49 @@ class FriendsScreen extends StatelessWidget {
                                         Icons.check_circle,
                                         color: Color(0xFF00E676),
                                       ),
-                                      onPressed: () => social
-                                          .acceptHabitInvite(doc.id, habitId),
+                                      onPressed: () async {
+                                        try {
+                                          await social.acceptHabitInvite(
+                                            doc.id,
+                                            habitId,
+                                          );
+                                        } catch (_) {
+                                          if (!context.mounted) return;
+                                          ScaffoldMessenger.of(
+                                            context,
+                                          ).showSnackBar(
+                                            const SnackBar(
+                                              content: Text(
+                                                'Could not accept invite. Please try again.',
+                                              ),
+                                            ),
+                                          );
+                                        }
+                                      },
                                     ),
                                     IconButton(
                                       icon: const Icon(
                                         Icons.cancel,
                                         color: Colors.redAccent,
                                       ),
-                                      onPressed: () =>
-                                          social.declineHabitInvite(doc.id),
+                                      onPressed: () async {
+                                        try {
+                                          await social.declineHabitInvite(
+                                            doc.id,
+                                          );
+                                        } catch (_) {
+                                          if (!context.mounted) return;
+                                          ScaffoldMessenger.of(
+                                            context,
+                                          ).showSnackBar(
+                                            const SnackBar(
+                                              content: Text(
+                                                'Could not decline invite. Please try again.',
+                                              ),
+                                            ),
+                                          );
+                                        }
+                                      },
                                     ),
                                   ],
                                 ),
@@ -271,12 +304,13 @@ class FriendsScreen extends StatelessWidget {
                       return FutureBuilder<UserProfile?>(
                         future: social.getUserProfile(fromUid),
                         builder: (ctx, userSnapshot) {
-                          if (!userSnapshot.hasData)
+                          if (!userSnapshot.hasData) {
                             return const SizedBox.shrink();
+                          }
                           final user = userSnapshot.data!;
                           return ListTile(
                             leading: CircleAvatar(
-                              backgroundColor: Colors.orange.withOpacity(0.2),
+                              backgroundColor: Colors.orange.withValues(alpha: 0.2),
                               backgroundImage: user.photoUrl != null
                                   ? NetworkImage(user.photoUrl!)
                                   : null,
@@ -302,25 +336,54 @@ class FriendsScreen extends StatelessWidget {
                                     Icons.check_circle,
                                     color: Color(0xFF00E676),
                                   ),
-                                  onPressed: () => social.acceptFriendRequest(
-                                    doc.id,
-                                    fromUid,
-                                  ),
+                                  onPressed: () async {
+                                    try {
+                                      await social.acceptFriendRequest(
+                                        doc.id,
+                                        fromUid,
+                                      );
+                                    } catch (_) {
+                                      if (!context.mounted) return;
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        const SnackBar(
+                                          content: Text(
+                                            'Could not accept request. Please try again.',
+                                          ),
+                                        ),
+                                      );
+                                    }
+                                  },
                                 ),
                                 IconButton(
                                   icon: const Icon(
                                     Icons.cancel,
                                     color: Colors.redAccent,
                                   ),
-                                  onPressed: () =>
-                                      social.declineFriendRequest(doc.id),
+                                  onPressed: () async {
+                                    try {
+                                      await social.declineFriendRequest(doc.id);
+                                    } catch (_) {
+                                      if (!context.mounted) return;
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        const SnackBar(
+                                          content: Text(
+                                            'Could not decline request. Please try again.',
+                                          ),
+                                        ),
+                                      );
+                                    }
+                                  },
                                 ),
                               ],
                             ),
                           );
                         },
                       );
-                    }).toList(),
+                    }),
                     const Divider(color: Colors.white10, height: 48),
                   ],
                 );
@@ -358,13 +421,13 @@ class FriendsScreen extends StatelessWidget {
                 }
 
                 return Column(
-                  children: friends
-                      .map(
+                  children: [
+                    ...friends.map(
                         (friend) => ListTile(
                           leading: CircleAvatar(
                             backgroundColor: Theme.of(
                               context,
-                            ).colorScheme.primary.withOpacity(0.2),
+                            ).colorScheme.primary.withValues(alpha: 0.2),
                             backgroundImage: friend.photoUrl != null
                                 ? NetworkImage(friend.photoUrl!)
                                 : null,
@@ -397,8 +460,8 @@ class FriendsScreen extends StatelessWidget {
                             );
                           },
                         ),
-                      )
-                      .toList(),
+                      ),
+                  ],
                 ).animate().fade().slideY(begin: 0.1);
               },
             ),

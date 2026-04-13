@@ -1,30 +1,31 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-
-import 'package:trackly/main.dart';
+import 'package:trackly/providers/quantified_log_provider.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  group('QuantifiedLogProvider', () {
+    test('clamps the initial value into range', () {
+      final provider = QuantifiedLogProvider(
+        min: 0,
+        max: 10,
+        initialValue: 99,
+      );
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+      expect(provider.value, 10);
+    });
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
+    test('snaps increments and decrements using the resolved step', () {
+      final provider = QuantifiedLogProvider(
+        min: 0,
+        max: 10,
+        initialValue: 5,
+      );
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+      provider.increment();
+      expect(provider.value, closeTo(5.1, 0.000001));
+
+      provider.decrement();
+      provider.decrement();
+      expect(provider.value, closeTo(4.9, 0.000001));
+    });
   });
 }

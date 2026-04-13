@@ -4,39 +4,57 @@ import '../models/habit.dart';
 
 class DatabaseService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
-  
-  // Dynamically fetch the real User ID from Firebase Auth
-  String get userId => FirebaseAuth.instance.currentUser?.uid ?? 'anonymous'; 
+
+  String? get currentUserId => FirebaseAuth.instance.currentUser?.uid;
+  String get userId => currentUserId ?? '';
+
+  String createHabitId() => _db.collection('habits').doc().id;
 
   // Stream of habits directly from Firestore
   Stream<List<Habit>> streamHabits() {
+    final currentUserId = userId;
+    if (currentUserId.isEmpty) {
+      return Stream.value(const <Habit>[]);
+    }
+
     return _db
         .collection('habits')
-        .where('participants', arrayContains: userId)
+        .where('participants', arrayContains: currentUserId)
         .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => Habit.fromMap(doc.data(), id: doc.id))
-            .toList());
+        .map(
+          (snapshot) => snapshot.docs
+              .map((doc) => Habit.fromMap(doc.data(), id: doc.id))
+              .toList(),
+        );
   }
 
   // Add or update a habit
-  Future<void> saveHabit(Habit habit) {
-    // Ensure the current user is always a participant
-    if (!habit.participants.contains(userId)) {
-      habit.participants.add(userId);
+  Future<void> saveHabit(
+    Habit habit, {
+    bool ensureCurrentUserParticipant = true,
+  }) async {
+    final currentUserId = userId;
+    if (currentUserId.isEmpty) {
+      throw StateError('You must be signed in to save habits.');
     }
-    return _db
-        .collection('habits')
-        .doc(habit.id)
-        .set(habit.toMap());
+
+    var habitToSave = habit;
+    if (ensureCurrentUserParticipant &&
+        !habit.participants.contains(currentUserId)) {
+      habitToSave = habit.copyWith(
+        participants: [...habit.participants, currentUserId],
+      );
+    }
+
+    await _db.collection('habits').doc(habit.id).set(habitToSave.toMap());
   }
 
   // Delete a habit
   Future<void> deleteHabit(String habitId) {
-    return _db
-        .collection('habits')
-        .doc(habitId)
-        .delete();
+    if (userId.isEmpty) {
+      throw StateError('You must be signed in to delete habits.');
+    }
+    return _db.collection('habits').doc(habitId).delete();
   }
 
   // Get a habit by ID

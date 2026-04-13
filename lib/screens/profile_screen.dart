@@ -7,16 +7,28 @@ import '../services/auth_service.dart';
 import '../models/user_profile.dart';
 import '../providers/profile_provider.dart';
 
-class ProfileScreen extends StatelessWidget {
-  ProfileScreen({super.key});
+class ProfileScreen extends StatefulWidget {
+  const ProfileScreen({super.key});
 
+  @override
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends State<ProfileScreen> {
   final _nameController = TextEditingController();
   final _usernameController = TextEditingController();
-  final String userId = FirebaseAuth.instance.currentUser?.uid ?? '';
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _usernameController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final profileProvider = context.watch<ProfileProvider>();
+    final userId = FirebaseAuth.instance.currentUser?.uid ?? '';
 
     return Scaffold(
       appBar: AppBar(
@@ -48,11 +60,47 @@ class ProfileScreen extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   const SizedBox(height: 16),
-                CircleAvatar(
-                  radius: 56,
-                  backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.1),
-                  child: Icon(Icons.person, size: 56, color: Theme.of(context).colorScheme.primary),
-                ),
+                  Stack(
+                    children: [
+                      GestureDetector(
+                        onTap: profileProvider.isUploadingPicture
+                            ? null
+                            : () async {
+                                final error = await profileProvider
+                                    .uploadProfilePicture();
+                                if (!context.mounted || error == null) {
+                                  return;
+                                }
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text(error)),
+                                );
+                              },
+                        child: CircleAvatar(
+                          radius: 56,
+                          backgroundColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+                          backgroundImage: profile.photoUrl != null ? NetworkImage(profile.photoUrl!) : null,
+                          child: profileProvider.isUploadingPicture
+                              ? const CircularProgressIndicator()
+                              : (profile.photoUrl == null
+                                  ? Icon(Icons.person, size: 56, color: Theme.of(context).colorScheme.primary)
+                                  : null),
+                        ),
+                      ),
+                      Positioned(
+                        bottom: 0,
+                        right: 0,
+                        child: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).colorScheme.primary,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Theme.of(context).colorScheme.surface, width: 3),
+                          ),
+                          child: const Icon(Icons.camera_alt_rounded, size: 16, color: Colors.black),
+                        ),
+                      ),
+                    ],
+                  ),
                 const SizedBox(height: 32),
                 
                 if (!profileProvider.isEditing) ...[
@@ -138,7 +186,7 @@ class ProfileScreen extends StatelessWidget {
                   icon: const Icon(Icons.logout),
                   label: const Text('Sign Out'),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.red.shade900.withOpacity(0.3),
+                    backgroundColor: Colors.red.shade900.withValues(alpha: 0.3),
                     foregroundColor: Colors.redAccent,
                     elevation: 0,
                     padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),

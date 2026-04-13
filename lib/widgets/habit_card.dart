@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../models/habit.dart';
@@ -21,9 +22,10 @@ class HabitCard extends StatefulWidget {
   State<HabitCard> createState() => _HabitCardState();
 }
 
-class _HabitCardState extends State<HabitCard> with SingleTickerProviderStateMixin {
+class _HabitCardState extends State<HabitCard>
+    with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
-  
+
   @override
   void initState() {
     super.initState();
@@ -38,16 +40,26 @@ class _HabitCardState extends State<HabitCard> with SingleTickerProviderStateMix
 
   @override
   Widget build(BuildContext context) {
-    bool completedToday = false;
     DateTime now = DateTime.now();
-    final userCompletions = widget.habit.completions[widget.currentUserId] ?? [];
-    
-    for (var date in userCompletions) {
-      if (date.year == now.year && date.month == now.month && date.day == now.day) {
-        completedToday = true;
-        break;
-      }
-    }
+    final todayValue = widget.habit.completionValueFor(
+      widget.currentUserId,
+      now,
+    );
+    final quantProgress = widget.habit.completionProgressFor(
+      widget.currentUserId,
+      now,
+    );
+    final quantProgressPct = (quantProgress * 100).round();
+    final userIsQuantified = widget.habit.isQuantifiedFor(widget.currentUserId);
+    final userQuantUnit = widget.habit.quantUnitFor(widget.currentUserId);
+    final userQuantMax = widget.habit.quantMaxFor(widget.currentUserId);
+    final hasQuantProgress = userIsQuantified && todayValue != null;
+    final completedToday = widget.habit.isCompletedOnDate(
+      widget.currentUserId,
+      now,
+    );
+    final userCompletions =
+        widget.habit.completions[widget.currentUserId] ?? [];
 
     if (completedToday) {
       _controller.forward();
@@ -58,21 +70,21 @@ class _HabitCardState extends State<HabitCard> with SingleTickerProviderStateMix
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
       decoration: BoxDecoration(
-        color: completedToday 
-            ? Theme.of(context).colorScheme.surface.withOpacity(0.8)
+        color: completedToday
+            ? Theme.of(context).colorScheme.surface.withValues(alpha: 0.8)
             : Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(24),
         border: Border.all(
-          color: completedToday 
-              ? Theme.of(context).colorScheme.primary.withOpacity(0.3)
-              : Colors.white.withOpacity(0.05)
+          color: completedToday
+              ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.3)
+              : Colors.white.withValues(alpha: 0.05),
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.3),
+            color: Colors.black.withValues(alpha: 0.3),
             blurRadius: 15,
             offset: const Offset(0, 8),
-          )
+          ),
         ],
       ),
       child: Material(
@@ -92,6 +104,7 @@ class _HabitCardState extends State<HabitCard> with SingleTickerProviderStateMix
                     // Animated Checkbox
                     GestureDetector(
                       onTap: () {
+                        HapticFeedback.heavyImpact();
                         widget.onCheck();
                       },
                       child: AnimatedContainer(
@@ -101,20 +114,26 @@ class _HabitCardState extends State<HabitCard> with SingleTickerProviderStateMix
                         height: 32,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          color: completedToday 
-                              ? Theme.of(context).colorScheme.primary 
+                          color: completedToday
+                              ? Theme.of(context).colorScheme.primary
                               : Colors.transparent,
                           border: Border.all(
-                            color: completedToday 
-                                ? Theme.of(context).colorScheme.primary 
+                            color: completedToday
+                                ? Theme.of(context).colorScheme.primary
                                 : Colors.grey[600]!,
                             width: 2,
                           ),
                         ),
                         child: Center(
                           child: completedToday
-                              ? const Icon(Icons.check_rounded, color: Colors.black, size: 20)
-                                  .animate().scale(duration: 200.ms, curve: Curves.easeOutBack)
+                              ? const Icon(
+                                  Icons.check_rounded,
+                                  color: Colors.black,
+                                  size: 20,
+                                ).animate().scale(
+                                  duration: 200.ms,
+                                  curve: Curves.easeOutBack,
+                                )
                               : null,
                         ),
                       ),
@@ -126,25 +145,116 @@ class _HabitCardState extends State<HabitCard> with SingleTickerProviderStateMix
                         children: [
                           Row(
                             children: [
-                              if (widget.habit.participants.length > 1) ...[
-                                Icon(Icons.people_alt_rounded, color: Theme.of(context).colorScheme.secondary, size: 16),
+                              if (widget.habit.isGroup) ...[
+                                Icon(
+                                  Icons.groups_rounded,
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.secondary,
+                                  size: 16,
+                                ),
+                                const SizedBox(width: 6),
+                              ] else if (widget.habit.participants.length >
+                                  1) ...[
+                                Icon(
+                                  Icons.people_alt_rounded,
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.secondary,
+                                  size: 16,
+                                ),
                                 const SizedBox(width: 6),
                               ],
                               Flexible(
                                 child: Text(
-                                  widget.habit.title,
+                                  widget.habit.displayTitle,
                                   style: GoogleFonts.outfit(
                                     fontSize: 20,
                                     fontWeight: FontWeight.w600,
-                                    color: completedToday ? Colors.grey[300] : Colors.white,
-                                    decoration: completedToday ? TextDecoration.lineThrough : null,
-                                    decorationColor: Theme.of(context).colorScheme.primary,
+                                    color: completedToday
+                                        ? Colors.grey[300]
+                                        : Colors.white,
+                                    decoration: completedToday
+                                        ? TextDecoration.lineThrough
+                                        : null,
+                                    decorationColor: Theme.of(
+                                      context,
+                                    ).colorScheme.primary,
                                   ),
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ),
                             ],
                           ),
+                          const SizedBox(height: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 5,
+                            ),
+                            decoration: BoxDecoration(
+                              color: widget.habit.isGroup
+                                  ? Theme.of(
+                                      context,
+                                    ).colorScheme.secondary.withValues(alpha: 0.14)
+                                  : Colors.white.withValues(alpha: 0.05),
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                            child: Text(
+                              widget.habit.spaceType.label,
+                              style: GoogleFonts.inter(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: widget.habit.isGroup
+                                    ? Theme.of(context).colorScheme.secondary
+                                    : Colors.grey[400],
+                              ),
+                            ),
+                          ),
+                          if (widget.habit.isGroup &&
+                              widget.habit.groupName != null &&
+                              widget.habit.groupName!.trim().isNotEmpty) ...[
+                            const SizedBox(height: 4),
+                            Text(
+                              widget.habit.hasMemberDefinedGroupTasks
+                                  ? (widget.habit
+                                            .taskFor(widget.currentUserId)
+                                            .isEmpty
+                                        ? 'No personal task set yet'
+                                        : widget.habit.taskFor(
+                                            widget.currentUserId,
+                                          ))
+                                  : widget.habit.title,
+                              style: GoogleFonts.inter(
+                                fontSize: 12,
+                                color: Colors.grey[500],
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                          if (userIsQuantified && completedToday) ...[
+                            const SizedBox(height: 6),
+                            Text(
+                              '${(todayValue ?? 0).toStringAsFixed(1)} / ${userQuantMax.toStringAsFixed(1)} $userQuantUnit • $quantProgressPct% completed',
+                              style: GoogleFonts.inter(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: Theme.of(context).colorScheme.primary,
+                              ),
+                            ),
+                          ],
+                          if (hasQuantProgress && !completedToday) ...[
+                            const SizedBox(height: 6),
+                            Text(
+                              '${todayValue.toStringAsFixed(1)} / ${userQuantMax.toStringAsFixed(1)} $userQuantUnit • $quantProgressPct% completed',
+                              style: GoogleFonts.inter(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: Theme.of(context).colorScheme.secondary,
+                              ),
+                            ),
+                          ],
                           if (widget.habit.description.isNotEmpty) ...[
                             const SizedBox(height: 4),
                             Text(
@@ -162,30 +272,59 @@ class _HabitCardState extends State<HabitCard> with SingleTickerProviderStateMix
                     ),
                     // Streak indicator
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
                       decoration: BoxDecoration(
-                        color: widget.habit.currentStreakFor(widget.currentUserId) > 0 
-                            ? Colors.orange.withOpacity(0.1)
-                            : Colors.white.withOpacity(0.05),
+                        color:
+                            widget.habit.currentStreakFor(
+                                  widget.currentUserId,
+                                ) >
+                                0
+                            ? Colors.orange.withValues(alpha: 0.1)
+                            : Colors.white.withValues(alpha: 0.05),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Row(
                         children: [
                           Icon(
-                            Icons.local_fire_department_rounded, 
-                            color: widget.habit.currentStreakFor(widget.currentUserId) > 0 ? Colors.orange : Colors.grey[600], 
-                            size: 20
-                          )
-                          .animate(
-                            target: (widget.habit.currentStreakFor(widget.currentUserId) >= 2 && completedToday) ? 1 : 0,
-                          ).scaleXY(end: 1.2, duration: 200.ms).then().scaleXY(end: 1.0, duration: 200.ms),
+                                Icons.local_fire_department_rounded,
+                                color:
+                                    widget.habit.currentStreakFor(
+                                          widget.currentUserId,
+                                        ) >
+                                        0
+                                    ? Colors.orange
+                                    : Colors.grey[600],
+                                size: 20,
+                              )
+                              .animate(
+                                target:
+                                    (widget.habit.currentStreakFor(
+                                              widget.currentUserId,
+                                            ) >=
+                                            2 &&
+                                        completedToday)
+                                    ? 1
+                                    : 0,
+                              )
+                              .scaleXY(end: 1.2, duration: 200.ms)
+                              .then()
+                              .scaleXY(end: 1.0, duration: 200.ms),
                           const SizedBox(width: 4),
                           Text(
                             '${widget.habit.currentStreakFor(widget.currentUserId)}',
                             style: GoogleFonts.outfit(
                               fontWeight: FontWeight.w700,
                               fontSize: 16,
-                              color: widget.habit.currentStreakFor(widget.currentUserId) > 0 ? Colors.orange : Colors.grey[600],
+                              color:
+                                  widget.habit.currentStreakFor(
+                                        widget.currentUserId,
+                                      ) >
+                                      0
+                                  ? Colors.orange
+                                  : Colors.grey[600],
                             ),
                           ),
                         ],
@@ -199,22 +338,25 @@ class _HabitCardState extends State<HabitCard> with SingleTickerProviderStateMix
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: List.generate(7, (index) {
                     final day = now.subtract(Duration(days: 6 - index));
-                    final isCompleted = userCompletions.any((d) => 
-                      d.year == day.year && d.month == day.month && d.day == day.day
+                    final isCompleted = userCompletions.any(
+                      (d) =>
+                          d.year == day.year &&
+                          d.month == day.month &&
+                          d.day == day.day,
                     );
-                    
+
                     return Container(
                       margin: const EdgeInsets.only(left: 6),
                       width: 14,
                       height: 14,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: isCompleted 
-                            ? Theme.of(context).colorScheme.primary 
+                        color: isCompleted
+                            ? Theme.of(context).colorScheme.primary
                             : Colors.transparent,
                         border: Border.all(
-                          color: isCompleted 
-                              ? Theme.of(context).colorScheme.primary 
+                          color: isCompleted
+                              ? Theme.of(context).colorScheme.primary
                               : Colors.grey[700]!,
                           width: 1.5,
                         ),

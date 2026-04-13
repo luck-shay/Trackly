@@ -1,11 +1,71 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
+enum HabitSpaceType { individual, sharedTask, group }
+
+enum GroupTaskMode { shared, memberDefined }
+
+extension HabitSpaceTypeX on HabitSpaceType {
+  String get value => switch (this) {
+    HabitSpaceType.individual => 'individual',
+    HabitSpaceType.sharedTask => 'sharedTask',
+    HabitSpaceType.group => 'group',
+  };
+
+  String get label => switch (this) {
+    HabitSpaceType.individual => 'Individual',
+    HabitSpaceType.sharedTask => 'Shared task',
+    HabitSpaceType.group => 'Group',
+  };
+
+  static HabitSpaceType fromValue(String? value) {
+    return switch (value) {
+      'individual' => HabitSpaceType.individual,
+      'group' => HabitSpaceType.group,
+      _ => HabitSpaceType.sharedTask,
+    };
+  }
+}
+
+extension GroupTaskModeX on GroupTaskMode {
+  String get value => switch (this) {
+    GroupTaskMode.shared => 'shared',
+    GroupTaskMode.memberDefined => 'memberDefined',
+  };
+
+  String get label => switch (this) {
+    GroupTaskMode.shared => 'Single shared task',
+    GroupTaskMode.memberDefined => 'Members add own tasks',
+  };
+
+  static GroupTaskMode fromValue(String? value) {
+    return switch (value) {
+      'memberDefined' => GroupTaskMode.memberDefined,
+      _ => GroupTaskMode.shared,
+    };
+  }
+}
+
 class Habit {
   final String id;
   final String title;
   final String description;
   final DateTime createdAt;
   Map<String, List<DateTime>> completions;
+  Map<String, Map<String, double>> quantifiedValues;
   List<String> participants;
   final int targetDaysPerWeek;
+  final HabitSpaceType spaceType;
+  final String? groupName;
+  final bool isQuantified;
+  final String quantUnit;
+  final double quantMin;
+  final double quantMax;
+  final GroupTaskMode groupTaskMode;
+  Map<String, String> memberTasks;
+  Map<String, bool> memberIsQuantified;
+  Map<String, String> memberQuantUnits;
+  Map<String, double> memberQuantMax;
+  final bool requiresPhotoValidation;
 
   Habit({
     required this.id,
@@ -13,10 +73,28 @@ class Habit {
     this.description = '',
     required this.createdAt,
     Map<String, List<DateTime>>? completions,
+    Map<String, Map<String, double>>? quantifiedValues,
     List<String>? participants,
     this.targetDaysPerWeek = 7,
-  })  : completions = completions ?? {},
-        participants = participants ?? [];
+    this.spaceType = HabitSpaceType.sharedTask,
+    this.groupName,
+    this.isQuantified = false,
+    this.quantUnit = 'units',
+    this.quantMin = 0,
+    this.quantMax = 10,
+    this.groupTaskMode = GroupTaskMode.shared,
+    Map<String, String>? memberTasks,
+    Map<String, bool>? memberIsQuantified,
+    Map<String, String>? memberQuantUnits,
+    Map<String, double>? memberQuantMax,
+    this.requiresPhotoValidation = false,
+  }) : completions = completions ?? {},
+       quantifiedValues = quantifiedValues ?? {},
+       participants = participants ?? [],
+       memberTasks = memberTasks ?? {},
+       memberIsQuantified = memberIsQuantified ?? {},
+       memberQuantUnits = memberQuantUnits ?? {},
+       memberQuantMax = memberQuantMax ?? {};
 
   Habit copyWith({
     String? id,
@@ -24,8 +102,21 @@ class Habit {
     String? description,
     DateTime? createdAt,
     Map<String, List<DateTime>>? completions,
+    Map<String, Map<String, double>>? quantifiedValues,
     List<String>? participants,
     int? targetDaysPerWeek,
+    HabitSpaceType? spaceType,
+    String? groupName,
+    bool? isQuantified,
+    String? quantUnit,
+    double? quantMin,
+    double? quantMax,
+    GroupTaskMode? groupTaskMode,
+    Map<String, String>? memberTasks,
+    Map<String, bool>? memberIsQuantified,
+    Map<String, String>? memberQuantUnits,
+    Map<String, double>? memberQuantMax,
+    bool? requiresPhotoValidation,
   }) {
     return Habit(
       id: id ?? this.id,
@@ -33,33 +124,140 @@ class Habit {
       description: description ?? this.description,
       createdAt: createdAt ?? this.createdAt,
       completions: completions ?? this.completions,
+      quantifiedValues: quantifiedValues ?? this.quantifiedValues,
       participants: participants ?? this.participants,
       targetDaysPerWeek: targetDaysPerWeek ?? this.targetDaysPerWeek,
+      spaceType: spaceType ?? this.spaceType,
+      groupName: groupName ?? this.groupName,
+      isQuantified: isQuantified ?? this.isQuantified,
+      quantUnit: quantUnit ?? this.quantUnit,
+      quantMin: quantMin ?? this.quantMin,
+      quantMax: quantMax ?? this.quantMax,
+      groupTaskMode: groupTaskMode ?? this.groupTaskMode,
+      memberTasks: memberTasks ?? this.memberTasks,
+      memberIsQuantified: memberIsQuantified ?? this.memberIsQuantified,
+      memberQuantUnits: memberQuantUnits ?? this.memberQuantUnits,
+      memberQuantMax: memberQuantMax ?? this.memberQuantMax,
+      requiresPhotoValidation: requiresPhotoValidation ?? this.requiresPhotoValidation,
     );
+  }
+
+  bool get isGroup => spaceType == HabitSpaceType.group;
+
+  String get displayTitle {
+    if (isGroup && (groupName ?? '').trim().isNotEmpty) {
+      return groupName!.trim();
+    }
+    return title;
+  }
+
+  bool get hasMemberDefinedGroupTasks {
+    return isGroup && groupTaskMode == GroupTaskMode.memberDefined;
+  }
+
+  String taskFor(String userId) {
+    if (!hasMemberDefinedGroupTasks) {
+      return title;
+    }
+
+    return memberTasks[userId]?.trim() ?? '';
+  }
+
+  bool isQuantifiedFor(String userId) {
+    if (!hasMemberDefinedGroupTasks) {
+      return isQuantified;
+    }
+    return memberIsQuantified[userId] ?? isQuantified;
+  }
+
+  String quantUnitFor(String userId) {
+    if (!hasMemberDefinedGroupTasks) {
+      return quantUnit;
+    }
+    final unit = memberQuantUnits[userId]?.trim();
+    if (unit == null || unit.isEmpty) {
+      return quantUnit;
+    }
+    return unit;
+  }
+
+  double quantMinFor(String userId) {
+    if (!hasMemberDefinedGroupTasks) {
+      return quantMin;
+    }
+    return 0;
+  }
+
+  double quantMaxFor(String userId) {
+    if (!hasMemberDefinedGroupTasks) {
+      return quantMax;
+    }
+    return memberQuantMax[userId] ?? quantMax;
+  }
+
+  String get dateKeyFormat => 'yyyy-mm-dd';
+
+  String dateKeyFor(DateTime date) {
+    final month = date.month.toString().padLeft(2, '0');
+    final day = date.day.toString().padLeft(2, '0');
+    return '${date.year}-$month-$day';
+  }
+
+  double? completionValueFor(String userId, DateTime date) {
+    final userValues = quantifiedValues[userId];
+    if (userValues == null) {
+      return null;
+    }
+    return userValues[dateKeyFor(date)];
+  }
+
+  bool isCompletedOnDate(String userId, DateTime date) {
+    final userCompletions = completions[userId] ?? const <DateTime>[];
+    return userCompletions.any(
+      (d) => d.year == date.year && d.month == date.month && d.day == date.day,
+    );
+  }
+
+  double completionProgressFor(String userId, DateTime date) {
+    if (!isQuantifiedFor(userId)) {
+      return isCompletedOnDate(userId, date) ? 1 : 0;
+    }
+
+    final value = completionValueFor(userId, date) ?? 0;
+    final userQuantMax = quantMaxFor(userId);
+    if (userQuantMax <= 0) {
+      return 0;
+    }
+
+    return (value / userQuantMax).clamp(0, 1);
   }
 
   // Calculate current streak based on completion dates for a specific user
   int currentStreakFor(String userId) {
-    if (!completions.containsKey(userId) || completions[userId]!.isEmpty) return 0;
-    
+    if (!completions.containsKey(userId) || completions[userId]!.isEmpty) {
+      return 0;
+    }
+
     int streak = 0;
     DateTime now = DateTime.now();
     DateTime today = DateTime(now.year, now.month, now.day);
-    
+
     List<DateTime> userCompletions = completions[userId]!;
-    
+
     // Sort descending
     List<DateTime> sorted = List.from(userCompletions)
       ..sort((a, b) => b.compareTo(a));
-    
+
     // Normalize to dates only
-    List<DateTime> dateOnly = sorted.map((d) => DateTime(d.year, d.month, d.day)).toList();
-    
+    List<DateTime> dateOnly = sorted
+        .map((d) => DateTime(d.year, d.month, d.day))
+        .toList();
+
     // If last completion isn't today or yesterday, streak is broken
     if (dateOnly.first.isBefore(today.subtract(const Duration(days: 1)))) {
       return 0;
     }
-    
+
     DateTime expectedDate = dateOnly.first;
     for (var date in dateOnly) {
       if (date.isAtSameMomentAs(expectedDate)) {
@@ -69,7 +267,7 @@ class Habit {
         break; // Streak broken
       }
     }
-    
+
     return streak;
   }
 
@@ -80,30 +278,135 @@ class Habit {
       'title': title,
       'description': description,
       'createdAt': createdAt.toIso8601String(),
-      'completions': completions.map((key, value) => MapEntry(key, value.map((d) => d.toIso8601String()).toList())),
+      'completions': completions.map(
+        (key, value) =>
+            MapEntry(key, value.map((d) => d.toIso8601String()).toList()),
+      ),
+      'quantifiedValues': quantifiedValues,
       'participants': participants,
       'targetDaysPerWeek': targetDaysPerWeek,
+      'spaceType': spaceType.value,
+      'groupName': groupName,
+      'isQuantified': isQuantified,
+      'quantUnit': quantUnit,
+      'quantMin': quantMin,
+      'quantMax': quantMax,
+      'groupTaskMode': groupTaskMode.value,
+      'memberTasks': memberTasks,
+      'memberIsQuantified': memberIsQuantified,
+      'memberQuantUnits': memberQuantUnits,
+      'memberQuantMax': memberQuantMax,
+      'requiresPhotoValidation': requiresPhotoValidation,
     };
   }
 
   // Parse from Firestore Map
   factory Habit.fromMap(Map<String, dynamic> map, {String? id}) {
-     Map<String, List<DateTime>> parsedCompletions = {};
-     if (map['completions'] != null) {
-       final rawCompletions = Map<String, dynamic>.from(map['completions']);
-       rawCompletions.forEach((key, value) {
-         parsedCompletions[key] = (value as List<dynamic>).map((d) => DateTime.parse(d as String)).toList();
-       });
-     }
+    DateTime? parseDate(dynamic raw) {
+      if (raw is DateTime) {
+        return raw;
+      }
+      if (raw is Timestamp) {
+        return raw.toDate();
+      }
+      if (raw is String) {
+        return DateTime.tryParse(raw);
+      }
+      return null;
+    }
+
+    Map<String, List<DateTime>> parsedCompletions = {};
+    final rawCompletionsAny = map['completions'];
+    if (rawCompletionsAny is Map) {
+      final rawCompletions = Map<String, dynamic>.from(rawCompletionsAny);
+      rawCompletions.forEach((key, value) {
+        if (value is List) {
+          parsedCompletions[key] = value
+              .map(parseDate)
+              .whereType<DateTime>()
+              .toList();
+        }
+      });
+    }
+
+    Map<String, Map<String, double>> parsedQuantifiedValues = {};
+    final rawValuesAny = map['quantifiedValues'];
+    if (rawValuesAny is Map) {
+      final rawValues = Map<String, dynamic>.from(rawValuesAny);
+      rawValues.forEach((userId, valueByDate) {
+        if (valueByDate is! Map) {
+          return;
+        }
+        final normalized = <String, double>{};
+        final dateMap = Map<String, dynamic>.from(valueByDate);
+        dateMap.forEach((dateKey, value) {
+          if (value is num) {
+            normalized[dateKey] = value.toDouble();
+          }
+        });
+        parsedQuantifiedValues[userId] = normalized;
+      });
+    }
+
+    final parsedMemberTasks = <String, String>{};
+    final rawTasksAny = map['memberTasks'];
+    if (rawTasksAny is Map) {
+      final rawTasks = Map<String, dynamic>.from(rawTasksAny);
+      rawTasks.forEach((userId, task) {
+        parsedMemberTasks[userId] = task.toString();
+      });
+    }
+
+    final parsedMemberIsQuantified = <String, bool>{};
+    final rawMemberIsQuantifiedAny = map['memberIsQuantified'];
+    if (rawMemberIsQuantifiedAny is Map) {
+      final rawMap = Map<String, dynamic>.from(rawMemberIsQuantifiedAny);
+      rawMap.forEach((userId, value) {
+        parsedMemberIsQuantified[userId] = value == true;
+      });
+    }
+
+    final parsedMemberQuantUnits = <String, String>{};
+    final rawMemberQuantUnitsAny = map['memberQuantUnits'];
+    if (rawMemberQuantUnitsAny is Map) {
+      final rawMap = Map<String, dynamic>.from(rawMemberQuantUnitsAny);
+      rawMap.forEach((userId, value) {
+        parsedMemberQuantUnits[userId] = value.toString();
+      });
+    }
+
+    final parsedMemberQuantMax = <String, double>{};
+    final rawMemberQuantMaxAny = map['memberQuantMax'];
+    if (rawMemberQuantMaxAny is Map) {
+      final rawMap = Map<String, dynamic>.from(rawMemberQuantMaxAny);
+      rawMap.forEach((userId, value) {
+        if (value is num) {
+          parsedMemberQuantMax[userId] = value.toDouble();
+        }
+      });
+    }
 
     return Habit(
       id: id ?? map['id'] ?? '',
       title: map['title'] ?? '',
       description: map['description'] ?? '',
-      createdAt: map['createdAt'] != null ? DateTime.parse(map['createdAt']) : DateTime.now(),
+      createdAt: parseDate(map['createdAt']) ?? DateTime.now(),
       completions: parsedCompletions,
+      quantifiedValues: parsedQuantifiedValues,
       participants: List<String>.from(map['participants'] ?? []),
       targetDaysPerWeek: map['targetDaysPerWeek']?.toInt() ?? 7,
+      spaceType: HabitSpaceTypeX.fromValue(map['spaceType'] as String?),
+      groupName: map['groupName'] as String?,
+      isQuantified: map['isQuantified'] as bool? ?? false,
+      quantUnit: map['quantUnit'] as String? ?? 'units',
+      quantMin: (map['quantMin'] as num?)?.toDouble() ?? 0,
+      quantMax: (map['quantMax'] as num?)?.toDouble() ?? 10,
+      groupTaskMode: GroupTaskModeX.fromValue(map['groupTaskMode'] as String?),
+      memberTasks: parsedMemberTasks,
+      memberIsQuantified: parsedMemberIsQuantified,
+      memberQuantUnits: parsedMemberQuantUnits,
+      memberQuantMax: parsedMemberQuantMax,
+      requiresPhotoValidation: map['requiresPhotoValidation'] ?? false,
     );
   }
 }
