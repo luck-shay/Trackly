@@ -12,7 +12,6 @@ import 'calendar_screen.dart';
 import 'create_habit_screen.dart';
 import 'groups_screen.dart';
 import 'friends_screen.dart';
-import 'profile_screen.dart';
 
 class MainLayoutScreen extends StatelessWidget {
   MainLayoutScreen({super.key});
@@ -22,7 +21,6 @@ class MainLayoutScreen extends StatelessWidget {
     const CalendarScreen(),
     const GroupsScreen(),
     const FriendsScreen(),
-    ProfileScreen(),
   ];
 
   @override

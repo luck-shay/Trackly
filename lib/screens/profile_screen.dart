@@ -32,7 +32,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        automaticallyImplyLeading: false, 
+        automaticallyImplyLeading: true,
         title: Text('Profile', style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
       ),
       body: StreamBuilder<DocumentSnapshot>(

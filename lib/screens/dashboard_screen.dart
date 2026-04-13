@@ -12,6 +12,7 @@ import '../providers/navigation_provider.dart';
 import '../providers/quantified_log_provider.dart';
 import '../services/ai_service.dart';
 import 'habit_leaderboard_screen.dart';
+import 'profile_screen.dart';
 
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key});
@@ -290,6 +291,7 @@ class DashboardScreen extends StatelessWidget {
 
     return Scaffold(
       body: SafeArea(
+        bottom: false,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -298,7 +300,7 @@ class DashboardScreen extends StatelessWidget {
                 left: 24.0,
                 right: 24.0,
                 top: 20.0,
-                bottom: 20.0,
+                // bottom: 20.0,
               ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -363,7 +365,12 @@ class DashboardScreen extends StatelessWidget {
                       ).colorScheme.primary.withValues(alpha: 0.1),
                       foregroundColor: Theme.of(context).colorScheme.primary,
                       onPressed: () {
-                        context.read<NavigationProvider>().setIndex(4);
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const ProfileScreen(),
+                          ),
+                        );
                       },
                       child: const Icon(Icons.person_rounded, size: 34),
                     ).animate().scale(delay: 300.ms, curve: Curves.easeOutBack),
@@ -471,7 +478,7 @@ class DashboardScreen extends StatelessWidget {
                     backgroundColor: Theme.of(context).colorScheme.surface,
                     child: ListView(
                       physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
-                      padding: const EdgeInsets.only(top: 8, bottom: 120),
+                      padding: const EdgeInsets.only(top: 8),
                       children: [
                       if (groupHabits.isNotEmpty) ...[
                         Padding(
