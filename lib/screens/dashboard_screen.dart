@@ -11,7 +11,6 @@ import '../providers/habits_provider.dart';
 import '../providers/navigation_provider.dart';
 import '../providers/quantified_log_provider.dart';
 import '../services/ai_service.dart';
-import 'create_habit_screen.dart';
 import 'habit_leaderboard_screen.dart';
 
 class DashboardScreen extends StatelessWidget {
@@ -356,47 +355,17 @@ class DashboardScreen extends StatelessWidget {
                     width: 60,
                     height: 60,
                     child: FloatingActionButton(
-                      shape: CircleBorder(),
-                      // mini: true,
+                      heroTag: 'dashboard_profile_fab',
+                      shape: const CircleBorder(),
                       elevation: 0,
                       backgroundColor: Theme.of(
                         context,
                       ).colorScheme.primary.withValues(alpha: 0.1),
-
                       foregroundColor: Theme.of(context).colorScheme.primary,
                       onPressed: () {
-                        Navigator.push(
-                          context,
-                          PageRouteBuilder(
-                            pageBuilder:
-                                (context, animation, secondaryAnimation) =>
-                                    CreateHabitScreen(),
-                            transitionsBuilder:
-                                (
-                                  context,
-                                  animation,
-                                  secondaryAnimation,
-                                  child,
-                                ) {
-                                  const begin = Offset(0.0, 1.0);
-                                  const end = Offset.zero;
-                                  const curve = Curves.easeOutCubic;
-                                  var tween = Tween(
-                                    begin: begin,
-                                    end: end,
-                                  ).chain(CurveTween(curve: curve));
-                                  return SlideTransition(
-                                    position: animation.drive(tween),
-                                    child: child,
-                                  );
-                                },
-                            transitionDuration: const Duration(
-                              milliseconds: 400,
-                            ),
-                          ),
-                        );
+                        context.read<NavigationProvider>().setIndex(4);
                       },
-                      child: const Icon(Icons.add, size: 40),
+                      child: const Icon(Icons.person_rounded, size: 34),
                     ).animate().scale(delay: 300.ms, curve: Curves.easeOutBack),
                   ),
                 ],

@@ -9,6 +9,7 @@ import '../providers/navigation_provider.dart';
 import '../services/social_service.dart';
 import 'dashboard_screen.dart';
 import 'calendar_screen.dart';
+import 'create_habit_screen.dart';
 import 'groups_screen.dart';
 import 'friends_screen.dart';
 import 'profile_screen.dart';
@@ -37,7 +38,7 @@ class MainLayoutScreen extends StatelessWidget {
 
           Positioned(
             left: 24,
-            right: 24,
+            right: 104,
             bottom: 32,
             child:
                 ClipRRect(
@@ -103,12 +104,6 @@ class MainLayoutScreen extends StatelessWidget {
                               );
                             },
                           ),
-                          _buildNavItem(
-                            context,
-                            Icons.person_rounded,
-                            'Profile',
-                            4,
-                          ),
                         ],
                       ),
                     ),
@@ -118,6 +113,52 @@ class MainLayoutScreen extends StatelessWidget {
                   duration: 800.ms,
                   curve: Curves.easeOutBack,
                 ),
+          ),
+          Positioned(
+            right: 24,
+            bottom: 38,
+            child: SizedBox(
+              width: 60,
+              height: 60,
+              child: ClipOval(
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+                  child: FloatingActionButton(
+                    heroTag: 'main_layout_add_fab',
+                    shape: const CircleBorder(),
+                    elevation: 0,
+                    backgroundColor: Colors.black.withValues(alpha: 0.22),
+                    foregroundColor: Theme.of(context).colorScheme.primary,
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        PageRouteBuilder(
+                          pageBuilder:
+                              (context, animation, secondaryAnimation) =>
+                                  CreateHabitScreen(),
+                          transitionsBuilder:
+                              (context, animation, secondaryAnimation, child) {
+                                const begin = Offset(0.0, 1.0);
+                                const end = Offset.zero;
+                                const curve = Curves.easeOutCubic;
+                                final tween = Tween(
+                                  begin: begin,
+                                  end: end,
+                                ).chain(CurveTween(curve: curve));
+                                return SlideTransition(
+                                  position: animation.drive(tween),
+                                  child: child,
+                                );
+                              },
+                          transitionDuration: const Duration(milliseconds: 400),
+                        ),
+                      );
+                    },
+                    child: const Icon(Icons.add, size: 38),
+                  ),
+                ),
+              ).animate().scale(delay: 350.ms, curve: Curves.easeOutBack),
+            ),
           ),
         ],
       ),
