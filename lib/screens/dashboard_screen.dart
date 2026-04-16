@@ -18,6 +18,8 @@ import 'profile_screen.dart';
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key});
 
+  static const double _bottomNavClearance = 124;
+
   Future<void> _showCompletionCelebration(
     BuildContext context,
     HabitsProvider provider,
@@ -479,8 +481,9 @@ class DashboardScreen extends StatelessWidget {
                     backgroundColor: Theme.of(context).colorScheme.surface,
                     child: ListView(
                       physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
-                      padding: const EdgeInsets.only(top: 8),
+                      padding: EdgeInsets.zero,
                       children: [
+                      const SizedBox(height: 8),
                       if (groupHabits.isNotEmpty) ...[
                         Padding(
                           padding: const EdgeInsets.fromLTRB(24, 4, 24, 8),
@@ -802,6 +805,7 @@ class DashboardScreen extends StatelessWidget {
                                   .slideY(begin: 0.2),
                         );
                       }),
+                      const SizedBox(height: _bottomNavClearance),
                     ],
                   ),
                 );
