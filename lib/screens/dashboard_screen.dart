@@ -11,6 +11,7 @@ import '../providers/habits_provider.dart';
 import '../providers/navigation_provider.dart';
 import '../providers/quantified_log_provider.dart';
 import '../services/ai_service.dart';
+import 'create_habit_screen.dart';
 import 'habit_leaderboard_screen.dart';
 import 'profile_screen.dart';
 
@@ -615,13 +616,18 @@ class DashboardScreen extends StatelessWidget {
                           key: Key(habit.id),
                           direction: DismissDirection.endToStart,
                           confirmDismiss: (direction) async {
+                            final isShared = habit.participants.length > 1;
                             final shouldDelete = await showDialog<bool>(
                               context: context,
                               builder: (dialogContext) {
                                 return AlertDialog(
-                                  title: const Text('Delete habit?'),
+                                  title: Text(
+                                    isShared ? 'Leave shared habit?' : 'Delete habit?',
+                                  ),
                                   content: Text(
-                                    'Are you sure you want to delete "${habit.title}"? This cannot be undone.',
+                                    isShared
+                                        ? 'You will be removed from "${habit.title}". Others will keep it and be notified that you left.'
+                                        : 'Are you sure you want to delete "${habit.title}"? This cannot be undone.',
                                   ),
                                   actions: [
                                     TextButton(
@@ -632,7 +638,7 @@ class DashboardScreen extends StatelessWidget {
                                     ElevatedButton(
                                       onPressed: () =>
                                           Navigator.pop(dialogContext, true),
-                                      child: const Text('Delete'),
+                                      child: Text(isShared ? 'Leave' : 'Delete'),
                                     ),
                                   ],
                                 );
@@ -658,7 +664,7 @@ class DashboardScreen extends StatelessWidget {
                             ),
                           ),
                           onDismissed: (direction) {
-                            provider.deleteHabit(habit.id);
+                            provider.deleteHabit(habit);
                           },
                           child:
                               HabitCard(
@@ -778,7 +784,17 @@ class DashboardScreen extends StatelessWidget {
                                                 ),
                                           ),
                                         );
+                                        return;
                                       }
+
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) => CreateHabitScreen(
+                                            initialHabit: habit,
+                                          ),
+                                        ),
+                                      );
                                     },
                                   )
                                   .animate(key: ValueKey('anim_${habit.id}'))

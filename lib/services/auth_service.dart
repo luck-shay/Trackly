@@ -8,9 +8,22 @@ import 'notification_service.dart';
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final GoogleSignIn _googleSignIn = GoogleSignIn.instance;
+  bool _isGoogleSignInInitialized = false;
+
+  // Firebase Web OAuth client ID (from google-services.json, client_type: 3).
+  // Required by google_sign_in on Android to issue the token used by Firebase Auth.
+  static const String _googleServerClientId =
+      '852142844109-k39c43icuhgd4nqheh3j33rird17a2bu.apps.googleusercontent.com';
 
   // Stream of auth state changes
   Stream<User?> get user => _auth.authStateChanges();
+
+  Future<void> _ensureGoogleSignInInitialized() async {
+    if (_isGoogleSignInInitialized) return;
+
+    await _googleSignIn.initialize(serverClientId: _googleServerClientId);
+    _isGoogleSignInInitialized = true;
+  }
 
   // Sign in with Google
   Future<UserCredential?> signInWithGoogle() async {
@@ -24,6 +37,8 @@ class AuthService {
         await syncUserToFirestore(userCredential.user);
         return userCredential;
       } else {
+        await _ensureGoogleSignInInitialized();
+
         // Trigger the Google Authentication flow
         final GoogleSignInAccount googleUser = await _googleSignIn
             .authenticate();

@@ -8,6 +8,7 @@ import '../providers/group_interaction_provider.dart';
 import '../providers/habit_leaderboard_provider.dart';
 import '../providers/habits_provider.dart';
 import '../services/social_service.dart';
+import 'create_habit_screen.dart';
 import '../widgets/calendar_activity_sheet.dart';
 
 class HabitLeaderboardScreen extends StatelessWidget {
@@ -451,6 +452,18 @@ class _HabitLeaderboardView extends StatelessWidget {
           style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
         ),
         actions: [
+          IconButton(
+            tooltip: 'Edit habit',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => CreateHabitScreen(initialHabit: habit),
+                ),
+              );
+            },
+            icon: const Icon(Icons.edit_rounded),
+          ),
           if (habit.isGroup)
             IconButton(
               tooltip: 'Leave group',

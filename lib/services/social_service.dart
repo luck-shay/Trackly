@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/user_profile.dart';
 import '../models/group_invite.dart';
+import '../models/habit.dart';
 
 class SocialService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
@@ -326,5 +327,44 @@ class SocialService {
     await _db.collection('groupInvites').doc(inviteId).update({
       'status': 'declined',
     });
+  }
+
+  Future<void> notifyHabitParticipantLeft({
+    required Habit habit,
+    required String departingUserId,
+    required List<String> remainingParticipantIds,
+  }) async {
+    if (remainingParticipantIds.isEmpty) {
+      return;
+    }
+
+    final departingProfile = await getUserProfile(departingUserId);
+    final departingName = departingProfile?.displayName ?? 'A participant';
+    final habitLabel = habit.isGroup
+        ? ((habit.groupName ?? '').trim().isEmpty
+              ? habit.title
+              : habit.groupName!.trim())
+        : habit.title;
+
+    final noticeMessage =
+        '$departingName left "$habitLabel". The habit is still active for you.';
+
+    final batch = _db.batch();
+    for (final participantId in remainingParticipantIds) {
+      final noticeRef = _db.collection('habitNotices').doc();
+      batch.set(noticeRef, {
+        'type': 'participantLeft',
+        'to': participantId,
+        'from': departingUserId,
+        'habitId': habit.id,
+        'habitTitle': habit.title,
+        'groupName': habit.groupName,
+        'message': noticeMessage,
+        'status': 'unread',
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+    }
+
+    await batch.commit();
   }
 }

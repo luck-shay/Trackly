@@ -14,6 +14,10 @@ class CreateHabitProvider extends ChangeNotifier {
   double _quantMax = 10;
   GroupTaskMode _groupTaskMode = GroupTaskMode.shared;
   bool _requiresPhotoValidation = false;
+  String? _reminderTime;
+  bool _isEditMode = false;
+  String? _editingHabitId;
+
 
   // Placeholder cycling logic
   int _placeholderIndex = 0;
@@ -53,6 +57,9 @@ class CreateHabitProvider extends ChangeNotifier {
   double get quantMax => _quantMax;
   GroupTaskMode get groupTaskMode => _groupTaskMode;
   bool get requiresPhotoValidation => _requiresPhotoValidation;
+  String? get reminderTime => _reminderTime;
+  bool get isEditMode => _isEditMode;
+
   double get quantSliderMin => _quantConfig(_quantUnit).min;
   double get quantSliderMax => _quantConfig(_quantUnit).max;
   double get quantSliderStep => _quantConfig(_quantUnit).step;
@@ -123,6 +130,28 @@ class CreateHabitProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  
+  void setReminderTime(String? time) {
+    _reminderTime = time;
+    notifyListeners();
+  }
+
+  void initializeForEdit(Habit habit) {
+    _isEditMode = true;
+    _editingHabitId = habit.id;
+    _targetDays = habit.targetDaysPerWeek;
+    _spaceType = habit.spaceType;
+    _isQuantified = habit.isQuantified;
+    _quantUnit = habit.quantUnit;
+    _quantMax = habit.quantMax;
+    _groupTaskMode = habit.groupTaskMode;
+    _requiresPhotoValidation = habit.requiresPhotoValidation;
+    _reminderTime = habit.reminderTime;
+    _selectedFriends.clear();
+    notifyListeners();
+  }
+
+
   void toggleFriend(String uid) {
     if (_selectedFriends.contains(uid)) {
       _selectedFriends.remove(uid);
@@ -143,60 +172,89 @@ class CreateHabitProvider extends ChangeNotifier {
     }
     final databaseService = DatabaseService();
 
-    final newHabit = Habit(
-      id: databaseService.createHabitId(),
-      title: title,
-      description: description,
-      createdAt: DateTime.now(),
-      targetDaysPerWeek: _targetDays,
-      participants: [currentUserId],
-      spaceType: _spaceType,
-      groupName: _spaceType == HabitSpaceType.group ? groupName : null,
-      isQuantified: _isQuantified,
-      quantUnit: _quantUnit,
-      quantMin: 0,
-      quantMax: _quantMax,
-      groupTaskMode: _spaceType == HabitSpaceType.group
-          ? _groupTaskMode
-          : GroupTaskMode.shared,
-      requiresPhotoValidation: _requiresPhotoValidation,
-      memberTasks:
-          _spaceType == HabitSpaceType.group &&
-              _groupTaskMode == GroupTaskMode.memberDefined
-          ? {currentUserId: title}
-          : const {},
-      memberIsQuantified:
-          _spaceType == HabitSpaceType.group &&
-              _groupTaskMode == GroupTaskMode.memberDefined
-          ? {currentUserId: _isQuantified}
-          : const {},
-      memberQuantUnits:
-          _spaceType == HabitSpaceType.group &&
-              _groupTaskMode == GroupTaskMode.memberDefined
-          ? {currentUserId: _quantUnit}
-          : const {},
-      memberQuantMax:
-          _spaceType == HabitSpaceType.group &&
-              _groupTaskMode == GroupTaskMode.memberDefined
-          ? {currentUserId: _quantMax}
-          : const {},
-    );
+    Habit savedHabit;
 
-    // Save to Database so it automatically streams to Dashboard via HabitsProvider
-    await databaseService.saveHabit(newHabit);
+    if (_isEditMode && _editingHabitId != null) {
+      final existing = await databaseService.getHabitById(_editingHabitId!);
+      if (existing == null) {
+        throw StateError('Habit not found. Please refresh and try again.');
+      }
 
-    for (final friendUid in _selectedFriends) {
-      if (_spaceType == HabitSpaceType.group) {
-        await SocialService().sendGroupInvite(
-          groupId: newHabit.id,
-          groupName: newHabit.groupName ?? newHabit.title,
-          toUserId: friendUid,
-        );
-      } else if (_spaceType == HabitSpaceType.sharedTask) {
-        await SocialService().sendHabitInvite(
-          habitId: newHabit.id,
-          toUserId: friendUid,
-        );
+      savedHabit = existing.copyWith(
+        title: title,
+        description: description,
+        targetDaysPerWeek: _targetDays,
+        isQuantified: _isQuantified,
+        quantUnit: _quantUnit,
+        quantMax: _quantMax,
+        groupTaskMode: existing.spaceType == HabitSpaceType.group
+            ? _groupTaskMode
+            : existing.groupTaskMode,
+        groupName: existing.spaceType == HabitSpaceType.group
+            ? groupName
+            : existing.groupName,
+        requiresPhotoValidation: _requiresPhotoValidation,
+        reminderTime: _reminderTime,
+      );
+
+      await databaseService.saveHabit(savedHabit);
+    } else {
+      savedHabit = Habit(
+        id: databaseService.createHabitId(),
+        title: title,
+        description: description,
+        createdAt: DateTime.now(),
+        targetDaysPerWeek: _targetDays,
+        participants: [currentUserId],
+        spaceType: _spaceType,
+        groupName: _spaceType == HabitSpaceType.group ? groupName : null,
+        isQuantified: _isQuantified,
+        quantUnit: _quantUnit,
+        quantMin: 0,
+        quantMax: _quantMax,
+        groupTaskMode: _spaceType == HabitSpaceType.group
+            ? _groupTaskMode
+            : GroupTaskMode.shared,
+        requiresPhotoValidation: _requiresPhotoValidation,
+        memberTasks:
+            _spaceType == HabitSpaceType.group &&
+                _groupTaskMode == GroupTaskMode.memberDefined
+            ? {currentUserId: title}
+            : const {},
+        memberIsQuantified:
+            _spaceType == HabitSpaceType.group &&
+                _groupTaskMode == GroupTaskMode.memberDefined
+            ? {currentUserId: _isQuantified}
+            : const {},
+        memberQuantUnits:
+            _spaceType == HabitSpaceType.group &&
+                _groupTaskMode == GroupTaskMode.memberDefined
+            ? {currentUserId: _quantUnit}
+            : const {},
+        memberQuantMax:
+            _spaceType == HabitSpaceType.group &&
+                _groupTaskMode == GroupTaskMode.memberDefined
+            ? {currentUserId: _quantMax}
+            : const {},
+        reminderTime: _reminderTime,
+      );
+
+      // Save to Database so it automatically streams to Dashboard via HabitsProvider
+      await databaseService.saveHabit(savedHabit);
+
+      for (final friendUid in _selectedFriends) {
+        if (_spaceType == HabitSpaceType.group) {
+          await SocialService().sendGroupInvite(
+            groupId: savedHabit.id,
+            groupName: savedHabit.groupName ?? savedHabit.title,
+            toUserId: friendUid,
+          );
+        } else if (_spaceType == HabitSpaceType.sharedTask) {
+          await SocialService().sendHabitInvite(
+            habitId: savedHabit.id,
+            toUserId: friendUid,
+          );
+        }
       }
     }
 
@@ -209,9 +267,12 @@ class CreateHabitProvider extends ChangeNotifier {
     _quantMax = 10;
     _groupTaskMode = GroupTaskMode.shared;
     _requiresPhotoValidation = false;
+    _reminderTime = null;
+    _isEditMode = false;
+    _editingHabitId = null;
     notifyListeners();
 
-    return newHabit;
+    return savedHabit;
   }
 }
 

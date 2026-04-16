@@ -10,25 +10,34 @@ import '../theme/app_layout.dart';
 
 class CreateHabitScreen extends StatelessWidget {
   final HabitSpaceType initialSpaceType;
+  final Habit? initialHabit;
 
   const CreateHabitScreen({
     super.key,
     this.initialSpaceType = HabitSpaceType.individual,
+    this.initialHabit,
   });
 
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
       create: (_) => CreateHabitProvider(),
-      child: _CreateHabitView(initialSpaceType: initialSpaceType),
+      child: _CreateHabitView(
+        initialSpaceType: initialHabit?.spaceType ?? initialSpaceType,
+        initialHabit: initialHabit,
+      ),
     );
   }
 }
 
 class _CreateHabitView extends StatefulWidget {
   final HabitSpaceType initialSpaceType;
+  final Habit? initialHabit;
 
-  const _CreateHabitView({required this.initialSpaceType});
+  const _CreateHabitView({
+    required this.initialSpaceType,
+    required this.initialHabit,
+  });
 
   @override
   State<_CreateHabitView> createState() => _CreateHabitViewState();
@@ -36,15 +45,40 @@ class _CreateHabitView extends StatefulWidget {
 
 class _CreateHabitViewState extends State<_CreateHabitView> {
   final _formKey = GlobalKey<FormState>();
+  late final TextEditingController _titleController;
+  late final TextEditingController _descriptionController;
+  late final TextEditingController _groupNameController;
+
+  bool get _isEditMode => widget.initialHabit != null;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+  }
 
   @override
   void initState() {
     super.initState();
+    _titleController = TextEditingController(
+      text: widget.initialHabit?.title ?? '',
+    );
+    _descriptionController = TextEditingController(
+      text: widget.initialHabit?.description ?? '',
+    );
+    _groupNameController = TextEditingController(
+      text: widget.initialHabit?.groupName ?? '',
+    );
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) {
         return;
       }
       final provider = context.read<CreateHabitProvider>();
+      if (widget.initialHabit != null) {
+        provider.initializeForEdit(widget.initialHabit!);
+        return;
+      }
+
       if (provider.spaceType != widget.initialSpaceType) {
         provider.setSpaceType(widget.initialSpaceType);
       }
@@ -52,11 +86,15 @@ class _CreateHabitViewState extends State<_CreateHabitView> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    String title = '';
-    String description = '';
-    String groupName = '';
+  void dispose() {
+    _titleController.dispose();
+    _descriptionController.dispose();
+    _groupNameController.dispose();
+    super.dispose();
+  }
 
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
@@ -64,7 +102,7 @@ class _CreateHabitViewState extends State<_CreateHabitView> {
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
-          'New Routine',
+          _isEditMode ? 'Edit Routine' : 'New Routine',
           style: GoogleFonts.outfit(fontWeight: FontWeight.w600),
         ),
       ),
@@ -98,6 +136,7 @@ class _CreateHabitViewState extends State<_CreateHabitView> {
               Consumer<CreateHabitProvider>(
                 builder: (context, provider, child) {
                   return TextFormField(
+                    controller: _titleController,
                     style: GoogleFonts.inter(fontSize: 18),
                     decoration: InputDecoration(
                       hintText: provider.currentPlaceholder,
@@ -121,7 +160,6 @@ class _CreateHabitViewState extends State<_CreateHabitView> {
                       }
                       return null;
                     },
-                    onSaved: (value) => title = value!,
                   );
                 },
               ).animate().fade(delay: 150.ms).slideX(begin: 0.05),
@@ -139,6 +177,7 @@ class _CreateHabitViewState extends State<_CreateHabitView> {
               ).animate().fade(delay: 200.ms),
               const VGap(AppLayout.sm),
               TextFormField(
+                controller: _descriptionController,
                 style: GoogleFonts.inter(fontSize: 16),
                 decoration: InputDecoration(
                   hintText: 'e.g. 5km around the park',
@@ -151,7 +190,6 @@ class _CreateHabitViewState extends State<_CreateHabitView> {
                   ),
                 ),
                 maxLines: 3,
-                onSaved: (value) => description = value ?? '',
               ).animate().fade(delay: 250.ms).slideX(begin: 0.05),
 
               const VGap(AppLayout.xxl),
@@ -328,9 +366,11 @@ class _CreateHabitViewState extends State<_CreateHabitView> {
                       ChoiceChip(
                         label: const Text('Individual'),
                         selected: isIndividual,
-                        onSelected: (_) {
-                          provider.setSpaceType(HabitSpaceType.individual);
-                        },
+                        onSelected: _isEditMode
+                            ? null
+                            : (_) {
+                                provider.setSpaceType(HabitSpaceType.individual);
+                              },
                         selectedColor: Theme.of(context).colorScheme.primary,
                         backgroundColor: Theme.of(context).colorScheme.surface,
                         labelStyle: GoogleFonts.inter(
@@ -341,9 +381,11 @@ class _CreateHabitViewState extends State<_CreateHabitView> {
                       ChoiceChip(
                         label: const Text('Shared task'),
                         selected: isShared,
-                        onSelected: (_) {
-                          provider.setSpaceType(HabitSpaceType.sharedTask);
-                        },
+                        onSelected: _isEditMode
+                            ? null
+                            : (_) {
+                                provider.setSpaceType(HabitSpaceType.sharedTask);
+                              },
                         selectedColor: Theme.of(context).colorScheme.primary,
                         backgroundColor: Theme.of(context).colorScheme.surface,
                         labelStyle: GoogleFonts.inter(
@@ -354,9 +396,11 @@ class _CreateHabitViewState extends State<_CreateHabitView> {
                       ChoiceChip(
                         label: const Text('Group'),
                         selected: isGroup,
-                        onSelected: (_) {
-                          provider.setSpaceType(HabitSpaceType.group);
-                        },
+                        onSelected: _isEditMode
+                            ? null
+                            : (_) {
+                                provider.setSpaceType(HabitSpaceType.group);
+                              },
                         selectedColor: Theme.of(context).colorScheme.primary,
                         backgroundColor: Theme.of(context).colorScheme.surface,
                         labelStyle: GoogleFonts.inter(
@@ -368,6 +412,17 @@ class _CreateHabitViewState extends State<_CreateHabitView> {
                   );
                 },
               ).animate().fade(delay: 300.ms).slideX(begin: 0.05),
+
+              if (_isEditMode) ...[
+                const VGap(AppLayout.xs),
+                Text(
+                  'Sharing mode is locked after creation.',
+                  style: GoogleFonts.inter(
+                    color: Colors.grey[500],
+                    fontSize: 12,
+                  ),
+                ),
+              ],
 
               const VGap(AppLayout.md),
               Consumer<CreateHabitProvider>(
@@ -390,6 +445,7 @@ class _CreateHabitViewState extends State<_CreateHabitView> {
                       ).animate().fade(delay: 325.ms),
                       const VGap(AppLayout.sm),
                       TextFormField(
+                        controller: _groupNameController,
                         style: GoogleFonts.inter(fontSize: 16),
                         decoration: InputDecoration(
                           hintText: 'e.g. Sunrise Runners',
@@ -408,7 +464,6 @@ class _CreateHabitViewState extends State<_CreateHabitView> {
                           }
                           return null;
                         },
-                        onSaved: (value) => groupName = value?.trim() ?? '',
                       ).animate().fade(delay: 350.ms).slideX(begin: 0.05),
                       const VGap(AppLayout.sm),
                       Text(
@@ -532,6 +587,89 @@ class _CreateHabitViewState extends State<_CreateHabitView> {
                   );
                 },
               ).animate().fade(delay: 350.ms),
+              
+              const VGap(AppLayout.xxl),
+
+              Text(
+                'REMINDER TIME',
+                style: GoogleFonts.inter(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey[500],
+                  letterSpacing: 1.2,
+                ),
+              ).animate().fade(delay: 375.ms),
+              const VGap(AppLayout.sm),
+              Consumer<CreateHabitProvider>(
+                builder: (context, provider, child) {
+                  return ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    onTap: () async {
+                      final now = TimeOfDay.now();
+                      final initialTime = provider.reminderTime != null
+                          ? TimeOfDay(
+                              hour: int.parse(provider.reminderTime!.split(':')[0]),
+                              minute: int.parse(provider.reminderTime!.split(':')[1]),
+                            )
+                          : now;
+
+                      final selected = await showTimePicker(
+                        context: context,
+                        initialTime: initialTime,
+                        builder: (context, child) {
+                          return Theme(
+                            data: Theme.of(context).copyWith(
+                              colorScheme: ColorScheme.dark(
+                                primary: Theme.of(context).colorScheme.primary,
+                                onPrimary: Colors.black,
+                                surface: const Color(0xFF1A1A1A),
+                                onSurface: Colors.white,
+                              ),
+                            ),
+                            child: child!,
+                          );
+                        },
+                      );
+
+                      if (selected != null) {
+                        provider.setReminderTime(
+                          "${selected.hour.toString().padLeft(2, '0')}:${selected.minute.toString().padLeft(2, '0')}",
+                        );
+                      }
+                    },
+                    leading: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.surface,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(
+                        Icons.notifications_active_rounded,
+                        color: provider.reminderTime != null
+                            ? Theme.of(context).colorScheme.primary
+                            : Colors.grey[600],
+                      ),
+                    ),
+                    title: Text(
+                      provider.reminderTime ?? 'No reminder set',
+                      style: GoogleFonts.inter(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                        color: provider.reminderTime != null 
+                            ? Colors.white 
+                            : Colors.grey[600],
+                      ),
+                    ),
+                    trailing: provider.reminderTime != null
+                        ? IconButton(
+                            icon: const Icon(Icons.close_rounded, size: 20),
+                            onPressed: () => provider.setReminderTime(null),
+                          )
+                        : const Icon(Icons.arrow_forward_ios_rounded, size: 16),
+                  );
+                },
+              ).animate().fade(delay: 400.ms).slideX(begin: 0.05),
+
 
               const VGap(AppLayout.xxl),
 
@@ -542,6 +680,32 @@ class _CreateHabitViewState extends State<_CreateHabitView> {
                     builder: (context, provider, child) {
                       if (provider.spaceType == HabitSpaceType.individual) {
                         return const SizedBox.shrink();
+                      }
+
+                      if (_isEditMode) {
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'SHARING',
+                              style: GoogleFonts.inter(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.grey[500],
+                                letterSpacing: 1.2,
+                              ),
+                            ).animate().fade(delay: 400.ms),
+                            const VGap(AppLayout.sm),
+                            Text(
+                              'Friend sharing cannot be edited here. Use invite/leave actions from the habit details screen.',
+                              style: GoogleFonts.inter(
+                                color: Colors.grey[500],
+                                fontSize: 13,
+                                height: 1.4,
+                              ),
+                            ).animate().fade(delay: 450.ms),
+                          ],
+                        );
                       }
 
                       final shareTitle =
@@ -628,8 +792,11 @@ class _CreateHabitViewState extends State<_CreateHabitView> {
                 child: ElevatedButton(
                   onPressed: () async {
                     if (_formKey.currentState!.validate()) {
-                      _formKey.currentState!.save();
                       final provider = context.read<CreateHabitProvider>();
+                      final title = _titleController.text.trim();
+                      final description = _descriptionController.text.trim();
+                      final groupName = _groupNameController.text.trim();
+
                       if (provider.spaceType == HabitSpaceType.group &&
                           groupName.isEmpty) {
                         if (context.mounted) {
@@ -675,6 +842,16 @@ class _CreateHabitViewState extends State<_CreateHabitView> {
                   ),
                   child: Consumer<CreateHabitProvider>(
                     builder: (context, provider, _) {
+                      if (provider.isEditMode) {
+                        return Text(
+                          'Save Changes',
+                          style: GoogleFonts.outfit(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        );
+                      }
+
                       final ctaLabel =
                           provider.spaceType == HabitSpaceType.group
                           ? 'Create Group'

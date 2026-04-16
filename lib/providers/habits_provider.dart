@@ -1,9 +1,13 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/habit.dart';
 import '../services/database_service.dart';
 import '../services/health_service.dart';
+import '../services/notification_service.dart';
+import '../services/social_service.dart';
+
 
 class HabitsProvider extends ChangeNotifier {
   final DatabaseService _db = DatabaseService();
@@ -40,6 +44,8 @@ class HabitsProvider extends ChangeNotifier {
         _isLoading = false;
         _error = null;
         notifyListeners();
+        // Refresh notifications whenever the habit list changes
+        NotificationService().scheduleAllHabitReminders();
       },
       onError: (err) {
         _error = err.toString();
@@ -255,19 +261,60 @@ class HabitsProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> deleteHabit(String habitId) async {
-    // Optimistic delete
-    final previousHabits = List<Habit>.from(_habits);
-    _habits.removeWhere((h) => h.id == habitId);
-    notifyListeners();
+  Future<void> deleteHabit(Habit habit) async {
+    final uid = _db.userId;
 
-    try {
-      await _db.deleteHabit(habitId);
-    } catch (_) {
-      _habits = previousHabits;
+    if (habit.participants.length <= 1) {
+      // True delete only when this user is the last participant.
+      final previousHabits = List<Habit>.from(_habits);
+      _habits.removeWhere((h) => h.id == habit.id);
       notifyListeners();
-      rethrow;
+
+      try {
+        await _db.deleteHabit(habit.id);
+      } catch (_) {
+        _habits = previousHabits;
+        notifyListeners();
+        rethrow;
+      }
+      return;
     }
+
+    if (!habit.participants.contains(uid)) {
+      return;
+    }
+
+    final remainingParticipants =
+        List<String>.from(habit.participants)..remove(uid);
+    final updatedHabit = habit.copyWith(
+      participants: remainingParticipants,
+      completions: Map<String, List<DateTime>>.from(habit.completions)
+        ..remove(uid),
+      quantifiedValues: Map<String, Map<String, double>>.from(
+        habit.quantifiedValues,
+      )..remove(uid),
+      memberTasks: Map<String, String>.from(habit.memberTasks)..remove(uid),
+      memberIsQuantified: Map<String, bool>.from(habit.memberIsQuantified)
+        ..remove(uid),
+      memberQuantUnits: Map<String, String>.from(habit.memberQuantUnits)
+        ..remove(uid),
+      memberQuantMax: Map<String, double>.from(habit.memberQuantMax)
+        ..remove(uid),
+    );
+
+    await _runWithRollback(
+      previousHabit: habit,
+      updatedHabit: updatedHabit,
+      action: () => _db.saveHabit(
+        updatedHabit,
+        ensureCurrentUserParticipant: false,
+      ),
+    );
+
+    await _notifyParticipantDeparture(
+      habit: habit,
+      remainingParticipants: remainingParticipants,
+    );
   }
 
   Future<void> convertToSharedSpace(Habit habit) async {
@@ -393,6 +440,32 @@ class HabitsProvider extends ChangeNotifier {
         ensureCurrentUserParticipant: false,
       ),
     );
+
+    await _notifyParticipantDeparture(
+      habit: habit,
+      remainingParticipants: newParticipants,
+    );
+  }
+
+  Future<void> _notifyParticipantDeparture({
+    required Habit habit,
+    required List<String> remainingParticipants,
+  }) async {
+    if (remainingParticipants.isEmpty) {
+      return;
+    }
+
+    try {
+      await SocialService().notifyHabitParticipantLeft(
+        habit: habit,
+        departingUserId: _db.userId,
+        remainingParticipantIds: remainingParticipants,
+      );
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('Failed to notify participants about departure: $e');
+      }
+    }
   }
 
   @override

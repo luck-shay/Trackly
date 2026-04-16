@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:google_sign_in/google_sign_in.dart';
 import 'firebase_options.dart';
 import 'screens/login_screen.dart';
 import 'screens/main_layout_screen.dart';
@@ -17,33 +16,27 @@ import 'providers/login_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  if (kDebugMode) debugPrint('Trackly: App Starting...');
+  
   Object? bootstrapError;
 
   try {
+    if (kDebugMode) debugPrint('Trackly: Initializing Firebase...');
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
+    if (kDebugMode) debugPrint('Trackly: Firebase Ready.');
 
     if (!kIsWeb) {
-      // Notification setup should never prevent the app from booting.
-      try {
-        await NotificationService().initialize();
-      } catch (notificationError, notificationStackTrace) {
-        FlutterError.reportError(
-          FlutterErrorDetails(
-            exception: notificationError,
-            stack: notificationStackTrace,
-            library: 'trackly notifications bootstrap',
-          ),
-        );
-      }
-
-      await GoogleSignIn.instance.initialize(
-        serverClientId:
-            '852142844109-k39c43icuhgd4nqheh3j33rird17a2bu.apps.googleusercontent.com',
-      );
+      // NON-BLOCKING notification setup
+      // We do NOT 'await' this so that the UI can boot immediately.
+      if (kDebugMode) debugPrint('Trackly: Warming up notifications (Background)...');
+      NotificationService().initialize().catchError((e, stack) {
+        if (kDebugMode) debugPrint('Trackly: Notification Init Error: $e');
+      });
     }
   } catch (error, stackTrace) {
+    if (kDebugMode) debugPrint('Trackly: Bootstrap Error: $error');
     bootstrapError = error;
     FlutterError.reportError(
       FlutterErrorDetails(
@@ -67,6 +60,7 @@ class MyApp extends StatelessWidget {
     if (bootstrapError != null) {
       return MaterialApp(
         debugShowCheckedModeBanner: false,
+        theme: ThemeData.dark(),
         home: _BootstrapErrorScreen(error: bootstrapError!),
       );
     }
@@ -124,8 +118,10 @@ class MyApp extends StatelessWidget {
               );
             }
             if (snapshot.hasData && snapshot.data != null) {
+              if (kDebugMode) debugPrint('Trackly: Session Found. Routing to Main.');
               return MainLayoutScreen();
             }
+            if (kDebugMode) debugPrint('Trackly: No Session. Routing to Login.');
             return const LoginScreen();
           },
         ),

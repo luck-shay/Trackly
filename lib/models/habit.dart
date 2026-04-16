@@ -66,6 +66,8 @@ class Habit {
   Map<String, String> memberQuantUnits;
   Map<String, double> memberQuantMax;
   final bool requiresPhotoValidation;
+  final String? reminderTime; // HH:mm format
+
 
   Habit({
     required this.id,
@@ -88,6 +90,7 @@ class Habit {
     Map<String, String>? memberQuantUnits,
     Map<String, double>? memberQuantMax,
     this.requiresPhotoValidation = false,
+    this.reminderTime,
   }) : completions = completions ?? {},
        quantifiedValues = quantifiedValues ?? {},
        participants = participants ?? [],
@@ -117,6 +120,7 @@ class Habit {
     Map<String, String>? memberQuantUnits,
     Map<String, double>? memberQuantMax,
     bool? requiresPhotoValidation,
+    String? reminderTime,
   }) {
     return Habit(
       id: id ?? this.id,
@@ -139,6 +143,7 @@ class Habit {
       memberQuantUnits: memberQuantUnits ?? this.memberQuantUnits,
       memberQuantMax: memberQuantMax ?? this.memberQuantMax,
       requiresPhotoValidation: requiresPhotoValidation ?? this.requiresPhotoValidation,
+      reminderTime: reminderTime ?? this.reminderTime,
     );
   }
 
@@ -297,6 +302,7 @@ class Habit {
       'memberQuantUnits': memberQuantUnits,
       'memberQuantMax': memberQuantMax,
       'requiresPhotoValidation': requiresPhotoValidation,
+      'reminderTime': reminderTime,
     };
   }
 
@@ -407,6 +413,7 @@ class Habit {
       memberQuantUnits: parsedMemberQuantUnits,
       memberQuantMax: parsedMemberQuantMax,
       requiresPhotoValidation: map['requiresPhotoValidation'] ?? false,
+      reminderTime: map['reminderTime'] as String?,
     );
   }
 }
