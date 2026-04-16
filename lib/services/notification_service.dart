@@ -86,6 +86,8 @@ class NotificationService {
         },
       ).timeout(const Duration(seconds: 5));
 
+      await _requestLocalNotificationPermissions();
+
       await _initializeTimeZone();
 
       if (!kIsWeb) {
@@ -137,10 +139,12 @@ class NotificationService {
         _handleNotificationTap(message.data.toString());
       });
 
+      // Mark initialized before wiring auth listeners because auth callbacks
+      // may fire immediately and trigger reminder scheduling.
+      _isInitialized = true;
       _watchRealtimeAlerts();
       
       if (kDebugMode) debugPrint('NotificationService: Initialization Complete.');
-      _isInitialized = true;
     } catch (e) {
       if (kDebugMode) debugPrint('NotificationService: Critical Initialization Error: $e');
     }
@@ -211,50 +215,68 @@ class NotificationService {
           .where('to', isEqualTo: user.uid)
           .where('status', isEqualTo: 'pending')
           .snapshots()
-          .listen((s) => _processInviteSnapshot(s, 'friendRequest'));
+          .listen(
+            (s) => _processInviteSnapshot(s, 'friendRequest'),
+            onError: (e) => debugPrint('Friend invite stream error: $e'),
+          );
 
       _habitInviteSubscription = db
           .collection('habitInvites')
           .where('to', isEqualTo: user.uid)
           .where('status', isEqualTo: 'pending')
           .snapshots()
-          .listen((s) => _processInviteSnapshot(s, 'habitInvite'));
+          .listen(
+            (s) => _processInviteSnapshot(s, 'habitInvite'),
+            onError: (e) => debugPrint('Habit invite stream error: $e'),
+          );
 
       _groupInviteSubscription = db
           .collection('groupInvites')
           .where('to', isEqualTo: user.uid)
           .where('status', isEqualTo: 'pending')
           .snapshots()
-          .listen((s) => _processInviteSnapshot(s, 'groupInvite'));
+          .listen(
+            (s) => _processInviteSnapshot(s, 'groupInvite'),
+            onError: (e) => debugPrint('Group invite stream error: $e'),
+          );
 
         // Notify sender when outgoing invites are accepted or declined.
-        _friendInviteResponseSubscription = db
+      _friendInviteResponseSubscription = db
           .collection('friendRequests')
           .where('from', isEqualTo: user.uid)
-          .where('status', whereIn: ['accepted', 'declined'])
           .snapshots()
-          .listen((s) => _processInviteResponseSnapshot(s, 'friendRequest'));
+          .listen(
+            (s) => _processInviteResponseSnapshot(s, 'friendRequest'),
+            onError: (e) => debugPrint('Friend invite response stream error: $e'),
+          );
 
-        _habitInviteResponseSubscription = db
+      _habitInviteResponseSubscription = db
           .collection('habitInvites')
           .where('from', isEqualTo: user.uid)
-          .where('status', whereIn: ['accepted', 'declined'])
           .snapshots()
-          .listen((s) => _processInviteResponseSnapshot(s, 'habitInvite'));
+          .listen(
+            (s) => _processInviteResponseSnapshot(s, 'habitInvite'),
+            onError: (e) => debugPrint('Habit invite response stream error: $e'),
+          );
 
-        _groupInviteResponseSubscription = db
+      _groupInviteResponseSubscription = db
           .collection('groupInvites')
           .where('from', isEqualTo: user.uid)
-          .where('status', whereIn: ['accepted', 'declined'])
           .snapshots()
-          .listen((s) => _processInviteResponseSnapshot(s, 'groupInvite'));
+          .listen(
+            (s) => _processInviteResponseSnapshot(s, 'groupInvite'),
+            onError: (e) => debugPrint('Group invite response stream error: $e'),
+          );
 
         _habitNoticeSubscription = db
             .collection('habitNotices')
             .where('to', isEqualTo: user.uid)
             .where('status', isEqualTo: 'unread')
             .snapshots()
-            .listen(_processHabitNoticeSnapshot);
+            .listen(
+              _processHabitNoticeSnapshot,
+              onError: (e) => debugPrint('Habit notice stream error: $e'),
+            );
     });
   }
 
@@ -446,6 +468,20 @@ class NotificationService {
 
   Future<void> scheduleAllHabitReminders() async {
     if (kIsWeb) return;
+
+    if (!_isInitialized) {
+      if (kDebugMode) {
+        debugPrint(
+          'NotificationService: Skipping reminder scheduling until initialization completes.',
+        );
+      }
+      return;
+    }
+
+    if (!_isTimeZoneInitialized) {
+      await _initializeTimeZone();
+    }
+
     if (kDebugMode) debugPrint('NotificationService: Refreshing habit reminders...');
 
     try {
@@ -589,13 +625,55 @@ class NotificationService {
     tzdata.initializeTimeZones();
     try {
       final localTimeZone = await FlutterTimezone.getLocalTimezone();
-      tz.setLocalLocation(tz.getLocation(localTimeZone));
+      final normalized = _normalizeTimeZoneId(localTimeZone);
+      tz.setLocalLocation(tz.getLocation(normalized));
+      if (kDebugMode) {
+        debugPrint('NotificationService: Local timezone set to $normalized');
+      }
     } catch (_) {
-      // Fallback to UTC if we cannot resolve a local timezone identifier.
-      tz.setLocalLocation(tz.UTC);
+      // Prefer a common device timezone fallback before UTC.
+      try {
+        tz.setLocalLocation(tz.getLocation('Asia/Kolkata'));
+      } catch (_) {
+        tz.setLocalLocation(tz.UTC);
+      }
+      if (kDebugMode) {
+        debugPrint('NotificationService: Falling back timezone to ${tz.local.name}');
+      }
     }
 
     _isTimeZoneInitialized = true;
+  }
+
+  Future<void> _requestLocalNotificationPermissions() async {
+    if (kIsWeb) return;
+
+    final android = _localNotifications
+        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+    await android?.requestNotificationsPermission();
+
+    final ios = _localNotifications
+        .resolvePlatformSpecificImplementation<IOSFlutterLocalNotificationsPlugin>();
+    await ios?.requestPermissions(alert: true, badge: true, sound: true);
+
+    final macos = _localNotifications
+        .resolvePlatformSpecificImplementation<MacOSFlutterLocalNotificationsPlugin>();
+    await macos?.requestPermissions(alert: true, badge: true, sound: true);
+  }
+
+  String _normalizeTimeZoneId(String raw) {
+    final value = raw.trim();
+    if (value.isEmpty) return value;
+
+    const aliases = <String, String>{
+      'Asia/Calcutta': 'Asia/Kolkata',
+      'US/Pacific': 'America/Los_Angeles',
+      'US/Central': 'America/Chicago',
+      'US/Mountain': 'America/Denver',
+      'US/Eastern': 'America/New_York',
+    };
+
+    return aliases[value] ?? value;
   }
 
   tz.TZDateTime _nextDateTime(int hour, int minute) {
