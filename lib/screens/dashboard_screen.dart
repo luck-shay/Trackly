@@ -58,7 +58,7 @@ class DashboardScreen extends StatelessWidget {
       );
       loaderShown = true;
 
-      final isValid = await AIService.validateHabitCompletion(
+      final validationResult = await AIService.validateHabitCompletionDetailed(
         habit.title,
         File(pickedFile.path),
       );
@@ -68,12 +68,10 @@ class DashboardScreen extends StatelessWidget {
         loaderShown = false;
       }
 
-      if (!isValid && context.mounted) {
+      if (!validationResult.approved && context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'AI didn\'t think the photo matches the habit. Try again!',
-            ),
+          SnackBar(
+            content: Text(validationResult.userMessage),
             backgroundColor: Colors.redAccent,
           ),
         );

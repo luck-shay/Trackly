@@ -36,73 +36,93 @@ class MainLayoutScreen extends StatelessWidget {
 
           Positioned(
             left: 24,
-            right: 104,
+            right: 24,
             bottom: 32,
-            child:
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(32),
-                  child: BackdropFilter(
-                    filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-                    child: Container(
-                      height: 72,
-                      decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: 0.3),
-                        borderRadius: BorderRadius.circular(32),
-                        border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.1),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Expanded(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(32),
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+                      child: Container(
+                        height: 72,
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.3),
+                          borderRadius: BorderRadius.circular(32),
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.1),
+                          ),
                         ),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                        children: [
-                          _buildNavItem(
-                            context,
-                            Icons.track_changes_rounded,
-                            'Habits',
-                            0,
-                          ),
-                          _buildNavItem(
-                            context,
-                            Icons.calendar_month_rounded,
-                            'History',
-                            1,
-                          ),
-                          StreamBuilder<QuerySnapshot>(
-                            stream: social.streamGroupInvites(),
-                            builder: (context, snapshot) {
-                              final count = snapshot.data?.docs.length ?? 0;
-                              return _buildNavItem(
-                                context,
-                                Icons.groups_rounded,
-                                'Groups',
-                                2,
-                                badgeCount: count,
-                              );
-                            },
-                          ),
-                          StreamBuilder<QuerySnapshot>(
-                            stream: social.streamIncomingFriendRequests(),
-                            builder: (context, friendSnapshot) {
-                              final friendCount =
-                                  friendSnapshot.data?.docs.length ?? 0;
-                              return StreamBuilder<QuerySnapshot>(
-                                stream: social.streamHabitInvites(),
-                                builder: (context, habitSnapshot) {
-                                  final habitCount =
-                                      habitSnapshot.data?.docs.length ?? 0;
-                                  final total = friendCount + habitCount;
-                                  return _buildNavItem(
+                        child: LayoutBuilder(
+                          builder: (context, constraints) {
+                            final compact = constraints.maxWidth / 4 < 68;
+                            return Row(
+                              children: [
+                                Expanded(
+                                  child: _buildNavItem(
                                     context,
-                                    Icons.people_alt_rounded,
-                                    'Friends',
-                                    3,
-                                    badgeCount: total,
-                                  );
-                                },
-                              );
-                            },
-                          ),
-                        ],
+                                    Icons.track_changes_rounded,
+                                    'Habits',
+                                    0,
+                                    compact: compact,
+                                  ),
+                                ),
+                                Expanded(
+                                  child: _buildNavItem(
+                                    context,
+                                    Icons.calendar_month_rounded,
+                                    'History',
+                                    1,
+                                    compact: compact,
+                                  ),
+                                ),
+                                Expanded(
+                                  child: StreamBuilder<QuerySnapshot>(
+                                    stream: social.streamGroupInvites(),
+                                    builder: (context, snapshot) {
+                                      final count = snapshot.data?.docs.length ?? 0;
+                                      return _buildNavItem(
+                                        context,
+                                        Icons.groups_rounded,
+                                        'Groups',
+                                        2,
+                                        badgeCount: count,
+                                        compact: compact,
+                                      );
+                                    },
+                                  ),
+                                ),
+                                Expanded(
+                                  child: StreamBuilder<QuerySnapshot>(
+                                    stream: social.streamIncomingFriendRequests(),
+                                    builder: (context, friendSnapshot) {
+                                      final friendCount =
+                                          friendSnapshot.data?.docs.length ?? 0;
+                                      return StreamBuilder<QuerySnapshot>(
+                                        stream: social.streamHabitInvites(),
+                                        builder: (context, habitSnapshot) {
+                                          final habitCount =
+                                              habitSnapshot.data?.docs.length ?? 0;
+                                          final total = friendCount + habitCount;
+                                          return _buildNavItem(
+                                            context,
+                                            Icons.people_alt_rounded,
+                                            'Friends',
+                                            3,
+                                            badgeCount: total,
+                                            compact: compact,
+                                          );
+                                        },
+                                      );
+                                    },
+                                  ),
+                                ),
+                              ],
+                            );
+                          },
+                        ),
                       ),
                     ),
                   ),
@@ -111,51 +131,50 @@ class MainLayoutScreen extends StatelessWidget {
                   duration: 800.ms,
                   curve: Curves.easeOutBack,
                 ),
-          ),
-          Positioned(
-            right: 24,
-            bottom: 38,
-            child: SizedBox(
-              width: 60,
-              height: 60,
-              child: ClipOval(
-                child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
-                  child: FloatingActionButton(
-                    heroTag: 'main_layout_add_fab',
-                    shape: const CircleBorder(),
-                    elevation: 0,
-                    backgroundColor: Colors.black.withValues(alpha: 0.22),
-                    foregroundColor: Theme.of(context).colorScheme.primary,
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        PageRouteBuilder(
-                          pageBuilder:
-                              (context, animation, secondaryAnimation) =>
-                                  CreateHabitScreen(),
-                          transitionsBuilder:
-                              (context, animation, secondaryAnimation, child) {
-                                const begin = Offset(0.0, 1.0);
-                                const end = Offset.zero;
-                                const curve = Curves.easeOutCubic;
-                                final tween = Tween(
-                                  begin: begin,
-                                  end: end,
-                                ).chain(CurveTween(curve: curve));
-                                return SlideTransition(
-                                  position: animation.drive(tween),
-                                  child: child,
-                                );
-                              },
-                          transitionDuration: const Duration(milliseconds: 400),
-                        ),
-                      );
-                    },
-                    child: const Icon(Icons.add, size: 38),
+                const SizedBox(width: 16),
+                SizedBox(
+                  width: 60,
+                  height: 60,
+                  child: ClipOval(
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+                      child: FloatingActionButton(
+                        heroTag: 'main_layout_add_fab',
+                        shape: const CircleBorder(),
+                        elevation: 0,
+                        backgroundColor: Colors.black.withValues(alpha: 0.22),
+                        foregroundColor: Theme.of(context).colorScheme.primary,
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            PageRouteBuilder(
+                              pageBuilder:
+                                  (context, animation, secondaryAnimation) =>
+                                      CreateHabitScreen(),
+                              transitionsBuilder:
+                                  (context, animation, secondaryAnimation, child) {
+                                    const begin = Offset(0.0, 1.0);
+                                    const end = Offset.zero;
+                                    const curve = Curves.easeOutCubic;
+                                    final tween = Tween(
+                                      begin: begin,
+                                      end: end,
+                                    ).chain(CurveTween(curve: curve));
+                                    return SlideTransition(
+                                      position: animation.drive(tween),
+                                      child: child,
+                                    );
+                                  },
+                              transitionDuration: const Duration(milliseconds: 400),
+                            ),
+                          );
+                        },
+                        child: const Icon(Icons.add, size: 38),
+                      ),
+                    ),
                   ),
-                ),
-              ).animate().scale(delay: 350.ms, curve: Curves.easeOutBack),
+                ).animate().scale(delay: 350.ms, curve: Curves.easeOutBack),
+              ],
             ),
           ),
         ],
@@ -169,6 +188,7 @@ class MainLayoutScreen extends StatelessWidget {
     String label,
     int index, {
     int badgeCount = 0,
+    required bool compact,
   }) {
     final isSelected =
         context.watch<NavigationProvider>().currentIndex == index;
@@ -183,7 +203,7 @@ class MainLayoutScreen extends StatelessWidget {
       behavior: HitTestBehavior.opaque,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 300),
-        width: 70,
+        width: double.infinity,
         height: double.infinity,
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -219,14 +239,20 @@ class MainLayoutScreen extends StatelessWidget {
                   ),
               ],
             ),
-            if (isSelected) ...[
+              if (isSelected && !compact) ...[
               const SizedBox(height: 4),
-              Text(
-                label,
-                style: GoogleFonts.inter(
-                  fontSize: 10,
-                  color: color,
-                  fontWeight: FontWeight.bold,
+                SizedBox(
+                  width: double.infinity,
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      label,
+                      style: GoogleFonts.inter(
+                        fontSize: 10,
+                        color: color,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                 ),
               ).animate().fade().scaleXY(),
             ],

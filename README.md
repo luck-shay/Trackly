@@ -23,12 +23,16 @@ Trackly is a Flutter habit-tracking app with Google sign-in, Firebase-backed per
 1. Install Flutter and platform toolchains.
 2. Run `flutter pub get`.
 3. Ensure Firebase config files are present for the target platform.
-4. Run `flutter run`.
+4. Set AI env vars when needed:
+	- `export GEMINI_API_KEY=your_key`
+	- `export GEMINI_MODEL=gemini-1.5-flash`
+5. Run `flutter run`.
 
 ## Quality Checks
 
 - `flutter analyze`
 - `flutter test`
+- `bash tool/quality_gate.sh`
 
 ## Release Notes
 
