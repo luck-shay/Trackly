@@ -139,6 +139,18 @@ class NotificationService {
         _handleNotificationTap(message.data.toString());
       });
 
+      _fcm.onTokenRefresh.listen((token) async {
+        final uid = FirebaseAuth.instance.currentUser?.uid;
+        if (uid == null || uid.isEmpty) return;
+        try {
+          await _saveToken(uid, token);
+        } catch (e) {
+          if (kDebugMode) {
+            debugPrint('NotificationService: Error saving refreshed FCM token: $e');
+          }
+        }
+      });
+
       // Mark initialized before wiring auth listeners because auth callbacks
       // may fire immediately and trigger reminder scheduling.
       _isInitialized = true;
@@ -745,6 +757,24 @@ class NotificationService {
     if (user == null) return;
 
     try {
+      if (!kIsWeb &&
+          (defaultTargetPlatform == TargetPlatform.iOS ||
+              defaultTargetPlatform == TargetPlatform.macOS)) {
+        final apnsToken = await _fcm.getAPNSToken().timeout(
+          const Duration(seconds: 5),
+          onTimeout: () => null,
+        );
+
+        if (apnsToken == null || apnsToken.isEmpty) {
+          if (kDebugMode) {
+            debugPrint(
+              'NotificationService: APNS token not available yet. FCM token save deferred.',
+            );
+          }
+          return;
+        }
+      }
+
       String? token = await _fcm.getToken().timeout(const Duration(seconds: 5));
       if (token != null) {
         await _saveToken(user.uid, token);
