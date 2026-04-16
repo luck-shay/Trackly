@@ -5,6 +5,44 @@ const admin = require("firebase-admin");
 admin.initializeApp();
 setGlobalOptions({region: "asia-south2", maxInstances: 10});
 
+const TOKEN_BATCH_SIZE = 500;
+
+function chunkArray(items, size) {
+  const chunks = [];
+  for (let i = 0; i < items.length; i += size) {
+    chunks.push(items.slice(i, i + size));
+  }
+  return chunks;
+}
+
+async function reserveEventOnce(event, scope) {
+  const eventId = event?.id;
+  if (!eventId) {
+    // If event id is missing for any reason, do not block delivery.
+    return true;
+  }
+
+  const dedupeKey = `${scope}:${eventId}`;
+  const ref = admin.firestore().collection("notificationEvents").doc(dedupeKey);
+  try {
+    await ref.create({
+      scope,
+      eventId,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      expiresAt: admin.firestore.Timestamp.fromDate(
+        new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      ),
+    });
+    return true;
+  } catch (error) {
+    if (error?.code === 6 || error?.code === "already-exists") {
+      logger.info("Skipping duplicate notification event", {scope, eventId});
+      return false;
+    }
+    throw error;
+  }
+}
+
 function toStringMap(data) {
   const out = {};
   for (const [key, value] of Object.entries(data)) {
@@ -26,9 +64,9 @@ async function getUserTokens(uid) {
   const profile = await getUserProfile(uid);
   if (!profile) return [];
   const tokens = Array.isArray(profile.fcmTokens) ? profile.fcmTokens : [];
-  return tokens
+  return [...new Set(tokens
     .filter((token) => typeof token === "string" && token.trim().length > 0)
-    .map((token) => token.trim());
+    .map((token) => token.trim()))];
 }
 
 async function removeInvalidTokens(uid, invalidTokens) {
@@ -49,8 +87,7 @@ async function sendPushToUser({uid, title, body, data}) {
     return;
   }
 
-  const payload = {
-    tokens,
+  const payloadBase = {
     notification: {
       title,
       body,
@@ -75,33 +112,54 @@ async function sendPushToUser({uid, title, body, data}) {
     },
   };
 
-  const response = await admin.messaging().sendEachForMulticast(payload);
+  let successCount = 0;
+  let failureCount = 0;
   const invalidTokens = [];
-  response.responses.forEach((result, index) => {
-    if (result.success) return;
-    const code = result.error?.code || "unknown";
-    if (
-      code === "messaging/registration-token-not-registered" ||
-      code === "messaging/invalid-registration-token"
-    ) {
-      invalidTokens.push(tokens[index]);
-    }
-  });
+  const failureCodeCounts = {};
+
+  const tokenBatches = chunkArray(tokens, TOKEN_BATCH_SIZE);
+  for (const batch of tokenBatches) {
+    const response = await admin.messaging().sendEachForMulticast({
+      ...payloadBase,
+      tokens: batch,
+    });
+
+    successCount += response.successCount;
+    failureCount += response.failureCount;
+
+    response.responses.forEach((result, index) => {
+      if (result.success) return;
+      const code = result.error?.code || "unknown";
+      failureCodeCounts[code] = (failureCodeCounts[code] || 0) + 1;
+      if (
+        code === "messaging/registration-token-not-registered" ||
+        code === "messaging/invalid-registration-token"
+      ) {
+        invalidTokens.push(batch[index]);
+      }
+    });
+  }
 
   if (invalidTokens.length) {
-    await removeInvalidTokens(uid, invalidTokens);
+    await removeInvalidTokens(uid, [...new Set(invalidTokens)]);
   }
 
   logger.info("Push dispatch complete", {
     uid,
-    successCount: response.successCount,
-    failureCount: response.failureCount,
+    tokenCount: tokens.length,
+    batchCount: tokenBatches.length,
+    successCount,
+    failureCount,
+    invalidTokenCount: invalidTokens.length,
+    failureCodeCounts,
   });
 }
 
 exports.notifyFriendInviteCreated = onDocumentCreated(
   "friendRequests/{requestId}",
   async (event) => {
+    if (!(await reserveEventOnce(event, "notifyFriendInviteCreated"))) return;
+
     const data = event.data?.data();
     if (!data) return;
     if (data.status !== "pending") return;
@@ -128,6 +186,8 @@ exports.notifyFriendInviteCreated = onDocumentCreated(
 exports.notifyHabitInviteCreated = onDocumentCreated(
   "habitInvites/{inviteId}",
   async (event) => {
+    if (!(await reserveEventOnce(event, "notifyHabitInviteCreated"))) return;
+
     const data = event.data?.data();
     if (!data) return;
     if (data.status !== "pending") return;
@@ -167,6 +227,8 @@ exports.notifyHabitInviteCreated = onDocumentCreated(
 exports.notifyGroupInviteCreated = onDocumentCreated(
   "groupInvites/{inviteId}",
   async (event) => {
+    if (!(await reserveEventOnce(event, "notifyGroupInviteCreated"))) return;
+
     const data = event.data?.data();
     if (!data) return;
     if (data.status !== "pending") return;
@@ -197,6 +259,8 @@ exports.notifyGroupInviteCreated = onDocumentCreated(
 exports.notifyInviteResponses = onDocumentUpdated(
   "{collectionId}/{docId}",
   async (event) => {
+    if (!(await reserveEventOnce(event, "notifyInviteResponses"))) return;
+
     const allowedCollections = new Set([
       "friendRequests",
       "habitInvites",
@@ -274,6 +338,8 @@ exports.notifyInviteResponses = onDocumentUpdated(
 exports.notifyHabitNoticeCreated = onDocumentCreated(
   "habitNotices/{noticeId}",
   async (event) => {
+    if (!(await reserveEventOnce(event, "notifyHabitNoticeCreated"))) return;
+
     const data = event.data?.data();
     if (!data) return;
     if (data.status !== "unread") return;

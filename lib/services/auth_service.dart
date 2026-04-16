@@ -66,6 +66,11 @@ class AuthService {
 
   // Sign out
   Future<void> signOut() async {
+    final uid = _auth.currentUser?.uid;
+    if (!kIsWeb && uid != null && uid.isNotEmpty) {
+      await NotificationService().detachCurrentDeviceTokenFromUser(uid);
+    }
+
     try {
       await _googleSignIn.signOut();
     } catch (e) {

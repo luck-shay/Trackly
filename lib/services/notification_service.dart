@@ -4,6 +4,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:timezone/data/latest.dart' as tzdata;
@@ -19,7 +20,7 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   }
 }
 
-class NotificationService {
+class NotificationService with WidgetsBindingObserver {
   static const int _morningSummaryId = 1001;
   static const int _eveningSummaryId = 1002;
   static const int _habitReminderBaseId = 20000;
@@ -45,10 +46,17 @@ class NotificationService {
   bool _isInitialized = false;
   bool _isTimeZoneInitialized = false;
   String? _lastReminderSignature;
+  bool _isSavingToken = false;
+  int _tokenRetryCount = 0;
+  Timer? _tokenRetryTimer;
+
+  static const int _maxTokenSaveRetries = 3;
 
   Future<void> initialize() async {
     if (_isInitialized) return;
     if (kDebugMode) debugPrint('NotificationService: Initializing...');
+
+    WidgetsBinding.instance.addObserver(this);
 
     try {
       // 1. SharedPreferences
@@ -157,22 +165,15 @@ class NotificationService {
         _handleNotificationTap(message.data.toString());
       });
 
-      _fcm.onTokenRefresh.listen((token) async {
-        final uid = FirebaseAuth.instance.currentUser?.uid;
-        if (uid == null || uid.isEmpty) return;
-        try {
-          await _saveToken(uid, token);
-        } catch (e) {
-          if (kDebugMode) {
-            debugPrint('NotificationService: Error saving refreshed FCM token: $e');
-          }
-        }
+      _fcm.onTokenRefresh.listen((token) {
+        _ensureTokenRegistration(token: token, reason: 'token_refresh');
       });
 
       // Mark initialized before wiring auth listeners because auth callbacks
       // may fire immediately and trigger reminder scheduling.
       _isInitialized = true;
       _watchRealtimeAlerts();
+      await _ensureTokenRegistration(reason: 'initialize');
       
       if (kDebugMode) debugPrint('NotificationService: Initialization Complete.');
     } catch (e) {
@@ -229,12 +230,14 @@ class NotificationService {
       if (user == null) {
         if (kDebugMode) debugPrint('NotificationService: User Logged Out.');
         _lastReminderSignature = null;
+        _tokenRetryCount = 0;
+        _tokenRetryTimer?.cancel();
         return;
       }
       
       if (kDebugMode) debugPrint('NotificationService: User Logged In (${user.uid}). Setting up watchers...');
       
-      await saveTokenToDatabase();
+      await _ensureTokenRegistration(reason: 'auth_state');
       // We don't await scheduleAllHabitReminders here to avoid blocking
       scheduleAllHabitReminders().catchError((e) => debugPrint('Error scheduling: $e'));
 
@@ -774,9 +777,59 @@ class NotificationService {
     return [uid, morningTime.trim(), eveningTime.trim(), ...reminderEntries].join('||');
   }
 
-  Future<void> saveTokenToDatabase() async {
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _ensureTokenRegistration(reason: 'app_resumed');
+    }
+  }
+
+  Future<void> _ensureTokenRegistration({String? token, required String reason}) async {
+    if (_isSavingToken) return;
+
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
+
+    _isSavingToken = true;
+    try {
+      final didSave = await saveTokenToDatabase(token: token);
+      if (didSave) {
+        _tokenRetryCount = 0;
+        _tokenRetryTimer?.cancel();
+      } else {
+        _scheduleTokenRegistrationRetry(reason);
+      }
+    } finally {
+      _isSavingToken = false;
+    }
+  }
+
+  void _scheduleTokenRegistrationRetry(String reason) {
+    if (FirebaseAuth.instance.currentUser == null) {
+      _tokenRetryCount = 0;
+      _tokenRetryTimer?.cancel();
+      return;
+    }
+
+    if (_tokenRetryCount >= _maxTokenSaveRetries) {
+      if (kDebugMode) {
+        debugPrint('NotificationService: Token registration retries exhausted ($reason).');
+      }
+      return;
+    }
+
+    _tokenRetryCount += 1;
+    final delay = Duration(seconds: 2 * (1 << (_tokenRetryCount - 1)));
+
+    _tokenRetryTimer?.cancel();
+    _tokenRetryTimer = Timer(delay, () {
+      _ensureTokenRegistration(reason: 'retry_$reason');
+    });
+  }
+
+  Future<bool> saveTokenToDatabase({String? token}) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return false;
 
     try {
       if (!kIsWeb &&
@@ -793,19 +846,57 @@ class NotificationService {
               'NotificationService: APNS token not available yet. FCM token save deferred.',
             );
           }
-          return;
+          return false;
         }
       }
 
-      String? token = await _fcm.getToken().timeout(const Duration(seconds: 15));
-      if (token != null) {
+      token ??= await _fcm.getToken().timeout(const Duration(seconds: 15));
+      if (token != null && token.isNotEmpty) {
         await _saveToken(user.uid, token);
+        return true;
       } else if (kDebugMode) {
         debugPrint('NotificationService: FCM token unavailable at this moment.');
       }
     } catch (e) {
       if (kDebugMode) debugPrint('NotificationService: Error saving FCM token: $e');
     }
+
+    return false;
+  }
+
+  Future<void> detachCurrentDeviceTokenFromUser(String uid, {String? token}) async {
+    if (uid.trim().isEmpty || kIsWeb) return;
+
+    try {
+      token ??= await _fcm.getToken().timeout(
+        const Duration(seconds: 10),
+        onTimeout: () => null,
+      );
+      if (token == null || token.isEmpty) return;
+
+      await FirebaseFirestore.instance.collection('users').doc(uid).set({
+        'fcmTokens': FieldValue.arrayRemove([token]),
+        'lastTokenCleanup': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('NotificationService: Error detaching current device token: $e');
+      }
+    }
+  }
+
+  Future<void> dispose() async {
+    WidgetsBinding.instance.removeObserver(this);
+    _tokenRetryTimer?.cancel();
+
+    await _friendInviteSubscription?.cancel();
+    await _habitInviteSubscription?.cancel();
+    await _groupInviteSubscription?.cancel();
+    await _friendInviteResponseSubscription?.cancel();
+    await _habitInviteResponseSubscription?.cancel();
+    await _groupInviteResponseSubscription?.cancel();
+    await _habitNoticeSubscription?.cancel();
+    await _authSubscription?.cancel();
   }
 
   Future<void> _saveToken(String uid, String token) async {
