@@ -358,7 +358,7 @@ class DashboardScreen extends StatelessWidget {
                   ),
                   SizedBox(
                     width: 60,
-                    height: 60,
+                    height: 100,
                     child: FloatingActionButton(
                       heroTag: 'dashboard_profile_fab',
                       shape: const CircleBorder(),

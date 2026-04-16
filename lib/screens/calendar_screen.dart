@@ -67,6 +67,7 @@ class _CalendarViewState extends State<_CalendarView> {
           'Activity History',
           style: GoogleFonts.outfit(fontWeight: FontWeight.w600),
         ),
+        
       ),
       body: StreamBuilder<List<Habit>>(
         stream: db.streamHabits(),
