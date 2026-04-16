@@ -100,11 +100,6 @@ class ProfileProvider extends ChangeNotifier {
     final bucket = Firebase.app().options.storageBucket?.trim() ?? '';
     if (bucket.isNotEmpty) {
       addBucket(bucket);
-      if (bucket.endsWith('.firebasestorage.app')) {
-        addBucket(bucket.replaceFirst('.firebasestorage.app', '.appspot.com'));
-      } else if (bucket.endsWith('.appspot.com')) {
-        addBucket(bucket.replaceFirst('.appspot.com', '.firebasestorage.app'));
-      }
     }
 
     if (targets.isEmpty) {
@@ -255,28 +250,20 @@ class ProfileProvider extends ChangeNotifier {
         try {
           final version = DateTime.now().microsecondsSinceEpoch;
           final uploadPath = 'profile_pictures/${_social.userId}/$version.jpg';
-          final storageRef = target.storage
-              .ref()
-              .child(uploadPath);
-
-          final downloadToken =
-              '${DateTime.now().microsecondsSinceEpoch}-${_social.userId}';
+          final storageRef = target.storage.ref().child(uploadPath);
 
           final uploadSnapshot = await storageRef.putData(
             compressedBytes,
             SettableMetadata(
               contentType: 'image/jpeg',
               cacheControl: 'public,max-age=604800',
-              customMetadata: {
-                'firebaseStorageDownloadTokens': downloadToken,
-              },
             ),
           );
 
           String? downloadUrl;
           FirebaseException? lastUrlError;
 
-          for (var attempt = 0; attempt < 5; attempt++) {
+          for (var attempt = 0; attempt < 8; attempt++) {
             try {
               downloadUrl = await uploadSnapshot.ref.getDownloadURL();
               break;
@@ -286,18 +273,11 @@ class ProfileProvider extends ChangeNotifier {
                 rethrow;
               }
               // Some runs return object-not-found immediately after upload;
-              // retry once against the uploaded ref.
+              // retry briefly against the uploaded ref.
               await Future<void>.delayed(
-                Duration(milliseconds: 300 * (attempt + 1)),
+                Duration(milliseconds: 350 * (attempt + 1)),
               );
             }
-          }
-
-          if ((downloadUrl == null || downloadUrl.isEmpty) &&
-              lastUrlError?.code == 'object-not-found') {
-            final encodedPath = Uri.encodeComponent(uploadSnapshot.ref.fullPath);
-            downloadUrl =
-                'https://firebasestorage.googleapis.com/v0/b/${target.bucketName}/o/$encodedPath?alt=media&token=$downloadToken';
           }
 
           if (downloadUrl == null || downloadUrl.isEmpty) {
