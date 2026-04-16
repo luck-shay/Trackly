@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import '../services/social_service.dart';
@@ -15,7 +16,8 @@ class _StorageTarget {
 class ProfileProvider extends ChangeNotifier {
   final SocialService _social = SocialService();
 
-  static const int _maxProfileImageBytes = 10 * 1024 * 1024;
+  static const int _maxProfileInputImageBytes = 12 * 1024 * 1024;
+  static const int _maxProfileUploadBytes = 450 * 1024;
 
   bool _isEditing = false;
   bool _isCheckingUsername = false;
@@ -117,6 +119,91 @@ class ProfileProvider extends ChangeNotifier {
     return targets;
   }
 
+  Future<Uint8List> _compressProfileImage(Uint8List sourceBytes) async {
+    var quality = 88;
+    Uint8List result = sourceBytes;
+
+    while (quality >= 42) {
+      final compressed = await FlutterImageCompress.compressWithList(
+        sourceBytes,
+        minWidth: 720,
+        minHeight: 720,
+        quality: quality,
+        format: CompressFormat.jpeg,
+        keepExif: false,
+      );
+
+      result = compressed;
+      if (result.lengthInBytes <= _maxProfileUploadBytes) {
+        break;
+      }
+      quality -= 10;
+    }
+
+    return result;
+  }
+
+  String? _extractStoragePathFromPhotoUrl(String? photoUrl) {
+    if (photoUrl == null || photoUrl.trim().isEmpty) {
+      return null;
+    }
+
+    try {
+      final uri = Uri.parse(photoUrl);
+      final segments = uri.pathSegments;
+      final objectIndex = segments.indexOf('o');
+      if (objectIndex >= 0 && objectIndex + 1 < segments.length) {
+        return Uri.decodeComponent(segments.sublist(objectIndex + 1).join('/'));
+      }
+    } catch (_) {
+      return null;
+    }
+    return null;
+  }
+
+  Future<void> _cleanupOldProfileImages({
+    required FirebaseStorage storage,
+    required String uid,
+    required String newPath,
+    String? previousPhotoUrl,
+  }) async {
+    final folderRef = storage.ref().child('profile_pictures').child(uid);
+    try {
+      final all = await folderRef.listAll();
+      for (final item in all.items) {
+        if (item.fullPath == newPath) continue;
+        try {
+          await item.delete();
+        } catch (_) {
+          // Best-effort cleanup; non-fatal.
+        }
+      }
+    } catch (_) {
+      // Folder listing is optional cleanup and should not block success.
+    }
+
+    // Backward-compat cleanup for legacy single-file path.
+    try {
+      final legacyRef = storage.ref().child('profile_pictures').child('$uid.jpg');
+      if (legacyRef.fullPath != newPath) {
+        await legacyRef.delete();
+      }
+    } catch (_) {
+      // Legacy file may not exist.
+    }
+
+    final previousPath = _extractStoragePathFromPhotoUrl(previousPhotoUrl);
+    if (previousPath == null || previousPath == newPath) {
+      return;
+    }
+
+    try {
+      await storage.ref().child(previousPath).delete();
+    } catch (_) {
+      // Previous URL may point to another bucket/path; ignore.
+    }
+  }
+
   Future<String?> uploadProfilePicture() async {
     final picker = ImagePicker();
     XFile? pickedFile;
@@ -149,32 +236,37 @@ class ProfileProvider extends ChangeNotifier {
       if (bytes.isEmpty) {
         return 'Selected photo is empty.';
       }
-      if (bytes.lengthInBytes > _maxProfileImageBytes) {
-        return 'Please select an image smaller than 10MB.';
+      if (bytes.lengthInBytes > _maxProfileInputImageBytes) {
+        return 'Please select an image smaller than 12MB.';
       }
 
-      final normalizedMime = (pickedFile.mimeType ?? '').toLowerCase();
-      final contentType = normalizedMime.startsWith('image/')
-          ? normalizedMime
-          : 'image/jpeg';
+      final compressedBytes = await _compressProfileImage(bytes);
+      if (compressedBytes.isEmpty) {
+        return 'Image compression failed. Please try another photo.';
+      }
+
+      final profile = await _social.getUserProfile(_social.userId);
+      final previousPhotoUrl = profile?.photoUrl;
 
       final storageCandidates = _candidateStorageTargets();
       FirebaseException? lastStorageError;
 
       for (final target in storageCandidates) {
         try {
+          final version = DateTime.now().microsecondsSinceEpoch;
+          final uploadPath = 'profile_pictures/${_social.userId}/$version.jpg';
           final storageRef = target.storage
               .ref()
-              .child('profile_pictures')
-              .child('${_social.userId}.jpg');
+              .child(uploadPath);
 
           final downloadToken =
               '${DateTime.now().microsecondsSinceEpoch}-${_social.userId}';
 
           final uploadSnapshot = await storageRef.putData(
-            bytes,
+            compressedBytes,
             SettableMetadata(
-              contentType: contentType,
+              contentType: 'image/jpeg',
+              cacheControl: 'public,max-age=604800',
               customMetadata: {
                 'firebaseStorageDownloadTokens': downloadToken,
               },
@@ -217,6 +309,14 @@ class ProfileProvider extends ChangeNotifier {
           }
 
           await _social.updateProfile(photoUrl: downloadUrl);
+
+          await _cleanupOldProfileImages(
+            storage: target.storage,
+            uid: _social.userId,
+            newPath: uploadPath,
+            previousPhotoUrl: previousPhotoUrl,
+          );
+
           return null;
         } on FirebaseException catch (e) {
           lastStorageError = e;

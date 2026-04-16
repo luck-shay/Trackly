@@ -47,11 +47,35 @@ class AIService {
     defaultValue: 'gemini-1.5-flash',
   );
 
+  static const String _configuredModelsCsv = String.fromEnvironment(
+    'GEMINI_MODELS',
+    defaultValue: '',
+  );
+
   static const List<String> _fallbackModels = [
+    'gemini-2.5-flash',
+    'gemini-2.0-flash',
     'gemini-1.5-flash',
     'gemini-1.5-flash-latest',
     'gemini-1.5-pro',
   ];
+
+  static const int _maxModelAttempts = 2;
+
+  static bool _isTransientModelError(String message) {
+    final lower = message.toLowerCase();
+    return lower.contains('429') ||
+        lower.contains('resource_exhausted') ||
+        lower.contains('rate limit') ||
+        lower.contains('too many requests') ||
+        lower.contains('deadline exceeded') ||
+        lower.contains('timeout') ||
+        lower.contains('socket') ||
+        lower.contains('connection') ||
+        lower.contains('network') ||
+        lower.contains('unavailable') ||
+        lower.contains('503');
+  }
 
   static String _detectMimeType(String path) {
     final lower = path.toLowerCase();
@@ -73,6 +97,11 @@ class AIService {
     }
 
     addModel(_configuredModel);
+    if (_configuredModelsCsv.trim().isNotEmpty) {
+      for (final model in _configuredModelsCsv.split(',')) {
+        addModel(model);
+      }
+    }
     for (final fallback in _fallbackModels) {
       addModel(fallback);
     }
@@ -89,8 +118,10 @@ class AIService {
       );
     }
     if (message.contains('429') ||
+        message.contains('resource_exhausted') ||
         message.contains('quota') ||
-        message.contains('rate')) {
+        message.contains('rate limit') ||
+        message.contains('too many requests')) {
       return const AIValidationResult.rejected(
         userMessage: 'AI is busy right now. Please try again in a moment.',
         reason: AIValidationFailureReason.quotaOrRateLimited,
@@ -155,33 +186,43 @@ class AIService {
 
       Object? lastError;
       for (final modelName in candidates) {
-        try {
-          final model = GenerativeModel(
-            model: modelName,
-            apiKey: _apiKey,
-          );
+        for (var attempt = 1; attempt <= _maxModelAttempts; attempt++) {
+          try {
+            final model = GenerativeModel(
+              model: modelName,
+              apiKey: _apiKey,
+            );
 
-          final response = await model.generateContent([
-            Content.multi([prompt, imagePart]),
-          ]);
+            final response = await model
+                .generateContent([
+                  Content.multi([prompt, imagePart]),
+                ])
+                .timeout(const Duration(seconds: 20));
 
-          final text = response.text?.trim().toUpperCase() ?? 'NO';
-          if (kDebugMode) {
-            debugPrint('AIService: Validation response with $modelName: $text');
-          }
+            final text = response.text?.trim().toUpperCase() ?? 'NO';
+            if (kDebugMode) {
+              debugPrint('AIService: Validation response with $modelName: $text');
+            }
 
-          if (text.contains('YES')) {
-            return const AIValidationResult.approved();
-          }
+            if (text.contains('YES')) {
+              return const AIValidationResult.approved();
+            }
 
-          return const AIValidationResult.rejected(
-            userMessage: 'AI did not find clear proof for this habit. Try a clearer photo.',
-            reason: AIValidationFailureReason.rejectedByModel,
-          );
-        } catch (e) {
-          lastError = e;
-          if (kDebugMode) {
-            debugPrint('AIService: Model $modelName failed: $e');
+            return const AIValidationResult.rejected(
+              userMessage: 'AI did not find clear proof for this habit. Try a clearer photo.',
+              reason: AIValidationFailureReason.rejectedByModel,
+            );
+          } catch (e) {
+            lastError = e;
+            if (kDebugMode) {
+              debugPrint('AIService: Model $modelName failed (attempt $attempt): $e');
+            }
+
+            if (attempt >= _maxModelAttempts || !_isTransientModelError(e.toString())) {
+              break;
+            }
+
+            await Future<void>.delayed(Duration(milliseconds: 350 * attempt));
           }
         }
       }

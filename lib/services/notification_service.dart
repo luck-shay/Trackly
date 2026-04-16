@@ -49,8 +49,21 @@ class NotificationService with WidgetsBindingObserver {
   bool _isSavingToken = false;
   int _tokenRetryCount = 0;
   Timer? _tokenRetryTimer;
+  DateTime? _lastApnsPendingLogAt;
+  DateTime? _lastRetryExhaustedLogAt;
 
-  static const int _maxTokenSaveRetries = 3;
+  static const int _maxTokenSaveRetries = 8;
+
+  bool _shouldLogWithCooldown(DateTime? lastLogAt, Duration cooldown) {
+    final now = DateTime.now();
+    if (lastLogAt == null) return true;
+    return now.difference(lastLogAt) >= cooldown;
+  }
+
+  bool _isApnsPendingError(Object error) {
+    final text = error.toString().toLowerCase();
+    return text.contains('apns-token-not-set');
+  }
 
   Future<void> initialize() async {
     if (_isInitialized) return;
@@ -813,8 +826,18 @@ class NotificationService with WidgetsBindingObserver {
 
     if (_tokenRetryCount >= _maxTokenSaveRetries) {
       if (kDebugMode) {
-        debugPrint('NotificationService: Token registration retries exhausted ($reason).');
+        if (_shouldLogWithCooldown(_lastRetryExhaustedLogAt, const Duration(minutes: 2))) {
+          _lastRetryExhaustedLogAt = DateTime.now();
+          debugPrint(
+            'NotificationService: Token registration retries exhausted ($reason). Continuing with slow retry loop.',
+          );
+        }
       }
+      _tokenRetryTimer?.cancel();
+      _tokenRetryTimer = Timer(const Duration(minutes: 1), () {
+        _tokenRetryCount = 0;
+        _ensureTokenRegistration(reason: reason);
+      });
       return;
     }
 
@@ -823,7 +846,7 @@ class NotificationService with WidgetsBindingObserver {
 
     _tokenRetryTimer?.cancel();
     _tokenRetryTimer = Timer(delay, () {
-      _ensureTokenRegistration(reason: 'retry_$reason');
+      _ensureTokenRegistration(reason: reason);
     });
   }
 
@@ -832,32 +855,32 @@ class NotificationService with WidgetsBindingObserver {
     if (user == null) return false;
 
     try {
-      if (!kIsWeb &&
-          (defaultTargetPlatform == TargetPlatform.iOS ||
-              defaultTargetPlatform == TargetPlatform.macOS)) {
-        final apnsToken = await _fcm.getAPNSToken().timeout(
-          const Duration(seconds: 5),
-          onTimeout: () => null,
-        );
-
-        if (apnsToken == null || apnsToken.isEmpty) {
-          if (kDebugMode) {
-            debugPrint(
-              'NotificationService: APNS token not available yet. FCM token save deferred.',
-            );
-          }
-          return false;
-        }
-      }
-
       token ??= await _fcm.getToken().timeout(const Duration(seconds: 15));
       if (token != null && token.isNotEmpty) {
         await _saveToken(user.uid, token);
+        if (kDebugMode) {
+          debugPrint('NotificationService: FCM token registered for ${user.uid}.');
+        }
         return true;
       } else if (kDebugMode) {
         debugPrint('NotificationService: FCM token unavailable at this moment.');
       }
     } catch (e) {
+      if (!kIsWeb &&
+          (defaultTargetPlatform == TargetPlatform.iOS ||
+              defaultTargetPlatform == TargetPlatform.macOS) &&
+          _isApnsPendingError(e)) {
+        if (kDebugMode) {
+          if (_shouldLogWithCooldown(_lastApnsPendingLogAt, const Duration(seconds: 30))) {
+            _lastApnsPendingLogAt = DateTime.now();
+            debugPrint(
+              'NotificationService: APNS not ready yet. Will retry FCM token registration.',
+            );
+          }
+        }
+        return false;
+      }
+
       if (kDebugMode) debugPrint('NotificationService: Error saving FCM token: $e');
     }
 
@@ -879,6 +902,13 @@ class NotificationService with WidgetsBindingObserver {
         'lastTokenCleanup': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
     } catch (e) {
+      if (!kIsWeb &&
+          (defaultTargetPlatform == TargetPlatform.iOS ||
+              defaultTargetPlatform == TargetPlatform.macOS) &&
+          _isApnsPendingError(e)) {
+        // If iOS signs out before APNS/FCM token is ready, there is nothing to detach.
+        return;
+      }
       if (kDebugMode) {
         debugPrint('NotificationService: Error detaching current device token: $e');
       }

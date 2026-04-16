@@ -52,6 +52,48 @@ function toStringMap(data) {
   return out;
 }
 
+function parseStorageRefFromUrl(rawUrl) {
+  if (typeof rawUrl !== "string") return null;
+  const url = rawUrl.trim();
+  if (!url) return null;
+
+  if (url.startsWith("gs://")) {
+    const withoutScheme = url.slice(5);
+    const slashIndex = withoutScheme.indexOf("/");
+    if (slashIndex <= 0 || slashIndex === withoutScheme.length - 1) {
+      return null;
+    }
+
+    return {
+      bucket: withoutScheme.slice(0, slashIndex),
+      path: withoutScheme.slice(slashIndex + 1),
+    };
+  }
+
+  try {
+    const parsed = new URL(url);
+    const segments = parsed.pathname.split("/").filter(Boolean);
+    const bucketIndex = segments.indexOf("b");
+    const objectIndex = segments.indexOf("o");
+    if (bucketIndex < 0 || objectIndex < 0) return null;
+    if (bucketIndex + 1 >= segments.length || objectIndex + 1 >= segments.length) return null;
+
+    const bucket = segments[bucketIndex + 1];
+    const path = decodeURIComponent(segments.slice(objectIndex + 1).join("/"));
+    if (!bucket || !path) return null;
+    return {bucket, path};
+  } catch (_) {
+    return null;
+  }
+}
+
+function isOwnedProfilePath(uid, path) {
+  if (!uid || !path) return false;
+  const normalized = String(path).trim();
+  return normalized.startsWith(`profile_pictures/${uid}/`) ||
+    normalized === `profile_pictures/${uid}.jpg`;
+}
+
 async function getUserProfile(uid) {
   if (!uid) return null;
   const doc = await admin.firestore().collection("users").doc(uid).get();
@@ -369,5 +411,49 @@ exports.notifyHabitNoticeCreated = onDocumentCreated(
       },
       {merge: true},
     );
+  },
+);
+
+exports.cleanupOldProfilePictureOnUpdate = onDocumentUpdated(
+  "users/{uid}",
+  async (event) => {
+    const uid = event.params.uid;
+    if (!uid) return;
+
+    const before = event.data?.before?.data() || null;
+    const after = event.data?.after?.data() || null;
+    if (!before || !after) return;
+
+    const beforeUrl = typeof before.photoUrl === "string" ? before.photoUrl.trim() : "";
+    const afterUrl = typeof after.photoUrl === "string" ? after.photoUrl.trim() : "";
+
+    // Only act when the URL changed.
+    if (beforeUrl === afterUrl || !beforeUrl) return;
+
+    const oldRef = parseStorageRefFromUrl(beforeUrl);
+    if (!oldRef) return;
+    if (!isOwnedProfilePath(uid, oldRef.path)) return;
+
+    // Never delete if old and new resolve to the same storage object.
+    const newRef = parseStorageRefFromUrl(afterUrl);
+    if (newRef && newRef.bucket === oldRef.bucket && newRef.path === oldRef.path) {
+      return;
+    }
+
+    try {
+      await admin.storage().bucket(oldRef.bucket).file(oldRef.path).delete({ignoreNotFound: true});
+      logger.info("Cleaned old profile image", {
+        uid,
+        bucket: oldRef.bucket,
+        path: oldRef.path,
+      });
+    } catch (error) {
+      logger.error("Failed to clean old profile image", {
+        uid,
+        bucket: oldRef.bucket,
+        path: oldRef.path,
+        error: error?.message || String(error),
+      });
+    }
   },
 );
