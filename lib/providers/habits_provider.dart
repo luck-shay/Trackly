@@ -302,14 +302,22 @@ class HabitsProvider extends ChangeNotifier {
         ..remove(uid),
     );
 
-    await _runWithRollback(
-      previousHabit: habit,
-      updatedHabit: updatedHabit,
-      action: () => _db.saveHabit(
+    // If current user leaves a shared habit, remove it from local list
+    // immediately so list items (e.g. Dismissible) do not keep stale keys.
+    final previousHabits = List<Habit>.from(_habits);
+    _habits.removeWhere((h) => h.id == habit.id);
+    notifyListeners();
+
+    try {
+      await _db.saveHabit(
         updatedHabit,
         ensureCurrentUserParticipant: false,
-      ),
-    );
+      );
+    } catch (_) {
+      _habits = previousHabits;
+      notifyListeners();
+      rethrow;
+    }
 
     await _notifyParticipantDeparture(
       habit: habit,
@@ -432,14 +440,21 @@ class HabitsProvider extends ChangeNotifier {
       memberQuantMax: newMemberQuantMax,
     );
 
-    await _runWithRollback(
-      previousHabit: habit,
-      updatedHabit: updatedHabit,
-      action: () => _db.saveHabit(
+    // User is leaving this group, so optimistically remove from local list.
+    final previousHabits = List<Habit>.from(_habits);
+    _habits.removeWhere((h) => h.id == habit.id);
+    notifyListeners();
+
+    try {
+      await _db.saveHabit(
         updatedHabit,
         ensureCurrentUserParticipant: false,
-      ),
-    );
+      );
+    } catch (_) {
+      _habits = previousHabits;
+      notifyListeners();
+      rethrow;
+    }
 
     await _notifyParticipantDeparture(
       habit: habit,

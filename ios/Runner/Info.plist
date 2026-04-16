@@ -62,6 +62,10 @@
 	</dict>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Trackly needs photo library access so you can select a profile picture.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Trackly may save edited profile photos to your library when needed.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>fetch</string>
