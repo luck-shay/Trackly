@@ -84,11 +84,23 @@ class NotificationService {
         onDidReceiveNotificationResponse: (response) {
           _handleNotificationTap(response.payload);
         },
-      ).timeout(const Duration(seconds: 5));
+      );
 
-      await _requestLocalNotificationPermissions();
+      try {
+        await _requestLocalNotificationPermissions();
+      } catch (e) {
+        if (kDebugMode) {
+          debugPrint('NotificationService: Local notification permission request failed: $e');
+        }
+      }
 
-      await _initializeTimeZone();
+      try {
+        await _initializeTimeZone();
+      } catch (e) {
+        if (kDebugMode) {
+          debugPrint('NotificationService: Timezone initialization failed: $e');
+        }
+      }
 
       if (!kIsWeb) {
         const AndroidNotificationChannel highImportanceChannel = AndroidNotificationChannel(
@@ -122,10 +134,16 @@ class NotificationService {
         final androidPlugin = _localNotifications
             .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
 
-        await androidPlugin?.createNotificationChannel(highImportanceChannel);
-        await androidPlugin?.createNotificationChannel(socialAlertsChannel);
-        await androidPlugin?.createNotificationChannel(dailySummaryChannel);
-        await androidPlugin?.createNotificationChannel(habitRemindersChannel);
+        try {
+          await androidPlugin?.createNotificationChannel(highImportanceChannel);
+          await androidPlugin?.createNotificationChannel(socialAlertsChannel);
+          await androidPlugin?.createNotificationChannel(dailySummaryChannel);
+          await androidPlugin?.createNotificationChannel(habitRemindersChannel);
+        } catch (e) {
+          if (kDebugMode) {
+            debugPrint('NotificationService: Failed creating channels: $e');
+          }
+        }
       }
 
       // 4. Listeners
@@ -220,65 +238,68 @@ class NotificationService {
       // We don't await scheduleAllHabitReminders here to avoid blocking
       scheduleAllHabitReminders().catchError((e) => debugPrint('Error scheduling: $e'));
 
-      final db = FirebaseFirestore.instance;
-      
-      _friendInviteSubscription = db
-          .collection('friendRequests')
-          .where('to', isEqualTo: user.uid)
-          .where('status', isEqualTo: 'pending')
-          .snapshots()
-          .listen(
-            (s) => _processInviteSnapshot(s, 'friendRequest'),
-            onError: (e) => debugPrint('Friend invite stream error: $e'),
-          );
+      // Production notifications should be delivered by backend FCM triggers.
+      // Keep Firestore listener-based local alerts only in debug as fallback.
+      if (kDebugMode) {
+        final db = FirebaseFirestore.instance;
 
-      _habitInviteSubscription = db
-          .collection('habitInvites')
-          .where('to', isEqualTo: user.uid)
-          .where('status', isEqualTo: 'pending')
-          .snapshots()
-          .listen(
-            (s) => _processInviteSnapshot(s, 'habitInvite'),
-            onError: (e) => debugPrint('Habit invite stream error: $e'),
-          );
+        _friendInviteSubscription = db
+            .collection('friendRequests')
+            .where('to', isEqualTo: user.uid)
+            .where('status', isEqualTo: 'pending')
+            .snapshots()
+            .listen(
+              (s) => _processInviteSnapshot(s, 'friendRequest'),
+              onError: (e) => debugPrint('Friend invite stream error: $e'),
+            );
 
-      _groupInviteSubscription = db
-          .collection('groupInvites')
-          .where('to', isEqualTo: user.uid)
-          .where('status', isEqualTo: 'pending')
-          .snapshots()
-          .listen(
-            (s) => _processInviteSnapshot(s, 'groupInvite'),
-            onError: (e) => debugPrint('Group invite stream error: $e'),
-          );
+        _habitInviteSubscription = db
+            .collection('habitInvites')
+            .where('to', isEqualTo: user.uid)
+            .where('status', isEqualTo: 'pending')
+            .snapshots()
+            .listen(
+              (s) => _processInviteSnapshot(s, 'habitInvite'),
+              onError: (e) => debugPrint('Habit invite stream error: $e'),
+            );
+
+        _groupInviteSubscription = db
+            .collection('groupInvites')
+            .where('to', isEqualTo: user.uid)
+            .where('status', isEqualTo: 'pending')
+            .snapshots()
+            .listen(
+              (s) => _processInviteSnapshot(s, 'groupInvite'),
+              onError: (e) => debugPrint('Group invite stream error: $e'),
+            );
 
         // Notify sender when outgoing invites are accepted or declined.
-      _friendInviteResponseSubscription = db
-          .collection('friendRequests')
-          .where('from', isEqualTo: user.uid)
-          .snapshots()
-          .listen(
-            (s) => _processInviteResponseSnapshot(s, 'friendRequest'),
-            onError: (e) => debugPrint('Friend invite response stream error: $e'),
-          );
+        _friendInviteResponseSubscription = db
+            .collection('friendRequests')
+            .where('from', isEqualTo: user.uid)
+            .snapshots()
+            .listen(
+              (s) => _processInviteResponseSnapshot(s, 'friendRequest'),
+              onError: (e) => debugPrint('Friend invite response stream error: $e'),
+            );
 
-      _habitInviteResponseSubscription = db
-          .collection('habitInvites')
-          .where('from', isEqualTo: user.uid)
-          .snapshots()
-          .listen(
-            (s) => _processInviteResponseSnapshot(s, 'habitInvite'),
-            onError: (e) => debugPrint('Habit invite response stream error: $e'),
-          );
+        _habitInviteResponseSubscription = db
+            .collection('habitInvites')
+            .where('from', isEqualTo: user.uid)
+            .snapshots()
+            .listen(
+              (s) => _processInviteResponseSnapshot(s, 'habitInvite'),
+              onError: (e) => debugPrint('Habit invite response stream error: $e'),
+            );
 
-      _groupInviteResponseSubscription = db
-          .collection('groupInvites')
-          .where('from', isEqualTo: user.uid)
-          .snapshots()
-          .listen(
-            (s) => _processInviteResponseSnapshot(s, 'groupInvite'),
-            onError: (e) => debugPrint('Group invite response stream error: $e'),
-          );
+        _groupInviteResponseSubscription = db
+            .collection('groupInvites')
+            .where('from', isEqualTo: user.uid)
+            .snapshots()
+            .listen(
+              (s) => _processInviteResponseSnapshot(s, 'groupInvite'),
+              onError: (e) => debugPrint('Group invite response stream error: $e'),
+            );
 
         _habitNoticeSubscription = db
             .collection('habitNotices')
@@ -289,6 +310,7 @@ class NotificationService {
               _processHabitNoticeSnapshot,
               onError: (e) => debugPrint('Habit notice stream error: $e'),
             );
+      }
     });
   }
 
@@ -775,9 +797,11 @@ class NotificationService {
         }
       }
 
-      String? token = await _fcm.getToken().timeout(const Duration(seconds: 5));
+      String? token = await _fcm.getToken().timeout(const Duration(seconds: 15));
       if (token != null) {
         await _saveToken(user.uid, token);
+      } else if (kDebugMode) {
+        debugPrint('NotificationService: FCM token unavailable at this moment.');
       }
     } catch (e) {
       if (kDebugMode) debugPrint('NotificationService: Error saving FCM token: $e');

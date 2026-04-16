@@ -157,7 +157,7 @@ class FriendsScreen extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Goal Invites',
+                      'Habit Invites',
                       style: GoogleFonts.outfit(
                         fontSize: 20,
                         fontWeight: FontWeight.w600,
@@ -188,7 +188,47 @@ class FriendsScreen extends StatelessWidget {
                               final habit = combinedSnapshot.data![1] as Habit?;
 
                               if (user == null || habit == null) {
-                                return const SizedBox.shrink();
+                                return ListTile(
+                                  leading: CircleAvatar(
+                                    backgroundColor: Colors.red.withValues(alpha: 0.15),
+                                    child: const Icon(
+                                      Icons.error_outline_rounded,
+                                      color: Colors.redAccent,
+                                    ),
+                                  ),
+                                  title: Text(
+                                    'Unavailable invite',
+                                    style: GoogleFonts.inter(
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                  subtitle: Text(
+                                    'This invite is no longer valid. Remove it.',
+                                    style: GoogleFonts.inter(
+                                      color: Colors.grey,
+                                    ),
+                                  ),
+                                  trailing: IconButton(
+                                    icon: const Icon(
+                                      Icons.delete_outline_rounded,
+                                      color: Colors.redAccent,
+                                    ),
+                                    onPressed: () async {
+                                      try {
+                                        await social.declineHabitInvite(doc.id);
+                                      } catch (_) {
+                                        if (!context.mounted) return;
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(
+                                            content: Text(
+                                              'Could not remove invalid invite. Please try again.',
+                                            ),
+                                          ),
+                                        );
+                                      }
+                                    },
+                                  ),
+                                );
                               }
 
                               return ListTile(
@@ -304,9 +344,54 @@ class FriendsScreen extends StatelessWidget {
                       return FutureBuilder<UserProfile?>(
                         future: social.getUserProfile(fromUid),
                         builder: (ctx, userSnapshot) {
-                          if (!userSnapshot.hasData) {
+                          if (userSnapshot.connectionState == ConnectionState.waiting) {
                             return const SizedBox.shrink();
                           }
+
+                          if (!userSnapshot.hasData || userSnapshot.data == null) {
+                            return ListTile(
+                              leading: CircleAvatar(
+                                backgroundColor: Colors.red.withValues(alpha: 0.15),
+                                child: const Icon(
+                                  Icons.error_outline_rounded,
+                                  color: Colors.redAccent,
+                                ),
+                              ),
+                              title: Text(
+                                'Unavailable request',
+                                style: GoogleFonts.inter(
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              subtitle: Text(
+                                'This friend request is no longer valid. Remove it.',
+                                style: GoogleFonts.inter(
+                                  color: Colors.grey,
+                                ),
+                              ),
+                              trailing: IconButton(
+                                icon: const Icon(
+                                  Icons.delete_outline_rounded,
+                                  color: Colors.redAccent,
+                                ),
+                                onPressed: () async {
+                                  try {
+                                    await social.declineFriendRequest(doc.id);
+                                  } catch (_) {
+                                    if (!context.mounted) return;
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                          'Could not remove invalid request. Please try again.',
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                },
+                              ),
+                            );
+                          }
+
                           final user = userSnapshot.data!;
                           return ListTile(
                             leading: CircleAvatar(

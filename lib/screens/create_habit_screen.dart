@@ -817,6 +817,19 @@ class _CreateHabitViewState extends State<_CreateHabitView> {
                               groupName: groupName,
                             );
                         if (context.mounted) {
+                          if (!provider.isEditMode) {
+                            final createdLabel =
+                                provider.spaceType == HabitSpaceType.group
+                                ? 'Group created'
+                                : provider.spaceType == HabitSpaceType.individual
+                                ? 'Task created'
+                                : 'Shared task created';
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('$createdLabel: ${newHabit.displayTitle}'),
+                              ),
+                            );
+                          }
                           Navigator.pop(context, newHabit);
                         }
                       } catch (error) {

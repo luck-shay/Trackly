@@ -34,6 +34,31 @@ Trackly is a Flutter habit-tracking app with Google sign-in, Firebase-backed per
 - `flutter test`
 - `bash tool/quality_gate.sh`
 
+## Reliable Push Notifications (Production)
+
+Trackly uses Firebase Cloud Functions to send FCM push notifications for:
+
+- Friend invites
+- Habit invites
+- Group invites
+- Invite accepted/declined responses
+- Habit notices (participant left)
+
+### Deploy backend functions
+
+1. Install Firebase CLI and login:
+	- `npm i -g firebase-tools`
+	- `firebase login`
+2. Install functions dependencies:
+	- `cd functions && npm install && cd ..`
+3. Select the project:
+	- `firebase use trackly-0643`
+4. Deploy:
+	- `firebase deploy --only functions`
+
+After deploy, release builds receive true push notifications from backend FCM,
+including when app is backgrounded/killed.
+
 ## Release Notes
 
 - Android release signing still needs to be configured in [android/app/build.gradle.kts](android/app/build.gradle.kts).
