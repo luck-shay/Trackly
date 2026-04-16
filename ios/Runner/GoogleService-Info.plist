@@ -3,11 +3,11 @@
 <plist version="1.0">
 <dict>
 	<key>CLIENT_ID</key>
-	<string>852142844109-t0us4nhk9ai9asuosejoichns6rvgvor.apps.googleusercontent.com</string>
+	<string>852142844109-n8uevr92ejjt0rsb1ja4ii59giav114s.apps.googleusercontent.com</string>
 	<key>REVERSED_CLIENT_ID</key>
-	<string>com.googleusercontent.apps.852142844109-t0us4nhk9ai9asuosejoichns6rvgvor</string>
+	<string>com.googleusercontent.apps.852142844109-n8uevr92ejjt0rsb1ja4ii59giav114s</string>
 	<key>ANDROID_CLIENT_ID</key>
-	<string>852142844109-pccubgbd42l35rjj556s9qj8f22pdm14.apps.googleusercontent.com</string>
+	<string>852142844109-idvaj5ji016ojlpt35soedeg78u5k4tu.apps.googleusercontent.com</string>
 	<key>API_KEY</key>
 	<string>AIzaSyDQ844oJWdjJTfIamiZYeRUHJKH5VEG2Dg</string>
 	<key>GCM_SENDER_ID</key>
@@ -15,7 +15,7 @@
 	<key>PLIST_VERSION</key>
 	<string>1</string>
 	<key>BUNDLE_ID</key>
-	<string>com.example.trackly</string>
+	<string>com.luck-shay.trackly</string>
 	<key>PROJECT_ID</key>
 	<string>trackly-0643</string>
 	<key>STORAGE_BUCKET</key>
@@ -31,6 +31,6 @@
 	<key>IS_SIGNIN_ENABLED</key>
 	<true></true>
 	<key>GOOGLE_APP_ID</key>
-	<string>1:852142844109:ios:af9bd56f53bc18d6cea184</string>
+	<string>1:852142844109:ios:43b516d9a1576b3ccea184</string>
 </dict>
 </plist>

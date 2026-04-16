@@ -5,6 +5,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:device_info_plus/device_info_plus.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:timezone/data/latest.dart' as tzdata;
@@ -51,6 +54,8 @@ class NotificationService with WidgetsBindingObserver {
   Timer? _tokenRetryTimer;
   DateTime? _lastApnsPendingLogAt;
   DateTime? _lastRetryExhaustedLogAt;
+  bool _isPushTokenRegistrationBlocked = false;
+  String? _pushTokenBlockReason;
 
   static const int _maxTokenSaveRetries = 8;
 
@@ -72,6 +77,8 @@ class NotificationService with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
 
     try {
+      await _evaluatePushTokenEnvironment();
+
       // 1. SharedPreferences
       final prefs = await SharedPreferences.getInstance();
       _notifiedInviteIds = prefs.getStringList('notified_invite_ids')?.toSet() ?? {};
@@ -255,8 +262,9 @@ class NotificationService with WidgetsBindingObserver {
       scheduleAllHabitReminders().catchError((e) => debugPrint('Error scheduling: $e'));
 
       // Production notifications should be delivered by backend FCM triggers.
-      // Keep Firestore listener-based local alerts only in debug as fallback.
-      if (kDebugMode) {
+      // Keep Firestore listener fallback for debug and simulator/mismatch diagnostics.
+      final enableLocalFallback = kDebugMode || _isPushTokenRegistrationBlocked;
+      if (enableLocalFallback) {
         final db = FirebaseFirestore.instance;
 
         _friendInviteSubscription = db
@@ -798,6 +806,13 @@ class NotificationService with WidgetsBindingObserver {
   }
 
   Future<void> _ensureTokenRegistration({String? token, required String reason}) async {
+    if (_isPushTokenRegistrationBlocked) {
+      if (kDebugMode && _pushTokenBlockReason != null) {
+        debugPrint('NotificationService: Push token registration blocked: $_pushTokenBlockReason');
+      }
+      return;
+    }
+
     if (_isSavingToken) return;
 
     final user = FirebaseAuth.instance.currentUser;
@@ -814,6 +829,46 @@ class NotificationService with WidgetsBindingObserver {
       }
     } finally {
       _isSavingToken = false;
+    }
+  }
+
+  Future<void> _evaluatePushTokenEnvironment() async {
+    if (kIsWeb) return;
+    if (defaultTargetPlatform != TargetPlatform.iOS) return;
+
+    try {
+      final iosInfo = await DeviceInfoPlugin().iosInfo;
+      if (!iosInfo.isPhysicalDevice) {
+        _isPushTokenRegistrationBlocked = true;
+        _pushTokenBlockReason =
+            'iOS simulator does not provide APNS tokens for production push delivery.';
+        if (kDebugMode) {
+          debugPrint('NotificationService: $_pushTokenBlockReason');
+        }
+        return;
+      }
+    } catch (_) {
+      // If device info is unavailable, continue normal flow.
+    }
+
+    try {
+      final packageInfo = await PackageInfo.fromPlatform();
+      final runtimeBundleId = packageInfo.packageName.trim();
+      final configuredBundleId = (Firebase.app().options.iosBundleId ?? '').trim();
+
+      if (runtimeBundleId.isNotEmpty &&
+          configuredBundleId.isNotEmpty &&
+          runtimeBundleId != configuredBundleId) {
+        _isPushTokenRegistrationBlocked = true;
+        _pushTokenBlockReason =
+            'Firebase iOS bundle mismatch (app=$runtimeBundleId, firebase=$configuredBundleId). '
+            'Replace ios/Runner/GoogleService-Info.plist and re-run flutterfire configure.';
+        if (kDebugMode) {
+          debugPrint('NotificationService: $_pushTokenBlockReason');
+        }
+      }
+    } catch (_) {
+      // If package info is unavailable, continue normal flow.
     }
   }
 

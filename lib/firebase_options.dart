@@ -59,11 +59,11 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions ios = FirebaseOptions(
     apiKey: 'AIzaSyDQ844oJWdjJTfIamiZYeRUHJKH5VEG2Dg',
-    appId: '1:852142844109:ios:af9bd56f53bc18d6cea184',
+    appId: '1:852142844109:ios:43b516d9a1576b3ccea184',
     messagingSenderId: '852142844109',
     projectId: 'trackly-0643',
     storageBucket: 'trackly-0643.firebasestorage.app',
-    iosBundleId: 'com.example.trackly',
+    iosBundleId: 'com.luck-shay.trackly',
   );
 
   static const FirebaseOptions macos = FirebaseOptions(

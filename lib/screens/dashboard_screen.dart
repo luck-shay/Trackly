@@ -1,11 +1,14 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 import '../models/habit.dart';
+import '../models/user_profile.dart';
 import '../widgets/habit_card.dart';
 import '../providers/habits_provider.dart';
 import '../providers/navigation_provider.dart';
@@ -289,6 +292,7 @@ class DashboardScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final today = DateTime.now();
     final dateStr = _formatDate(today);
+    final userId = FirebaseAuth.instance.currentUser?.uid ?? '';
 
     return Scaffold(
       body: SafeArea(
@@ -373,7 +377,29 @@ class DashboardScreen extends StatelessWidget {
                           ),
                         );
                       },
-                      child: const Icon(Icons.person_rounded, size: 34),
+                      child: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+                        stream: userId.isEmpty
+                            ? null
+                            : FirebaseFirestore.instance
+                                .collection('users')
+                                .doc(userId)
+                                .snapshots(),
+                        builder: (context, snapshot) {
+                          final data = snapshot.data?.data();
+                          final profile = data != null ? UserProfile.fromMap(data) : null;
+                          final photoUrl = profile?.photoUrl?.trim();
+
+                          if (photoUrl != null && photoUrl.isNotEmpty) {
+                            return CircleAvatar(
+                              radius: 22,
+                              backgroundImage: NetworkImage(photoUrl),
+                              backgroundColor: Colors.transparent,
+                            );
+                          }
+
+                          return const Icon(Icons.person_rounded, size: 34);
+                        },
+                      ),
                     ).animate().scale(delay: 300.ms, curve: Curves.easeOutBack),
                   ),
                 ],
