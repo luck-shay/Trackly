@@ -11,20 +11,26 @@ import '../theme/app_layout.dart';
 class CreateHabitScreen extends StatelessWidget {
   final HabitSpaceType initialSpaceType;
   final Habit? initialHabit;
+  final bool allowGroupCreation;
 
   const CreateHabitScreen({
     super.key,
     this.initialSpaceType = HabitSpaceType.individual,
     this.initialHabit,
+    this.allowGroupCreation = false,
   });
 
   @override
   Widget build(BuildContext context) {
+    final resolvedAllowGroupCreation =
+        allowGroupCreation || initialHabit?.spaceType == HabitSpaceType.group;
+
     return ChangeNotifierProvider(
       create: (_) => CreateHabitProvider(),
       child: _CreateHabitView(
         initialSpaceType: initialHabit?.spaceType ?? initialSpaceType,
         initialHabit: initialHabit,
+        allowGroupCreation: resolvedAllowGroupCreation,
       ),
     );
   }
@@ -33,10 +39,12 @@ class CreateHabitScreen extends StatelessWidget {
 class _CreateHabitView extends StatefulWidget {
   final HabitSpaceType initialSpaceType;
   final Habit? initialHabit;
+  final bool allowGroupCreation;
 
   const _CreateHabitView({
     required this.initialSpaceType,
     required this.initialHabit,
+    required this.allowGroupCreation,
   });
 
   @override
@@ -77,6 +85,12 @@ class _CreateHabitViewState extends State<_CreateHabitView> {
       final provider = context.read<CreateHabitProvider>();
       if (widget.initialHabit != null) {
         provider.initializeForEdit(widget.initialHabit!);
+        return;
+      }
+
+      if (!widget.allowGroupCreation &&
+          widget.initialSpaceType == HabitSpaceType.group) {
+        provider.setSpaceType(HabitSpaceType.sharedTask);
         return;
       }
 
@@ -342,90 +356,52 @@ class _CreateHabitViewState extends State<_CreateHabitView> {
 
               const VGap(AppLayout.xxl),
 
-              Text(
-                'SHARING MODE',
-                style: GoogleFonts.inter(
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.grey[500],
-                  letterSpacing: 1.2,
-                ),
-              ).animate().fade(delay: 275.ms),
-              const VGap(AppLayout.sm),
-              Consumer<CreateHabitProvider>(
-                builder: (context, provider, child) {
-                  final isIndividual =
-                      provider.spaceType == HabitSpaceType.individual;
-                  final isShared =
-                      provider.spaceType == HabitSpaceType.sharedTask;
-                  final isGroup = provider.spaceType == HabitSpaceType.group;
-
-                  return Wrap(
-                    spacing: AppLayout.xs,
-                    runSpacing: AppLayout.xs,
-                    children: [
-                      ChoiceChip(
-                        label: const Text('Individual'),
-                        selected: isIndividual,
-                        onSelected: _isEditMode
-                            ? null
-                            : (_) {
-                                provider.setSpaceType(HabitSpaceType.individual);
-                              },
-                        selectedColor: Theme.of(context).colorScheme.primary,
-                        backgroundColor: Theme.of(context).colorScheme.surface,
-                        labelStyle: GoogleFonts.inter(
-                          color: isIndividual ? Colors.black : Colors.white,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      ChoiceChip(
-                        label: const Text('Shared task'),
-                        selected: isShared,
-                        onSelected: _isEditMode
-                            ? null
-                            : (_) {
-                                provider.setSpaceType(HabitSpaceType.sharedTask);
-                              },
-                        selectedColor: Theme.of(context).colorScheme.primary,
-                        backgroundColor: Theme.of(context).colorScheme.surface,
-                        labelStyle: GoogleFonts.inter(
-                          color: isShared ? Colors.black : Colors.white,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      ChoiceChip(
-                        label: const Text('Group'),
-                        selected: isGroup,
-                        onSelected: _isEditMode
-                            ? null
-                            : (_) {
-                                provider.setSpaceType(HabitSpaceType.group);
-                              },
-                        selectedColor: Theme.of(context).colorScheme.primary,
-                        backgroundColor: Theme.of(context).colorScheme.surface,
-                        labelStyle: GoogleFonts.inter(
-                          color: isGroup ? Colors.black : Colors.white,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  );
-                },
-              ).animate().fade(delay: 300.ms).slideX(begin: 0.05),
-
               if (_isEditMode) ...[
+                Text(
+                  'SPACE TYPE',
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.grey[500],
+                    letterSpacing: 1.2,
+                  ),
+                ).animate().fade(delay: 275.ms),
+                const VGap(AppLayout.sm),
+                Consumer<CreateHabitProvider>(
+                  builder: (context, provider, child) {
+                    return Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 10,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.surface,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.06),
+                        ),
+                      ),
+                      child: Text(
+                        provider.spaceType.label,
+                        style: GoogleFonts.inter(
+                          fontWeight: FontWeight.w600,
+                          color: Colors.grey[300],
+                        ),
+                      ),
+                    );
+                  },
+                ).animate().fade(delay: 300.ms).slideX(begin: 0.05),
                 const VGap(AppLayout.xs),
                 Text(
-                  'Sharing mode is locked after creation.',
+                  'Space type is locked after creation.',
                   style: GoogleFonts.inter(
                     color: Colors.grey[500],
                     fontSize: 12,
                   ),
                 ),
+                const VGap(AppLayout.md),
               ],
 
-              const VGap(AppLayout.md),
               Consumer<CreateHabitProvider>(
                 builder: (context, provider, child) {
                   if (provider.spaceType != HabitSpaceType.group) {
@@ -523,8 +499,6 @@ class _CreateHabitViewState extends State<_CreateHabitView> {
                   );
                 },
               ),
-
-              const VGap(AppLayout.xxl),
 
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,

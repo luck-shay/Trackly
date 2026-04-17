@@ -47,6 +47,7 @@ extension GroupTaskModeX on GroupTaskMode {
 
 class Habit {
   final String id;
+  final String? groupEntityId;
   final String title;
   final String description;
   final DateTime createdAt;
@@ -71,6 +72,7 @@ class Habit {
 
   Habit({
     required this.id,
+    this.groupEntityId,
     required this.title,
     this.description = '',
     required this.createdAt,
@@ -101,6 +103,7 @@ class Habit {
 
   Habit copyWith({
     String? id,
+    String? groupEntityId,
     String? title,
     String? description,
     DateTime? createdAt,
@@ -124,6 +127,7 @@ class Habit {
   }) {
     return Habit(
       id: id ?? this.id,
+      groupEntityId: groupEntityId ?? this.groupEntityId,
       title: title ?? this.title,
       description: description ?? this.description,
       createdAt: createdAt ?? this.createdAt,
@@ -280,6 +284,7 @@ class Habit {
   Map<String, dynamic> toMap() {
     return {
       'id': id,
+      'groupEntityId': groupEntityId,
       'title': title,
       'description': description,
       'createdAt': createdAt.toIso8601String(),
@@ -394,6 +399,7 @@ class Habit {
 
     return Habit(
       id: id ?? map['id'] ?? '',
+      groupEntityId: map['groupEntityId'] as String?,
       title: map['title'] ?? '',
       description: map['description'] ?? '',
       createdAt: parseDate(map['createdAt']) ?? DateTime.now(),

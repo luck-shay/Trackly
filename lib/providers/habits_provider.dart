@@ -3,7 +3,11 @@ import 'package:flutter/foundation.dart';
 // import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/habit.dart';
+import '../models/group.dart';
+import '../models/group_task.dart';
 import '../services/database_service.dart';
+import '../services/group_service.dart';
+import '../services/group_migration_service.dart';
 import '../services/health_service.dart';
 import '../services/notification_service.dart';
 import '../services/social_service.dart';
@@ -11,8 +15,17 @@ import '../services/social_service.dart';
 
 class HabitsProvider extends ChangeNotifier {
   final DatabaseService _db = DatabaseService();
-  StreamSubscription<List<Habit>>? _subscription;
+  final GroupService _groupService = GroupService();
+  StreamSubscription<List<Habit>>? _habitSubscription;
+  StreamSubscription<List<Group>>? _groupsSubscription;
   StreamSubscription<User?>? _authSubscription;
+  final Map<String, StreamSubscription<List<GroupTask>>> _groupTaskSubscriptions =
+      <String, StreamSubscription<List<GroupTask>>>{};
+  final Map<String, List<Habit>> _groupHabitsByGroupId =
+      <String, List<Habit>>{};
+  List<Habit> _baseHabits = [];
+  bool _baseLoaded = false;
+  bool _groupsLoaded = false;
 
   List<Habit> _habits = [];
   bool _isLoading = true;
@@ -26,26 +39,35 @@ class HabitsProvider extends ChangeNotifier {
 
   HabitsProvider() {
     _authSubscription = FirebaseAuth.instance.authStateChanges().listen((_) {
+      unawaited(GroupMigrationService().migrateLegacyGroupsForCurrentUser());
       _initStream();
     });
+    unawaited(GroupMigrationService().migrateLegacyGroupsForCurrentUser());
     _initStream();
   }
 
   void _initStream() {
-    _subscription?.cancel();
+    _habitSubscription?.cancel();
+    _groupsSubscription?.cancel();
+    for (final sub in _groupTaskSubscriptions.values) {
+      sub.cancel();
+    }
+    _groupTaskSubscriptions.clear();
+    _groupHabitsByGroupId.clear();
+    _baseHabits = [];
+    _baseLoaded = false;
+    _groupsLoaded = false;
+
     _isLoading = true;
     _error = null;
     notifyListeners();
 
-    _subscription = _db.streamHabits().listen(
+    _habitSubscription = _db.streamHabits().listen(
       (data) {
-        _habits = data;
-        _habits.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-        _isLoading = false;
+        _baseHabits = data;
+        _baseLoaded = true;
         _error = null;
-        notifyListeners();
-        // Refresh notifications whenever the habit list changes
-        NotificationService().scheduleAllHabitReminders();
+        _publishMergedHabits();
       },
       onError: (err) {
         _error = err.toString();
@@ -53,6 +75,96 @@ class HabitsProvider extends ChangeNotifier {
         notifyListeners();
       },
     );
+
+    _groupsSubscription = _groupService.streamGroupsForCurrentUser().listen(
+      (groups) {
+        _groupsLoaded = true;
+        _error = null;
+        _bindGroupTaskStreams(groups);
+      },
+      onError: (err) {
+        _error = err.toString();
+        _isLoading = false;
+        notifyListeners();
+      },
+    );
+  }
+
+  void _bindGroupTaskStreams(List<Group> groups) {
+    final activeGroupIds = groups.map((group) => group.id).toSet();
+
+    final subscriptionsToRemove = _groupTaskSubscriptions.keys
+        .where((groupId) => !activeGroupIds.contains(groupId))
+        .toList();
+
+    for (final groupId in subscriptionsToRemove) {
+      _groupTaskSubscriptions[groupId]?.cancel();
+      _groupTaskSubscriptions.remove(groupId);
+      _groupHabitsByGroupId.remove(groupId);
+    }
+
+    for (final group in groups) {
+      if (_groupTaskSubscriptions.containsKey(group.id)) {
+        continue;
+      }
+
+      _groupTaskSubscriptions[group.id] =
+          _groupService.streamGroupTasks(group.id).listen(
+                (tasks) {
+                  _groupHabitsByGroupId[group.id] = tasks
+                      .map((task) => _habitFromGroupTask(group, task))
+                      .toList();
+                  _publishMergedHabits();
+                },
+                onError: (err) {
+                  _error = err.toString();
+                  _isLoading = false;
+                  notifyListeners();
+                },
+              );
+    }
+
+    _publishMergedHabits();
+  }
+
+  Habit _habitFromGroupTask(Group group, GroupTask task) {
+    return Habit(
+      id: task.id,
+      groupEntityId: group.id,
+      title: task.title,
+      description: task.description,
+      createdAt: task.createdAt,
+      completions: task.completions,
+      quantifiedValues: task.quantifiedValues,
+      participants: List<String>.from(group.memberIds),
+      targetDaysPerWeek: 7,
+      spaceType: HabitSpaceType.group,
+      groupName: group.name,
+      isQuantified: task.isQuantified,
+      quantUnit: task.quantUnit,
+      quantMin: 0,
+      quantMax: task.quantMax,
+      groupTaskMode: GroupTaskMode.shared,
+      memberTasks: const {},
+      memberIsQuantified: const {},
+      memberQuantUnits: const {},
+      memberQuantMax: const {},
+      requiresPhotoValidation: false,
+      reminderTime: null,
+    );
+  }
+
+  void _publishMergedHabits() {
+    final merged = <Habit>[..._baseHabits];
+    for (final habits in _groupHabitsByGroupId.values) {
+      merged.addAll(habits);
+    }
+
+    merged.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    _habits = merged;
+    _isLoading = !(_baseLoaded && _groupsLoaded);
+    notifyListeners();
+    NotificationService().scheduleAllHabitReminders();
   }
 
   Future<void> toggleHabitCompletion(Habit habit) async {
@@ -125,7 +237,7 @@ class HabitsProvider extends ChangeNotifier {
     await _runWithRollback(
       previousHabit: habit,
       updatedHabit: updatedHabit,
-      action: () => _db.saveHabit(updatedHabit),
+      action: () => _persistHabit(updatedHabit),
     );
   }
 
@@ -159,7 +271,7 @@ class HabitsProvider extends ChangeNotifier {
     await _runWithRollback(
       previousHabit: habit,
       updatedHabit: updatedHabit,
-      action: () => _db.saveHabit(updatedHabit),
+      action: () => _persistHabit(updatedHabit),
     );
   }
 
@@ -203,8 +315,31 @@ class HabitsProvider extends ChangeNotifier {
     await _runWithRollback(
       previousHabit: habit,
       updatedHabit: updatedHabit,
-      action: () => _db.saveHabit(updatedHabit),
+      action: () => _persistHabit(updatedHabit),
     );
+  }
+
+  Future<void> _persistHabit(Habit habit) async {
+    if (habit.isGroup && (habit.groupEntityId ?? '').trim().isNotEmpty) {
+      final groupId = habit.groupEntityId!.trim();
+      final existingTask = await _groupService.getGroupTaskById(groupId, habit.id);
+      if (existingTask != null) {
+        await _groupService.saveGroupTask(
+          existingTask.copyWith(
+            title: habit.title,
+            description: habit.description,
+            completions: habit.completions,
+            quantifiedValues: habit.quantifiedValues,
+            isQuantified: habit.isQuantified,
+            quantUnit: habit.quantUnit,
+            quantMax: habit.quantMax,
+          ),
+        );
+        return;
+      }
+    }
+
+    await _db.saveHabit(habit);
   }
 
   Future<void> syncHealthDataForStepsHabits() async {
@@ -485,7 +620,11 @@ class HabitsProvider extends ChangeNotifier {
 
   @override
   void dispose() {
-    _subscription?.cancel();
+    _habitSubscription?.cancel();
+    _groupsSubscription?.cancel();
+    for (final sub in _groupTaskSubscriptions.values) {
+      sub.cancel();
+    }
     _authSubscription?.cancel();
     super.dispose();
   }

@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../models/user_profile.dart';
 import '../models/group_invite.dart';
 import '../models/habit.dart';
+import '../services/group_service.dart';
 
 class SocialService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
@@ -285,6 +286,16 @@ class SocialService {
   }) async {
     if (userId.isEmpty || toUserId.isEmpty || groupId.isEmpty) return;
 
+    final groupDoc = await _db.collection('groups').doc(groupId).get();
+    if (groupDoc.exists) {
+      final memberIds = List<String>.from(
+        (groupDoc.data()?['memberIds'] as List?) ?? const <String>[],
+      );
+      if (memberIds.contains(toUserId)) {
+        return;
+      }
+    }
+
     final existing = await _db
         .collection('groupInvites')
         .where('from', isEqualTo: userId)
@@ -310,17 +321,31 @@ class SocialService {
   Future<void> acceptGroupInvite(String inviteId, String groupId) async {
     if (userId.isEmpty) return;
 
+    final groupRef = _db.collection('groups').doc(groupId);
+    final groupDoc = await groupRef.get();
+
     final batch = _db.batch();
 
     final inviteRef = _db.collection('groupInvites').doc(inviteId);
     batch.update(inviteRef, {'status': 'accepted'});
 
-    final groupRef = _db.collection('habits').doc(groupId);
-    batch.update(groupRef, {
-      'participants': FieldValue.arrayUnion([userId]),
-    });
+    if (groupDoc.exists) {
+      batch.update(groupRef, {
+        'memberIds': FieldValue.arrayUnion([userId]),
+      });
+    } else {
+      // Backward compatibility: older builds stored groups in habits.
+      final legacyGroupRef = _db.collection('habits').doc(groupId);
+      batch.update(legacyGroupRef, {
+        'participants': FieldValue.arrayUnion([userId]),
+      });
+    }
 
     await batch.commit();
+
+    if (groupDoc.exists) {
+      await GroupService().syncTaskMirrorsForGroup(groupId);
+    }
   }
 
   Future<void> declineGroupInvite(String inviteId) async {

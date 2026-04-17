@@ -41,6 +41,15 @@ class _HabitCardState extends State<HabitCard>
   @override
   Widget build(BuildContext context) {
     DateTime now = DateTime.now();
+    final groupTaskTitle = widget.habit.hasMemberDefinedGroupTasks
+      ? (widget.habit.taskFor(widget.currentUserId).trim().isEmpty
+          ? 'No personal task set yet'
+          : widget.habit.taskFor(widget.currentUserId).trim())
+      : widget.habit.title;
+    final primaryTitle = widget.habit.isGroup
+      ? groupTaskTitle
+      : widget.habit.displayTitle;
+    final groupLabel = (widget.habit.groupName ?? '').trim();
     final todayValue = widget.habit.completionValueFor(
       widget.currentUserId,
       now,
@@ -167,7 +176,7 @@ class _HabitCardState extends State<HabitCard>
                               ],
                               Flexible(
                                 child: Text(
-                                  widget.habit.displayTitle,
+                                  primaryTitle,
                                   style: GoogleFonts.outfit(
                                     fontSize: 20,
                                     fontWeight: FontWeight.w600,
@@ -212,19 +221,10 @@ class _HabitCardState extends State<HabitCard>
                             ),
                           ),
                           if (widget.habit.isGroup &&
-                              widget.habit.groupName != null &&
-                              widget.habit.groupName!.trim().isNotEmpty) ...[
+                              groupLabel.isNotEmpty) ...[
                             const SizedBox(height: 4),
                             Text(
-                              widget.habit.hasMemberDefinedGroupTasks
-                                  ? (widget.habit
-                                            .taskFor(widget.currentUserId)
-                                            .isEmpty
-                                        ? 'No personal task set yet'
-                                        : widget.habit.taskFor(
-                                            widget.currentUserId,
-                                          ))
-                                  : widget.habit.title,
+                              'Group: $groupLabel',
                               style: GoogleFonts.inter(
                                 fontSize: 12,
                                 color: Colors.grey[500],

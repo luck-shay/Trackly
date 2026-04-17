@@ -1,19 +1,59 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:provider/provider.dart';
 
-import '../models/habit.dart';
+import '../models/group.dart';
 import '../models/group_invite.dart';
-import '../providers/habits_provider.dart';
-import '../providers/navigation_provider.dart';
-import '../screens/create_habit_screen.dart';
-import '../screens/habit_leaderboard_screen.dart';
+import '../models/group_task.dart';
+import '../services/group_service.dart';
 import '../services/social_service.dart';
 import '../theme/app_layout.dart';
+import 'create_group_screen.dart';
+import 'group_detail_screen.dart';
 
 class GroupsScreen extends StatelessWidget {
   const GroupsScreen({super.key});
+
+  bool _isSameDay(DateTime a, DateTime b) {
+    return a.year == b.year && a.month == b.month && a.day == b.day;
+  }
+
+  int _activeTodayCount(Group group, List<GroupTask> tasks) {
+    final now = DateTime.now();
+    final activeMembers = <String>{};
+    for (final task in tasks) {
+      task.completions.forEach((uid, dates) {
+        final completedToday = dates.any((date) => _isSameDay(date, now));
+        if (completedToday) {
+          activeMembers.add(uid);
+        }
+      });
+    }
+    return activeMembers.where(group.memberIds.contains).length;
+  }
+
+  Future<void> _openCreateGroup(BuildContext context) async {
+    final result = await Navigator.push<dynamic>(
+      context,
+      MaterialPageRoute(builder: (_) => const CreateGroupScreen()),
+    );
+
+    if (!context.mounted || result == null) {
+      return;
+    }
+
+    final data = result is Map<String, dynamic>
+        ? result
+        : (result is Map ? Map<String, dynamic>.from(result) : null);
+    if (data == null) {
+      return;
+    }
+
+    final message = data['snackbarMessage'];
+    if (message is String && message.isNotEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -27,27 +67,16 @@ class GroupsScreen extends StatelessWidget {
           style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
         ),
       ),
-      body: Consumer<HabitsProvider>(
-        builder: (context, provider, child) {
-          if (provider.isLoading) {
+      body: StreamBuilder<List<Group>>(
+        stream: GroupService().streamGroupsForCurrentUser(),
+        builder: (context, groupSnapshot) {
+          if (!groupSnapshot.hasData) {
             return const Center(
               child: CircularProgressIndicator(color: Color(0xFF00E676)),
             );
           }
 
-          if (provider.error != null) {
-            return Center(
-              child: Text(
-                'Error: ${provider.error}',
-                style: const TextStyle(color: Colors.red),
-              ),
-            );
-          }
-
-          final groupHabits =
-              provider.habits.where((habit) => habit.isGroup).toList()
-                ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
-
+          final groups = groupSnapshot.data!;
           return CustomScrollView(
             slivers: [
               SliverToBoxAdapter(
@@ -62,7 +91,7 @@ class GroupsScreen extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Shared structure for teams, friends, and premium communities.',
+                        'Create communities and manage multiple tasks in each group.',
                         style: GoogleFonts.inter(
                           color: Colors.grey[500],
                           fontSize: 14,
@@ -74,19 +103,18 @@ class GroupsScreen extends StatelessWidget {
                         children: [
                           _StatPill(
                             label: 'Groups',
-                            value: groupHabits.length.toString(),
+                            value: groups.length.toString(),
                             icon: Icons.groups_rounded,
                           ),
                           const HGap(AppLayout.sm),
                           _StatPill(
-                            label: 'People',
-                            value: groupHabits.isEmpty
+                            label: 'Members',
+                            value: groups.isEmpty
                                 ? '0'
-                                : groupHabits
+                                : groups
                                       .fold<int>(
                                         0,
-                                        (sum, habit) =>
-                                            sum + habit.participants.length,
+                                        (sum, group) => sum + group.memberIds.length,
                                       )
                                       .toString(),
                             icon: Icons.people_alt_rounded,
@@ -134,9 +162,7 @@ class GroupsScreen extends StatelessWidget {
                           const VGap(AppLayout.sm),
                           ...invites.map((invite) {
                             return Container(
-                              margin: const EdgeInsets.only(
-                                bottom: AppLayout.sm,
-                              ),
+                              margin: const EdgeInsets.only(bottom: AppLayout.sm),
                               padding: const EdgeInsets.all(AppLayout.md),
                               decoration: BoxDecoration(
                                 color: Theme.of(context).colorScheme.surface,
@@ -172,14 +198,12 @@ class GroupsScreen extends StatelessWidget {
                                         child: OutlinedButton(
                                           onPressed: () async {
                                             try {
-                                              await social.declineGroupInvite(
-                                                invite.id,
-                                              );
+                                              await social.declineGroupInvite(invite.id);
                                             } catch (_) {
-                                              if (!context.mounted) return;
-                                              ScaffoldMessenger.of(
-                                                context,
-                                              ).showSnackBar(
+                                              if (!context.mounted) {
+                                                return;
+                                              }
+                                              ScaffoldMessenger.of(context).showSnackBar(
                                                 const SnackBar(
                                                   content: Text(
                                                     'Could not decline invite. Please try again.',
@@ -201,10 +225,10 @@ class GroupsScreen extends StatelessWidget {
                                                 invite.groupId,
                                               );
                                             } catch (_) {
-                                              if (!context.mounted) return;
-                                              ScaffoldMessenger.of(
-                                                context,
-                                              ).showSnackBar(
+                                              if (!context.mounted) {
+                                                return;
+                                              }
+                                              ScaffoldMessenger.of(context).showSnackBar(
                                                 const SnackBar(
                                                   content: Text(
                                                     'Could not accept invite. Please try again.',
@@ -214,9 +238,8 @@ class GroupsScreen extends StatelessWidget {
                                             }
                                           },
                                           style: ElevatedButton.styleFrom(
-                                            backgroundColor: Theme.of(
-                                              context,
-                                            ).colorScheme.primary,
+                                            backgroundColor:
+                                                Theme.of(context).colorScheme.primary,
                                             foregroundColor: Colors.black,
                                           ),
                                           child: const Text('Accept'),
@@ -234,13 +257,11 @@ class GroupsScreen extends StatelessWidget {
                   },
                 ),
               ),
-              if (groupHabits.isEmpty)
+              if (groups.isEmpty)
                 SliverFillRemaining(
                   hasScrollBody: false,
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppLayout.lg,
-                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: AppLayout.lg),
                     child: Center(
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -249,9 +270,10 @@ class GroupsScreen extends StatelessWidget {
                             padding: const EdgeInsets.all(22),
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.secondary.withValues(alpha: 0.08),
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .secondary
+                                  .withValues(alpha: 0.08),
                             ),
                             child: Icon(
                               Icons.groups_rounded,
@@ -269,7 +291,7 @@ class GroupsScreen extends StatelessWidget {
                           ),
                           const VGap(10),
                           Text(
-                            'Create a group for a premium shared experience with richer coordination and verification.',
+                            'Create a group and manage multiple tasks in one shared place.',
                             style: GoogleFonts.inter(
                               color: Colors.grey[500],
                               fontSize: 15,
@@ -281,48 +303,20 @@ class GroupsScreen extends StatelessWidget {
                           SizedBox(
                             width: double.infinity,
                             height: 54,
-                            child: Padding(
-                              padding: const EdgeInsets.only(bottom: 110),
-                              child: ElevatedButton.icon(
-                                onPressed: () async {
-                                  final result = await Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (_) => const CreateHabitScreen(
-                                        initialSpaceType: HabitSpaceType.group,
-                                      ),
-                                    ),
-                                  );
-
-                                  if (!context.mounted || result == null) {
-                                    return;
-                                  }
-
-                                  if (result is Map && result['snackbarMessage'] is String) {
-                                    context.read<NavigationProvider>().setIndex(0);
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                        content: Text(
-                                          result['snackbarMessage'] as String,
-                                        ),
-                                      ),
-                                    );
-                                  }
-                                },
-                                icon: const Icon(Icons.add_rounded),
-                                label: const Text('Create a group'),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Theme.of(
-                                    context,
-                                  ).colorScheme.primary,
-                                  foregroundColor: Colors.black,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(16),
-                                  ),
+                            child: ElevatedButton.icon(
+                              onPressed: () => _openCreateGroup(context),
+                              icon: const Icon(Icons.add_rounded),
+                              label: const Text('Create a group'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Theme.of(context).colorScheme.primary,
+                                foregroundColor: Colors.black,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16),
                                 ),
                               ),
                             ),
                           ),
+                          const VGap(110),
                         ],
                       ),
                     ),
@@ -330,193 +324,160 @@ class GroupsScreen extends StatelessWidget {
                 )
               else
                 SliverList.separated(
-                  itemCount: groupHabits.length + 1,
+                  itemCount: groups.length + 1,
                   separatorBuilder: (context, index) => const VGap(0),
                   itemBuilder: (context, index) {
-                    if (index == groupHabits.length) {
+                    if (index == groups.length) {
                       return const VGap(140);
                     }
 
-                    final habit = groupHabits[index];
-                    final myTask = habit.taskFor(provider.userId);
-                    final myHasTask = myTask.trim().isNotEmpty;
-                    final myIsQuantified = habit.isQuantifiedFor(
-                      provider.userId,
-                    );
-                    final taskModeLabel = habit.hasMemberDefinedGroupTasks
-                        ? 'Member-defined tasks'
-                        : 'Single shared task';
+                    final group = groups[index];
+                    return StreamBuilder<List<GroupTask>>(
+                      stream: GroupService().streamGroupTasks(group.id),
+                      builder: (context, taskSnapshot) {
+                        final tasks = taskSnapshot.data ?? const <GroupTask>[];
+                        final activeToday = _activeTodayCount(group, tasks);
 
-                    return Container(
-                      margin: const EdgeInsets.fromLTRB(24, 8, 24, 8),
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.surface,
-                        borderRadius: BorderRadius.circular(22),
-                        border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.06),
-                        ),
-                      ),
-                      child: Material(
-                        color: Colors.transparent,
-                        borderRadius: BorderRadius.circular(22),
-                        child: InkWell(
-                          borderRadius: BorderRadius.circular(22),
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) =>
-                                    HabitLeaderboardScreen(habit: habit),
-                              ),
-                            );
-                          },
-                          child: Padding(
-                            padding: const EdgeInsets.all(18),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    Container(
-                                      padding: const EdgeInsets.all(10),
-                                      decoration: BoxDecoration(
-                                        shape: BoxShape.circle,
-                                        color: Theme.of(context)
-                                            .colorScheme
-                                            .secondary
-                                            .withValues(alpha: 0.14),
-                                      ),
-                                      child: Icon(
-                                        Icons.groups_rounded,
-                                        color: Theme.of(
-                                          context,
-                                        ).colorScheme.secondary,
-                                        size: 20,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            habit.displayTitle,
-                                            style: GoogleFonts.outfit(
-                                              fontSize: 20,
-                                              fontWeight: FontWeight.w700,
-                                            ),
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                          const SizedBox(height: 2),
-                                          Text(
-                                            '${habit.participants.length} members',
-                                            style: GoogleFonts.inter(
-                                              fontSize: 12,
-                                              color: Colors.grey[500],
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    Icon(
-                                      Icons.chevron_right_rounded,
-                                      color: Colors.grey[500],
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 12),
-                                Wrap(
-                                  spacing: 8,
-                                  runSpacing: 8,
-                                  children: [
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 10,
-                                        vertical: 6,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: Colors.white.withValues(alpha: 0.05),
-                                        borderRadius: BorderRadius.circular(
-                                          999,
-                                        ),
-                                      ),
-                                      child: Text(
-                                        taskModeLabel,
-                                        style: GoogleFonts.inter(
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w600,
-                                          color: Colors.grey[300],
-                                        ),
-                                      ),
-                                    ),
-                                    if (habit.hasMemberDefinedGroupTasks)
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 10,
-                                          vertical: 6,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: myIsQuantified
-                                              ? Theme.of(context)
-                                                    .colorScheme
-                                                    .primary
-                                                    .withValues(alpha: 0.18)
-                                              : Colors.white.withValues(alpha: 0.05),
-                                          borderRadius: BorderRadius.circular(
-                                            999,
-                                          ),
-                                        ),
-                                        child: Text(
-                                          myIsQuantified
-                                              ? 'My task: quantified'
-                                              : 'My task: checkbox',
-                                          style: GoogleFonts.inter(
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.w600,
-                                            color: myIsQuantified
-                                                ? Theme.of(
-                                                    context,
-                                                  ).colorScheme.primary
-                                                : Colors.grey[300],
-                                          ),
-                                        ),
-                                      ),
-                                  ],
-                                ),
-                                const SizedBox(height: 10),
-                                Text(
-                                  habit.hasMemberDefinedGroupTasks
-                                      ? (myHasTask
-                                            ? 'My task: $myTask'
-                                            : 'No personal task set yet. Tap to set your task and log progress.')
-                                      : 'Shared task: ${habit.title}',
-                                  style: GoogleFonts.inter(
-                                    fontSize: 13,
-                                    color: Colors.grey[400],
-                                    height: 1.4,
-                                  ),
-                                ),
-                                const SizedBox(height: 14),
-                                Row(
-                                  children: [
-                                    
-                                   
-                                    
-                                  ],
-                                ),
-                              ],
+                        return Container(
+                          margin: const EdgeInsets.fromLTRB(24, 8, 24, 8),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).colorScheme.surface,
+                            borderRadius: BorderRadius.circular(22),
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.06),
                             ),
                           ),
-                        ),
-                      ),
-                    ).animate().fade().slideY(begin: 0.08);
+                          child: Material(
+                            color: Colors.transparent,
+                            borderRadius: BorderRadius.circular(22),
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(22),
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => GroupDetailScreen(group: group),
+                                  ),
+                                );
+                              },
+                              child: Padding(
+                                padding: const EdgeInsets.all(18),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Container(
+                                          padding: const EdgeInsets.all(10),
+                                          decoration: BoxDecoration(
+                                            shape: BoxShape.circle,
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .secondary
+                                                .withValues(alpha: 0.14),
+                                          ),
+                                          child: Icon(
+                                            Icons.groups_rounded,
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .secondary,
+                                            size: 20,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                group.name,
+                                                style: GoogleFonts.outfit(
+                                                  fontSize: 20,
+                                                  fontWeight: FontWeight.w700,
+                                                ),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                              const SizedBox(height: 2),
+                                              Text(
+                                                '${group.memberIds.length} members',
+                                                style: GoogleFonts.inter(
+                                                  fontSize: 12,
+                                                  color: Colors.grey[500],
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        Icon(
+                                          Icons.chevron_right_rounded,
+                                          color: Colors.grey[500],
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 10),
+                                    Wrap(
+                                      spacing: 8,
+                                      runSpacing: 8,
+                                      children: [
+                                        _MetricChip(label: 'Tasks', value: '${tasks.length}'),
+                                        _MetricChip(
+                                          label: 'Active today',
+                                          value: '$activeToday/${group.memberIds.length}',
+                                        ),
+                                      ],
+                                    ),
+                                    if (group.description.isNotEmpty) ...[
+                                      const SizedBox(height: 12),
+                                      Text(
+                                        group.description,
+                                        style: GoogleFonts.inter(
+                                          fontSize: 13,
+                                          color: Colors.grey[400],
+                                          height: 1.4,
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ).animate().fade().slideY(begin: 0.08);
+                      },
+                    );
                   },
                 ),
             ],
           );
         },
+      ),
+    );
+  }
+}
+
+class _MetricChip extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _MetricChip({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        '$label: $value',
+        style: GoogleFonts.inter(
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          color: Colors.grey[300],
+        ),
       ),
     );
   }

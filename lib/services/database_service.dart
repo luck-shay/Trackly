@@ -22,9 +22,10 @@ class DatabaseService {
         .where('participants', arrayContains: currentUserId)
         .snapshots()
         .map(
-          (snapshot) => snapshot.docs
-              .map((doc) => Habit.fromMap(doc.data(), id: doc.id))
-              .toList(),
+        (snapshot) => snapshot.docs
+          .map((doc) => Habit.fromMap(doc.data(), id: doc.id))
+          .where((habit) => !habit.isGroup)
+          .toList(),
         );
   }
 

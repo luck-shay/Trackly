@@ -1,0 +1,829 @@
+import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+
+import '../models/group.dart';
+import '../models/group_task.dart';
+import '../models/user_profile.dart';
+import '../services/group_service.dart';
+import '../services/social_service.dart';
+import '../theme/app_layout.dart';
+import 'create_group_task_screen.dart';
+
+class GroupDetailScreen extends StatelessWidget {
+  final Group group;
+
+  const GroupDetailScreen({super.key, required this.group});
+
+  Future<void> _confirmLeaveGroup(BuildContext context, Group group) async {
+    final shouldLeave = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Leave group?'),
+          content: const Text(
+            'You will stop receiving group updates. Your group tasks history will remain in the group record.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('Leave'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (shouldLeave != true || !context.mounted) {
+      return;
+    }
+
+    try {
+      await GroupService().leaveGroup(group.id);
+      if (!context.mounted) {
+        return;
+      }
+      Navigator.pop(context);
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('You left the group.')));
+    } catch (error) {
+      if (!context.mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Could not leave group. ${error.toString().split('\n').first}',
+          ),
+        ),
+      );
+    }
+  }
+
+  Future<void> _openInviteMembersSheet(BuildContext context, Group group) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      builder: (sheetContext) {
+        return _InviteMembersSheet(group: group);
+      },
+    );
+  }
+
+  Future<void> _createTask(BuildContext context, Group group) async {
+    final createdTask = await Navigator.push<GroupTask>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => CreateGroupTaskScreen(group: group),
+      ),
+    );
+
+    if (!context.mounted || createdTask == null) {
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Task created: ${createdTask.title}')),
+    );
+  }
+
+  Future<void> _toggleCheckboxTask(BuildContext context, GroupTask task) async {
+    try {
+      await GroupService().toggleCheckboxTaskCompletion(task);
+    } catch (error) {
+      if (!context.mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Could not update task. ${error.toString().split('\n').first}',
+          ),
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<Group?>(
+      stream: GroupService().streamGroupsForCurrentUser().map((groups) {
+        for (final item in groups) {
+          if (item.id == group.id) {
+            return item;
+          }
+        }
+        return null;
+      }),
+      builder: (context, snapshot) {
+        final liveGroup = snapshot.data ?? group;
+
+        return Scaffold(
+          appBar: AppBar(
+            title: Text(
+              liveGroup.name,
+              style: GoogleFonts.outfit(fontWeight: FontWeight.w700),
+            ),
+            actions: [
+              PopupMenuButton<String>(
+                onSelected: (value) {
+                  if (value == 'leave') {
+                    _confirmLeaveGroup(context, liveGroup);
+                  }
+                },
+                itemBuilder: (_) {
+                  return const [
+                    PopupMenuItem<String>(
+                      value: 'leave',
+                      child: Text('Leave group'),
+                    ),
+                  ];
+                },
+              ),
+            ],
+          ),
+          body: SingleChildScrollView(
+            padding: AppLayout.screenPadding,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(AppLayout.md),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surface,
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        liveGroup.description.isEmpty
+                            ? 'No description yet.'
+                            : liveGroup.description,
+                        style: GoogleFonts.inter(
+                          color: Colors.grey[300],
+                          height: 1.4,
+                        ),
+                      ),
+                      const VGap(AppLayout.sm),
+                      Text(
+                        '${liveGroup.memberIds.length} member${liveGroup.memberIds.length == 1 ? '' : 's'}',
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          color: Colors.grey[500],
+                        ),
+                      ),
+                      const VGap(AppLayout.sm),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: () =>
+                                  _openInviteMembersSheet(context, liveGroup),
+                              icon: const Icon(Icons.person_add_alt_1_rounded),
+                              label: const Text('Invite'),
+                            ),
+                          ),
+                          const HGap(AppLayout.sm),
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              onPressed: () => _createTask(context, liveGroup),
+                              icon: const Icon(Icons.add_task_rounded),
+                              label: const Text('Add Task'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor:
+                                    Theme.of(context).colorScheme.primary,
+                                foregroundColor: Colors.black,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const VGap(AppLayout.lg),
+                StreamBuilder<List<GroupTask>>(
+                  stream: GroupService().streamGroupTasks(liveGroup.id),
+                  builder: (context, taskSnapshot) {
+                    if (!taskSnapshot.hasData) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+
+                    final tasks = taskSnapshot.data!;
+                    final now = DateTime.now();
+                    final uid = GroupService().userId;
+
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _GroupPulseCard(group: liveGroup, tasks: tasks),
+                        const VGap(AppLayout.lg),
+                        Text(
+                          'Tasks',
+                          style: GoogleFonts.outfit(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const VGap(AppLayout.sm),
+                        if (tasks.isEmpty)
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(AppLayout.lg),
+                            decoration: BoxDecoration(
+                              color: Theme.of(context).colorScheme.surface,
+                              borderRadius: BorderRadius.circular(18),
+                              border: Border.all(
+                                color: Colors.white.withValues(alpha: 0.05),
+                              ),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'No tasks in this group yet.',
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                const VGap(AppLayout.xs),
+                                Text(
+                                  'Create your first task and start tracking progress with the group.',
+                                  style: GoogleFonts.inter(
+                                    color: Colors.grey[500],
+                                    height: 1.4,
+                                  ),
+                                ),
+                                const VGap(AppLayout.md),
+                                SizedBox(
+                                  width: double.infinity,
+                                  child: ElevatedButton.icon(
+                                    onPressed: () => _createTask(context, liveGroup),
+                                    icon: const Icon(Icons.add_task_rounded),
+                                    label: const Text('Create First Group Task'),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor:
+                                          Theme.of(context).colorScheme.primary,
+                                      foregroundColor: Colors.black,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        else
+                          Column(
+                            children: tasks.map((task) {
+                              final completedToday =
+                                  uid.isNotEmpty && task.isCompletedOnDate(uid, now);
+                              final completedTodayCount = task.completions.values
+                                  .map(
+                                    (dates) => dates.where(
+                                      (date) =>
+                                          date.year == now.year &&
+                                          date.month == now.month &&
+                                          date.day == now.day,
+                                    ).length,
+                                  )
+                                  .fold<int>(0, (sum, value) => sum + value);
+                              final todayValue = uid.isEmpty
+                                  ? null
+                                  : task.completionValueFor(uid, now);
+                                final progress = (task.isQuantified &&
+                                    task.quantMax > 0 &&
+                                    todayValue != null)
+                                  ? (todayValue / task.quantMax)
+                                    .clamp(0.0, 1.0)
+                                    .toDouble()
+                                  : 0.0;
+
+                              return Container(
+                                width: double.infinity,
+                                margin: const EdgeInsets.only(bottom: AppLayout.sm),
+                                padding: const EdgeInsets.all(AppLayout.md),
+                                decoration: BoxDecoration(
+                                  color: Theme.of(context).colorScheme.surface,
+                                  borderRadius: BorderRadius.circular(18),
+                                  border: Border.all(
+                                    color: Colors.white.withValues(alpha: 0.05),
+                                  ),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                task.title,
+                                                style: GoogleFonts.outfit(
+                                                  fontSize: 18,
+                                                  fontWeight: FontWeight.w700,
+                                                ),
+                                              ),
+                                              if (task.description.isNotEmpty) ...[
+                                                const VGap(AppLayout.xs),
+                                                Text(
+                                                  task.description,
+                                                  style: GoogleFonts.inter(
+                                                    color: Colors.grey[400],
+                                                    height: 1.4,
+                                                  ),
+                                                ),
+                                              ],
+                                            ],
+                                          ),
+                                        ),
+                                        if (!task.isQuantified)
+                                          IconButton.filledTonal(
+                                            tooltip: completedToday
+                                                ? 'Undo today'
+                                                : 'Mark done today',
+                                            onPressed: uid.isEmpty
+                                                ? null
+                                                : () => _toggleCheckboxTask(
+                                                      context,
+                                                      task,
+                                                    ),
+                                            icon: Icon(
+                                              completedToday
+                                                  ? Icons.check_circle_rounded
+                                                  : Icons.radio_button_unchecked_rounded,
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                    const VGap(AppLayout.sm),
+                                    Wrap(
+                                      spacing: 8,
+                                      runSpacing: 8,
+                                      children: [
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 10,
+                                            vertical: 6,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: Colors.white.withValues(alpha: 0.06),
+                                            borderRadius: BorderRadius.circular(999),
+                                          ),
+                                          child: Text(
+                                            '$completedTodayCount completed today',
+                                            style: GoogleFonts.inter(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w700,
+                                              color: Colors.grey[300],
+                                            ),
+                                          ),
+                                        ),
+                                        if (task.isQuantified)
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 10,
+                                              vertical: 6,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: Theme.of(context)
+                                                  .colorScheme
+                                                  .primary
+                                                  .withValues(alpha: 0.16),
+                                              borderRadius:
+                                                  BorderRadius.circular(999),
+                                            ),
+                                            child: Text(
+                                              'Today: ${(todayValue ?? 0).toStringAsFixed(1)}/${task.quantMax.toStringAsFixed(1)} ${task.quantUnit}',
+                                              style: GoogleFonts.inter(
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.w700,
+                                                color: Theme.of(context)
+                                                    .colorScheme
+                                                    .primary,
+                                              ),
+                                            ),
+                                          )
+                                        else
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 10,
+                                              vertical: 6,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: completedToday
+                                                  ? Theme.of(context)
+                                                      .colorScheme
+                                                      .primary
+                                                      .withValues(alpha: 0.16)
+                                                  : Colors.white.withValues(alpha: 0.06),
+                                              borderRadius: BorderRadius.circular(999),
+                                            ),
+                                            child: Text(
+                                              completedToday
+                                                  ? 'You are done today'
+                                                  : 'Not done today',
+                                              style: GoogleFonts.inter(
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.w700,
+                                                color: completedToday
+                                                    ? Theme.of(context)
+                                                        .colorScheme
+                                                        .primary
+                                                    : Colors.grey[300],
+                                              ),
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                    if (task.isQuantified) ...[
+                                      const VGap(AppLayout.sm),
+                                      LinearProgressIndicator(
+                                        value: progress,
+                                        minHeight: 7,
+                                        borderRadius: BorderRadius.circular(999),
+                                        backgroundColor:
+                                            Colors.white.withValues(alpha: 0.08),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              );
+                            }).toList(),
+                          ),
+                      ],
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _GroupPulseCard extends StatelessWidget {
+  final Group group;
+  final List<GroupTask> tasks;
+
+  const _GroupPulseCard({required this.group, required this.tasks});
+
+  bool _isSameDay(DateTime a, DateTime b) {
+    return a.year == b.year && a.month == b.month && a.day == b.day;
+  }
+
+  Map<String, int> _todayCounts(DateTime now) {
+    final counts = <String, int>{};
+    for (final task in tasks) {
+      task.completions.forEach((uid, dates) {
+        final total = dates.where((date) => _isSameDay(date, now)).length;
+        if (total > 0) {
+          counts[uid] = (counts[uid] ?? 0) + total;
+        }
+      });
+    }
+    return counts;
+  }
+
+  Map<String, int> _weekCounts(DateTime now) {
+    final start = DateTime(now.year, now.month, now.day).subtract(
+      const Duration(days: 6),
+    );
+    final end = DateTime(now.year, now.month, now.day, 23, 59, 59);
+
+    final counts = <String, int>{};
+    for (final task in tasks) {
+      task.completions.forEach((uid, dates) {
+        final total = dates.where((date) {
+          return !date.isBefore(start) && !date.isAfter(end);
+        }).length;
+        if (total > 0) {
+          counts[uid] = (counts[uid] ?? 0) + total;
+        }
+      });
+    }
+    return counts;
+  }
+
+  Future<Map<String, String>> _memberNames(List<String> memberIds) async {
+    final social = SocialService();
+    final names = <String, String>{};
+
+    for (final memberId in memberIds) {
+      final profile = await social.getUserProfile(memberId);
+      final username = profile?.username?.trim();
+      final displayName = profile?.displayName.trim();
+
+      if (displayName != null && displayName.isNotEmpty) {
+        names[memberId] = displayName;
+      } else if (username != null && username.isNotEmpty) {
+        names[memberId] = '@$username';
+      } else {
+        names[memberId] = memberId;
+      }
+    }
+
+    return names;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final now = DateTime.now();
+    final todayCounts = _todayCounts(now);
+    final weekCounts = _weekCounts(now);
+
+    final activeToday = group.memberIds
+        .where((memberId) => (todayCounts[memberId] ?? 0) > 0)
+        .length;
+
+    String? topUid;
+    var maxCount = 0;
+    for (final entry in weekCounts.entries) {
+      if (entry.value > maxCount) {
+        maxCount = entry.value;
+        topUid = entry.key;
+      }
+    }
+
+    final hasTasks = tasks.isNotEmpty;
+    final hasMultipleMembers = group.memberIds.length > 1;
+
+    String nextAction;
+    if (!hasTasks) {
+      nextAction = 'Create your first task to start this group.';
+    } else if (!hasMultipleMembers) {
+      nextAction = 'Invite members so progress and competition can start.';
+    } else if (activeToday == 0) {
+      nextAction = 'No one has logged progress today yet.';
+    } else {
+      nextAction = 'Group is active today. Keep the streak going.';
+    }
+
+    return FutureBuilder<Map<String, String>>(
+      future: _memberNames(group.memberIds),
+      builder: (context, snapshot) {
+        final names = snapshot.data ?? const <String, String>{};
+        final topName = topUid == null
+            ? 'No leader yet'
+            : '${names[topUid] ?? topUid} • $maxCount this week';
+
+        return Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(AppLayout.md),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surface,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Group Pulse',
+                style: GoogleFonts.outfit(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const VGap(AppLayout.xs),
+              Text(
+                nextAction,
+                style: GoogleFonts.inter(
+                  color: Colors.grey[400],
+                  height: 1.4,
+                ),
+              ),
+              const VGap(AppLayout.sm),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  _PulseChip(label: 'Tasks', value: '${tasks.length}'),
+                  _PulseChip(
+                    label: 'Active Today',
+                    value: '$activeToday/${group.memberIds.length}',
+                  ),
+                  _PulseChip(label: 'Top Performer', value: topName),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _PulseChip extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _PulseChip({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        '$label: $value',
+        style: GoogleFonts.inter(
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          color: Colors.grey[300],
+        ),
+      ),
+    );
+  }
+}
+
+class _InviteMembersSheet extends StatefulWidget {
+  final Group group;
+
+  const _InviteMembersSheet({required this.group});
+
+  @override
+  State<_InviteMembersSheet> createState() => _InviteMembersSheetState();
+}
+
+class _InviteMembersSheetState extends State<_InviteMembersSheet> {
+  final Set<String> _selectedFriendIds = <String>{};
+  bool _isSubmitting = false;
+
+  Future<void> _sendInvites() async {
+    if (_selectedFriendIds.isEmpty) {
+      Navigator.pop(context);
+      return;
+    }
+
+    setState(() {
+      _isSubmitting = true;
+    });
+
+    try {
+      final social = SocialService();
+      for (final uid in _selectedFriendIds) {
+        await social.sendGroupInvite(
+          groupId: widget.group.id,
+          groupName: widget.group.name,
+          toUserId: uid,
+        );
+      }
+
+      if (!mounted) {
+        return;
+      }
+
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Group invites sent.')),
+      );
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Could not send invites. ${error.toString().split('\n').first}',
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          AppLayout.lg,
+          AppLayout.md,
+          AppLayout.lg,
+          AppLayout.md + MediaQuery.of(context).viewInsets.bottom,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Invite members',
+              style: GoogleFonts.outfit(
+                fontSize: 22,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const VGap(AppLayout.sm),
+            Text(
+              'Select friends to invite to ${widget.group.name}.',
+              style: GoogleFonts.inter(color: Colors.grey[400]),
+            ),
+            const VGap(AppLayout.md),
+            StreamBuilder<List<UserProfile>>(
+              stream: SocialService().streamFriends(),
+              builder: (context, snapshot) {
+                if (!snapshot.hasData) {
+                  return const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 18),
+                    child: Center(child: CircularProgressIndicator()),
+                  );
+                }
+
+                final inviteableFriends = snapshot.data!
+                    .where((friend) => !widget.group.memberIds.contains(friend.uid))
+                    .toList();
+
+                if (inviteableFriends.isEmpty) {
+                  return Text(
+                    'All your friends are already in this group, or you have no friends yet.',
+                    style: GoogleFonts.inter(color: Colors.grey[500]),
+                  );
+                }
+
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: inviteableFriends.map((friend) {
+                        final isSelected = _selectedFriendIds.contains(friend.uid);
+                        return FilterChip(
+                          label: Text(friend.displayName),
+                          selected: isSelected,
+                          selectedColor: Theme.of(context).colorScheme.primary,
+                          checkmarkColor: Colors.black,
+                          labelStyle: GoogleFonts.inter(
+                            color: isSelected ? Colors.black : Colors.white,
+                          ),
+                          backgroundColor: Colors.black.withValues(alpha: 0.15),
+                          onSelected: (selected) {
+                            setState(() {
+                              if (selected) {
+                                _selectedFriendIds.add(friend.uid);
+                              } else {
+                                _selectedFriendIds.remove(friend.uid);
+                              }
+                            });
+                          },
+                        );
+                      }).toList(),
+                    ),
+                    const VGap(AppLayout.lg),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 52,
+                      child: ElevatedButton(
+                        onPressed: _isSubmitting ? null : _sendInvites,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Theme.of(context).colorScheme.primary,
+                          foregroundColor: Colors.black,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
+                        child: Text(
+                          _isSubmitting ? 'Sending...' : 'Send Invites',
+                          style: GoogleFonts.outfit(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
