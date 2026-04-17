@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -29,7 +30,7 @@ class DashboardScreen extends StatelessWidget {
     Habit habit,
   ) async {
     if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
+    final controller = ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         duration: const Duration(seconds: 3),
         content: Text('Nice work! "${habit.displayTitle}" completed.'),
@@ -41,6 +42,14 @@ class DashboardScreen extends StatelessWidget {
         ),
       ),
     );
+
+    // On some Android accessibility/device settings, action snackbars can linger.
+    // Force-close it after the intended timeout for consistent UX.
+    Timer(const Duration(seconds: 3), () {
+      if (context.mounted) {
+        controller.close();
+      }
+    });
   }
 
   Future<bool> _runPhotoValidation(BuildContext context, Habit habit) async {
