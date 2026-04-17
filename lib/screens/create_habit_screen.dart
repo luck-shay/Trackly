@@ -48,6 +48,7 @@ class _CreateHabitViewState extends State<_CreateHabitView> {
   late final TextEditingController _titleController;
   late final TextEditingController _descriptionController;
   late final TextEditingController _groupNameController;
+  bool _isSubmitting = false;
 
   bool get _isEditMode => widget.initialHabit != null;
 
@@ -790,9 +791,12 @@ class _CreateHabitViewState extends State<_CreateHabitView> {
                 width: double.infinity,
                 height: 56,
                 child: ElevatedButton(
-                  onPressed: () async {
+                  onPressed: _isSubmitting
+                      ? null
+                      : () async {
                     if (_formKey.currentState!.validate()) {
                       final provider = context.read<CreateHabitProvider>();
+                      final wasEditMode = provider.isEditMode;
                       final title = _titleController.text.trim();
                       final description = _descriptionController.text.trim();
                       final groupName = _groupNameController.text.trim();
@@ -808,6 +812,11 @@ class _CreateHabitViewState extends State<_CreateHabitView> {
                         }
                         return;
                       }
+
+                      setState(() {
+                        _isSubmitting = true;
+                      });
+
                       try {
                         final newHabit = await context
                             .read<CreateHabitProvider>()
@@ -817,20 +826,21 @@ class _CreateHabitViewState extends State<_CreateHabitView> {
                               groupName: groupName,
                             );
                         if (context.mounted) {
-                          if (!provider.isEditMode) {
+                          if (!wasEditMode) {
                             final createdLabel =
                                 provider.spaceType == HabitSpaceType.group
                                 ? 'Group created'
                                 : provider.spaceType == HabitSpaceType.individual
                                 ? 'Task created'
                                 : 'Shared task created';
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('$createdLabel: ${newHabit.displayTitle}'),
-                              ),
-                            );
+                            Navigator.pop(context, {
+                              'habit': newHabit,
+                              'snackbarMessage': '$createdLabel: ${newHabit.displayTitle}',
+                            });
+                            return;
                           }
-                          Navigator.pop(context, newHabit);
+
+                          Navigator.pop(context, {'habit': newHabit});
                         }
                       } catch (error) {
                         if (context.mounted) {
@@ -841,6 +851,12 @@ class _CreateHabitViewState extends State<_CreateHabitView> {
                               ),
                             ),
                           );
+                        }
+                      } finally {
+                        if (mounted) {
+                          setState(() {
+                            _isSubmitting = false;
+                          });
                         }
                       }
                     }

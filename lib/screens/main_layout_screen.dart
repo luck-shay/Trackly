@@ -167,7 +167,18 @@ class MainLayoutScreen extends StatelessWidget {
                                   },
                               transitionDuration: const Duration(milliseconds: 400),
                             ),
-                          );
+                          ).then((result) {
+                            if (!context.mounted || result == null) {
+                              return;
+                            }
+
+                            if (result is Map && result['snackbarMessage'] is String) {
+                              context.read<NavigationProvider>().setIndex(0);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text(result['snackbarMessage'] as String)),
+                              );
+                            }
+                          });
                         },
                         child: const Icon(Icons.add, size: 38),
                       ),

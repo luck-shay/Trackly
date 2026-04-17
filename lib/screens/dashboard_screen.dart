@@ -31,6 +31,7 @@ class DashboardScreen extends StatelessWidget {
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
+        duration: const Duration(seconds: 3),
         content: Text('Nice work! "${habit.displayTitle}" completed.'),
         action: SnackBarAction(
           label: 'Undo',

@@ -37,10 +37,27 @@ class AIValidationResult {
 }
 
 class AIService {
-  static const String _apiKey = String.fromEnvironment(
+  static const String _primaryApiKey = String.fromEnvironment(
     'GEMINI_API_KEY',
     defaultValue: '',
   );
+
+  static const String _secondaryApiKey = String.fromEnvironment(
+    'GOOGLE_API_KEY',
+    defaultValue: '',
+  );
+
+  static const String _tertiaryApiKey = String.fromEnvironment(
+    'GENAI_API_KEY',
+    defaultValue: '',
+  );
+
+  static String get _apiKey {
+    if (_primaryApiKey.trim().isNotEmpty) return _primaryApiKey.trim();
+    if (_secondaryApiKey.trim().isNotEmpty) return _secondaryApiKey.trim();
+    if (_tertiaryApiKey.trim().isNotEmpty) return _tertiaryApiKey.trim();
+    return '';
+  }
 
   static const String _configuredModel = String.fromEnvironment(
     'GEMINI_MODEL',
@@ -155,10 +172,10 @@ class AIService {
   ) async {
     if (_apiKey.isEmpty) {
       if (kDebugMode) {
-        debugPrint('AIService: No GEMINI_API_KEY provided.');
+        debugPrint('AIService: No API key provided (GEMINI_API_KEY/GOOGLE_API_KEY/GENAI_API_KEY).');
       }
       return const AIValidationResult.rejected(
-        userMessage: 'AI setup is incomplete. Please configure API key.',
+        userMessage: 'AI setup is incomplete in this build. Please configure API key and rebuild.',
         reason: AIValidationFailureReason.missingApiKey,
       );
     }

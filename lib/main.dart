@@ -104,6 +104,21 @@ class MyApp extends StatelessWidget {
               borderRadius: BorderRadius.all(Radius.circular(20)),
             ),
           ),
+          snackBarTheme: SnackBarThemeData(
+            behavior: SnackBarBehavior.floating,
+            elevation: 0,
+            backgroundColor: const Color(0xFF1C1F24),
+            contentTextStyle: GoogleFonts.inter(
+              color: Colors.white,
+              fontWeight: FontWeight.w600,
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+              side: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
+            ),
+            actionTextColor: const Color(0xFF00E676),
+            dismissDirection: DismissDirection.horizontal,
+          ),
           useMaterial3: true,
         ),
         home: StreamBuilder<User?>(

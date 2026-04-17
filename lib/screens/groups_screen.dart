@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../models/habit.dart';
 import '../models/group_invite.dart';
 import '../providers/habits_provider.dart';
+import '../providers/navigation_provider.dart';
 import '../screens/create_habit_screen.dart';
 import '../screens/habit_leaderboard_screen.dart';
 import '../services/social_service.dart';
@@ -280,26 +281,44 @@ class GroupsScreen extends StatelessWidget {
                           SizedBox(
                             width: double.infinity,
                             height: 54,
-                            child: ElevatedButton.icon(
-                              onPressed: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => const CreateHabitScreen(
-                                      initialSpaceType: HabitSpaceType.group,
+                            child: Padding(
+                              padding: const EdgeInsets.only(bottom: 110),
+                              child: ElevatedButton.icon(
+                                onPressed: () async {
+                                  final result = await Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => const CreateHabitScreen(
+                                        initialSpaceType: HabitSpaceType.group,
+                                      ),
                                     ),
+                                  );
+
+                                  if (!context.mounted || result == null) {
+                                    return;
+                                  }
+
+                                  if (result is Map && result['snackbarMessage'] is String) {
+                                    context.read<NavigationProvider>().setIndex(0);
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                          result['snackbarMessage'] as String,
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                },
+                                icon: const Icon(Icons.add_rounded),
+                                label: const Text('Create a group'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Theme.of(
+                                    context,
+                                  ).colorScheme.primary,
+                                  foregroundColor: Colors.black,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(16),
                                   ),
-                                );
-                              },
-                              icon: const Icon(Icons.add_rounded),
-                              label: const Text('Create a group'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Theme.of(
-                                  context,
-                                ).colorScheme.primary,
-                                foregroundColor: Colors.black,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(16),
                                 ),
                               ),
                             ),

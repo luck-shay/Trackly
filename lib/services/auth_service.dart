@@ -100,10 +100,15 @@ class AuthService {
       final existing = doc.data() ?? <String, dynamic>{};
       final currentDisplayName =
           (existing['displayName'] as String?)?.trim() ?? '';
+      final currentPhotoUrl = (existing['photoUrl'] as String?)?.trim() ?? '';
       final updates = <String, dynamic>{
         'email': user.email ?? '',
-        'photoUrl': user.photoURL,
       };
+
+      // Keep a customized profile picture if the user has already set one.
+      if (currentPhotoUrl.isEmpty) {
+        updates['photoUrl'] = user.photoURL;
+      }
 
       if (currentDisplayName.isEmpty) {
         updates['displayName'] = user.displayName ?? 'Anonymous User';
