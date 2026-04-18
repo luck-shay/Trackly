@@ -160,7 +160,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ] else ...[
                   _buildTextField(context, 'Display Name', _nameController, Icons.badge_rounded),
                   const SizedBox(height: 16),
-                  _buildTextField(context, 'Username', _usernameController, Icons.alternate_email_rounded, prefix: '@'),
+                  _buildTextField(context, 'Username', _usernameController, Icons.alternate_email_rounded,),
                   if (profileProvider.usernameError != null)
                     Padding(
                       padding: const EdgeInsets.only(top: 8.0),
@@ -209,66 +209,70 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                 ],
                 
-                const SizedBox(height: 48),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surface,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: Theme.of(context).dividerColor.withValues(alpha: 0.3),
+                if (!profileProvider.isEditing) ...[
+                  const SizedBox(height: 48),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 6,
                     ),
-                  ),
-                  child: SwitchListTile.adaptive(
-                    value: themeModeProvider.isDarkMode,
-                    onChanged: (value) {
-                      context.read<ThemeModeProvider>().setDarkModeEnabled(value);
-                    },
-                    contentPadding: EdgeInsets.zero,
-                    title: Text(
-                      'Dark Mode',
-                      style: GoogleFonts.inter(fontWeight: FontWeight.w600),
-                    ),
-                    subtitle: Text(
-                      themeModeProvider.isDarkMode
-                          ? 'Using dark appearance'
-                          : 'Using light appearance',
-                      style: GoogleFonts.inter(
-                        color: Colors.grey[500],
-                        fontSize: 12,
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.surface,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: Theme.of(context).dividerColor.withValues(alpha: 0.3),
                       ),
                     ),
-                    secondary: Icon(
-                      themeModeProvider.isDarkMode
-                          ? Icons.dark_mode_rounded
-                          : Icons.light_mode_rounded,
-                      color: Theme.of(context).colorScheme.primary,
+                    child: SwitchListTile.adaptive(
+                      value: themeModeProvider.isDarkMode,
+                      onChanged: (value) {
+                        context.read<ThemeModeProvider>().setDarkModeEnabled(value);
+                      },
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(
+                        'Dark Mode',
+                        style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+                      ),
+                      subtitle: Text(
+                        themeModeProvider.isDarkMode
+                            ? 'Using dark appearance'
+                            : 'Using light appearance',
+                        style: GoogleFonts.inter(
+                          color: Colors.grey[500],
+                          fontSize: 12,
+                        ),
+                      ),
+                      secondary: Icon(
+                        themeModeProvider.isDarkMode
+                            ? Icons.dark_mode_rounded
+                            : Icons.light_mode_rounded,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                      activeThumbColor: Theme.of(context).colorScheme.primary,
                     ),
-                    activeThumbColor: Theme.of(context).colorScheme.primary,
                   ),
-                ),
-                const SizedBox(height: 24),
-                ElevatedButton.icon(
-                  icon: const Icon(Icons.logout),
-                  label: const Text('Sign Out'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.red.shade900.withValues(alpha: 0.3),
-                    foregroundColor: Colors.redAccent,
-                    elevation: 0,
-                    padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                ],
+                if (!profileProvider.isEditing) ...[
+                  const SizedBox(height: 24),
+                  ElevatedButton.icon(
+                    icon: const Icon(Icons.logout),
+                    label: const Text('Sign Out'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.red.shade900.withValues(alpha: 0.3),
+                      foregroundColor: Colors.redAccent,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    ),
+                    onPressed: () async {
+                      await AuthService().signOut();
+                      if (context.mounted) {
+                        Navigator.of(context).popUntil((route) => route.isFirst);
+                      }
+                    },
                   ),
-                  onPressed: () async {
-                    await AuthService().signOut();
-                    if (context.mounted) {
-                      Navigator.of(context).popUntil((route) => route.isFirst);
-                    }
-                  },
-                ),
+                ],
                 const SizedBox(height: 120), 
               ],
             ),

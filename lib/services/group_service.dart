@@ -336,6 +336,15 @@ class GroupService {
       throw StateError('You must be signed in to delete group tasks.');
     }
 
+    final group = await getGroupById(groupId);
+    if (group == null) {
+      throw StateError('Group not found.');
+    }
+
+    if (group.ownerId != userId) {
+      throw StateError('Only the group admin can delete tasks.');
+    }
+
     await _db
         .collection('groups')
         .doc(groupId)

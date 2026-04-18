@@ -333,6 +333,19 @@ class _HabitCardState extends State<HabitCard>
                     ),
                   ],
                 ),
+                if (userIsQuantified) ...[
+                  const SizedBox(height: 12),
+                  LinearProgressIndicator(
+                    value: quantProgress.clamp(0.0, 1.0),
+                    minHeight: 7,
+                    borderRadius: BorderRadius.circular(999),
+                    backgroundColor:
+                        scheme.onSurface.withValues(alpha: 0.12),
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      scheme.primary,
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 16),
                 // 7-Day History Bubbles
                 Row(

@@ -112,6 +112,33 @@ class GroupDetailScreen extends StatelessWidget {
     }
   }
 
+  Future<void> _deleteTask(
+    BuildContext context,
+    Group group,
+    GroupTask task,
+  ) async {
+    try {
+      await GroupService().deleteGroupTask(group.id, task.id);
+      if (!context.mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Task deleted: ${task.title}')),
+      );
+    } catch (error) {
+      if (!context.mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Could not delete task. ${error.toString().split('\n').first}',
+          ),
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<Group?>(
@@ -225,6 +252,8 @@ class GroupDetailScreen extends StatelessWidget {
                     final tasks = taskSnapshot.data!;
                     final now = DateTime.now();
                     final uid = GroupService().userId;
+                    final isGroupAdmin =
+                      uid.isNotEmpty && uid == liveGroup.ownerId;
 
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -311,7 +340,7 @@ class GroupDetailScreen extends StatelessWidget {
                                     .toDouble()
                                   : 0.0;
 
-                              return Container(
+                                final taskCard = Container(
                                 width: double.infinity,
                                 margin: const EdgeInsets.only(bottom: AppLayout.sm),
                                 padding: const EdgeInsets.all(AppLayout.md),
@@ -473,6 +502,74 @@ class GroupDetailScreen extends StatelessWidget {
                                     ],
                                   ],
                                 ),
+                              );
+
+                              if (!isGroupAdmin) {
+                                return taskCard;
+                              }
+
+                              return Dismissible(
+                                key: Key('group_task_${task.id}'),
+                                direction: DismissDirection.endToStart,
+                                confirmDismiss: (direction) async {
+                                  return await showDialog<bool>(
+                                        context: context,
+                                        builder: (dialogContext) {
+                                          return AlertDialog(
+                                            title: const Text('Delete task?'),
+                                            content: Text(
+                                              '"${task.title}" will be removed for all group members and cannot be restored.',
+                                            ),
+                                            actions: [
+                                              TextButton(
+                                                onPressed: () => Navigator.pop(
+                                                  dialogContext,
+                                                  false,
+                                                ),
+                                                child: const Text('Cancel'),
+                                              ),
+                                              FilledButton(
+                                                style: FilledButton.styleFrom(
+                                                  backgroundColor: Theme.of(context)
+                                                      .colorScheme
+                                                      .error,
+                                                  foregroundColor: Theme.of(context)
+                                                      .colorScheme
+                                                      .onError,
+                                                ),
+                                                onPressed: () => Navigator.pop(
+                                                  dialogContext,
+                                                  true,
+                                                ),
+                                                child: const Text('Delete'),
+                                              ),
+                                            ],
+                                          );
+                                        },
+                                      ) ??
+                                      false;
+                                },
+                                onDismissed: (_) {
+                                  _deleteTask(context, liveGroup, task);
+                                },
+                                background: Container(
+                                  alignment: Alignment.centerRight,
+                                  padding: const EdgeInsets.only(right: 30),
+                                  margin: const EdgeInsets.only(bottom: AppLayout.sm),
+                                  decoration: BoxDecoration(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .error
+                                        .withValues(alpha: 0.85),
+                                    borderRadius: BorderRadius.circular(18),
+                                  ),
+                                  child: Icon(
+                                    Icons.delete_sweep_rounded,
+                                    color: Theme.of(context).colorScheme.onError,
+                                    size: 30,
+                                  ),
+                                ),
+                                child: taskCard,
                               );
                             }).toList(),
                           ),

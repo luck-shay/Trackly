@@ -292,7 +292,11 @@ class _CreateHabitViewState extends State<_CreateHabitView> {
                               context,
                             ).colorScheme.surface,
                             labelStyle: GoogleFonts.inter(
-                              color: isSelected ? Colors.black : Colors.white,
+                              color: isSelected
+                                  ? Colors.black
+                                  : Theme.of(context)
+                                      .colorScheme
+                                      .onSurface,
                               fontWeight: FontWeight.w600,
                             ),
                           );
@@ -456,7 +460,11 @@ class _CreateHabitViewState extends State<_CreateHabitView> {
                               context,
                             ).colorScheme.surface,
                             labelStyle: GoogleFonts.inter(
-                              color: isSelected ? Colors.black : Colors.white,
+                              color: isSelected
+                                  ? Colors.black
+                                  : Theme.of(context)
+                                      .colorScheme
+                                      .onSurface,
                               fontWeight: FontWeight.w600,
                             ),
                           );
