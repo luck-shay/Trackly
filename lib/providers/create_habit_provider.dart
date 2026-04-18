@@ -123,10 +123,10 @@ class CreateHabitProvider extends ChangeNotifier {
   }
 
   void setRequiresPhotoValidation(bool value) {
-    if (_requiresPhotoValidation == value) {
+    if (_requiresPhotoValidation == false) {
       return;
     }
-    _requiresPhotoValidation = value;
+    _requiresPhotoValidation = false;
     notifyListeners();
   }
 
@@ -145,7 +145,7 @@ class CreateHabitProvider extends ChangeNotifier {
     _quantUnit = habit.quantUnit;
     _quantMax = habit.quantMax;
     _groupTaskMode = habit.groupTaskMode;
-    _requiresPhotoValidation = habit.requiresPhotoValidation;
+    _requiresPhotoValidation = false;
     _reminderTime = habit.reminderTime;
     _selectedFriends.clear();
     notifyListeners();
@@ -193,7 +193,7 @@ class CreateHabitProvider extends ChangeNotifier {
         groupName: existing.spaceType == HabitSpaceType.group
             ? groupName
             : existing.groupName,
-        requiresPhotoValidation: _requiresPhotoValidation,
+        requiresPhotoValidation: false,
         reminderTime: _reminderTime,
       );
 
@@ -215,7 +215,7 @@ class CreateHabitProvider extends ChangeNotifier {
         groupTaskMode: _spaceType == HabitSpaceType.group
             ? _groupTaskMode
             : GroupTaskMode.shared,
-        requiresPhotoValidation: _requiresPhotoValidation,
+        requiresPhotoValidation: false,
         memberTasks:
             _spaceType == HabitSpaceType.group &&
                 _groupTaskMode == GroupTaskMode.memberDefined

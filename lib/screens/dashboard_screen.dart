@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -7,14 +6,12 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:provider/provider.dart';
-import 'package:image_picker/image_picker.dart';
 import '../models/habit.dart';
 import '../models/user_profile.dart';
 import '../widgets/habit_card.dart';
 import '../providers/habits_provider.dart';
 import '../providers/navigation_provider.dart';
 import '../providers/quantified_log_provider.dart';
-import '../services/ai_service.dart';
 import 'create_habit_screen.dart';
 import 'habit_leaderboard_screen.dart';
 import 'profile_screen.dart';
@@ -51,64 +48,6 @@ class DashboardScreen extends StatelessWidget {
       }
     });
   }
-
-  Future<bool> _runPhotoValidation(BuildContext context, Habit habit) async {
-    var loaderShown = false;
-    try {
-      final picker = ImagePicker();
-      final pickedFile = await picker.pickImage(
-        source: ImageSource.camera,
-        imageQuality: 80,
-      );
-
-      if (pickedFile == null) return false;
-
-      if (!context.mounted) return false;
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (ctx) => const Center(child: CircularProgressIndicator()),
-      );
-      loaderShown = true;
-
-      final validationResult = await AIService.validateHabitCompletionDetailed(
-        habit.title,
-        File(pickedFile.path),
-      );
-
-      if (loaderShown && context.mounted) {
-        Navigator.pop(context); // close loader
-        loaderShown = false;
-      }
-
-      if (!validationResult.approved && context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(validationResult.userMessage),
-            backgroundColor: Colors.redAccent,
-          ),
-        );
-        return false;
-      }
-
-      // In a real app we'd also upload to Storage here to keep a gallery
-      return true;
-    } catch (_) {
-      if (loaderShown && context.mounted) {
-        Navigator.pop(context);
-      }
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Could not capture/validate photo. Please try again.'),
-            backgroundColor: Colors.redAccent,
-          ),
-        );
-      }
-      return false;
-    }
-  }
-
 
   Future<double?> _askQuantifiedValue(
     BuildContext context,
@@ -550,10 +489,6 @@ class DashboardScreen extends StatelessWidget {
                                       provider.userId,
                                       now,
                                     );
-                                    if (habit.requiresPhotoValidation && !habit.isCompletedOnDate(provider.userId, now)) {
-                                      final aiCheckOk = await _runPhotoValidation(context, habit);
-                                      if (!aiCheckOk) return;
-                                    }
                                     await provider.toggleHabitCompletion(habit);
                                     if (!wasCompleted && context.mounted) {
                                       await _showCompletionCelebration(
@@ -591,21 +526,6 @@ class DashboardScreen extends StatelessWidget {
 
                                   if (!context.mounted) {
                                     return;
-                                  }
-
-                                  if (habit.requiresPhotoValidation &&
-                                      value >= quantMax &&
-                                      !habit.isCompletedOnDate(
-                                        provider.userId,
-                                        now,
-                                      )) {
-                                    final aiCheckOk = await _runPhotoValidation(
-                                      context,
-                                      habit,
-                                    );
-                                    if (!aiCheckOk) {
-                                      return;
-                                    }
                                   }
 
                                   await provider.saveQuantifiedProgress(
@@ -722,18 +642,6 @@ class DashboardScreen extends StatelessWidget {
                                               provider.userId,
                                               now,
                                             );
-                                        if (habit.requiresPhotoValidation &&
-                                            !habit.isCompletedOnDate(
-                                              provider.userId,
-                                              now,
-                                            )) {
-                                          final aiCheckOk =
-                                              await _runPhotoValidation(
-                                                context,
-                                                habit,
-                                              );
-                                          if (!aiCheckOk) return;
-                                        }
                                         await provider.toggleHabitCompletion(
                                           habit,
                                         );
@@ -778,22 +686,6 @@ class DashboardScreen extends StatelessWidget {
 
                                       if (!context.mounted) {
                                         return;
-                                      }
-
-                                      if (habit.requiresPhotoValidation &&
-                                          value >= quantMax &&
-                                          !habit.isCompletedOnDate(
-                                            provider.userId,
-                                            now,
-                                          )) {
-                                        final aiCheckOk =
-                                            await _runPhotoValidation(
-                                              context,
-                                              habit,
-                                            );
-                                        if (!aiCheckOk) {
-                                          return;
-                                        }
                                       }
 
                                       await provider.saveQuantifiedProgress(

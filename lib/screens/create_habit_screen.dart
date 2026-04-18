@@ -244,29 +244,7 @@ class _CreateHabitViewState extends State<_CreateHabitView> {
               ),
               Consumer<CreateHabitProvider>(
                 builder: (context, provider, child) {
-                  return SwitchListTile.adaptive(
-                    value: provider.requiresPhotoValidation,
-                    onChanged: provider.setRequiresPhotoValidation,
-                    contentPadding: EdgeInsets.zero,
-                    title: Row(
-                      children: [
-                        Text(
-                          'Require Photo Validation',
-                          style: GoogleFonts.inter(fontWeight: FontWeight.w600),
-                        ),
-                        const SizedBox(width: 8),
-                        Icon(Icons.auto_awesome, color: Colors.yellow[700], size: 16),
-                      ],
-                    ),
-                    subtitle: Text(
-                      'AI will check proof of your work upon completion',
-                      style: GoogleFonts.inter(
-                        color: Colors.grey[500],
-                        fontSize: 12,
-                      ),
-                    ),
-                    activeThumbColor: Theme.of(context).colorScheme.primary,
-                  );
+                  return const SizedBox.shrink();
                 },
               ),
               Consumer<CreateHabitProvider>(
