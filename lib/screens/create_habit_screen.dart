@@ -556,7 +556,7 @@ class _CreateHabitViewState extends State<_CreateHabitView> {
                 style: GoogleFonts.inter(
                   fontSize: 12,
                   fontWeight: FontWeight.bold,
-                  color: Colors.grey[500],
+                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.68),
                   letterSpacing: 1.2,
                 ),
               ).animate().fade(delay: 375.ms),
@@ -608,7 +608,10 @@ class _CreateHabitViewState extends State<_CreateHabitView> {
                         Icons.notifications_active_rounded,
                         color: provider.reminderTime != null
                             ? Theme.of(context).colorScheme.primary
-                            : Colors.grey[600],
+                            : Theme.of(context)
+                                .colorScheme
+                                .onSurface
+                                .withValues(alpha: 0.58),
                       ),
                     ),
                     title: Text(
@@ -616,9 +619,12 @@ class _CreateHabitViewState extends State<_CreateHabitView> {
                       style: GoogleFonts.inter(
                         fontSize: 18,
                         fontWeight: FontWeight.w600,
-                        color: provider.reminderTime != null 
-                            ? Colors.white 
-                            : Colors.grey[600],
+                        color: provider.reminderTime != null
+                            ? Theme.of(context).colorScheme.onSurface
+                            : Theme.of(context)
+                                .colorScheme
+                                .onSurface
+                                .withValues(alpha: 0.58),
                       ),
                     ),
                     trailing: provider.reminderTime != null
