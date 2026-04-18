@@ -1,0 +1,176 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isCurrentUser(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    function isParticipantByList(participants) {
+      return isSignedIn() && participants is list && participants.hasAny([request.auth.uid]);
+    }
+
+    function isHabitParticipant() {
+      return isParticipantByList(resource.data.participants);
+    }
+
+    function isGroupMember() {
+      return isSignedIn() &&
+        resource.data.memberIds is list &&
+        resource.data.memberIds.hasAny([request.auth.uid]);
+    }
+
+    function canSelfJoinGroup() {
+      return isSignedIn() &&
+        request.resource.data.memberIds is list &&
+        request.resource.data.memberIds.hasAny([request.auth.uid]) &&
+        request.resource.data.diff(resource.data).changedKeys().hasOnly(['memberIds']);
+    }
+
+    function canOnlyChangeStatus() {
+      return request.resource.data.diff(resource.data).changedKeys().hasOnly(['status']);
+    }
+
+    function isRecipientOrSender(fromField, toField) {
+      return isSignedIn() &&
+        (resource.data[fromField] == request.auth.uid || resource.data[toField] == request.auth.uid);
+    }
+
+    match /users/{uid} {
+      allow read: if isSignedIn();
+
+      allow create: if isCurrentUser(uid) &&
+        request.resource.data.uid == uid;
+
+      allow update: if isCurrentUser(uid) ||
+        (
+          isSignedIn() &&
+          request.resource.data.diff(resource.data).changedKeys().hasOnly(['friends']) &&
+          request.resource.data.friends is list &&
+          request.resource.data.friends.hasAll(resource.data.friends) &&
+          request.resource.data.friends.hasAny([request.auth.uid])
+        );
+
+      allow delete: if false;
+    }
+
+    match /habits/{habitId} {
+      allow read: if isHabitParticipant();
+
+      allow create: if isSignedIn() &&
+        request.resource.data.id == habitId &&
+        isParticipantByList(request.resource.data.participants);
+
+      allow update, delete: if isHabitParticipant() ||
+        (
+          isSignedIn() &&
+          request.resource.data.participants is list &&
+          request.resource.data.participants.hasAny([request.auth.uid]) &&
+          request.resource.data.diff(resource.data).changedKeys().hasOnly(['participants'])
+        );
+    }
+
+    match /friendRequests/{requestId} {
+      allow read: if isRecipientOrSender('from', 'to');
+
+      allow create: if isSignedIn() &&
+        request.resource.data.from == request.auth.uid &&
+        request.resource.data.to is string &&
+        request.resource.data.to != request.auth.uid &&
+        request.resource.data.status == 'pending';
+
+      allow update: if isSignedIn() &&
+        resource.data.to == request.auth.uid &&
+        canOnlyChangeStatus() &&
+        request.resource.data.status in ['accepted', 'declined'];
+
+      allow delete: if false;
+    }
+
+    match /habitInvites/{inviteId} {
+      allow read: if isRecipientOrSender('from', 'to');
+
+      allow create: if isSignedIn() &&
+        request.resource.data.from == request.auth.uid &&
+        request.resource.data.to is string &&
+        request.resource.data.to != request.auth.uid &&
+        request.resource.data.habitId is string &&
+        request.resource.data.status == 'pending';
+
+      allow update: if isSignedIn() &&
+        resource.data.to == request.auth.uid &&
+        canOnlyChangeStatus() &&
+        request.resource.data.status in ['accepted', 'declined'];
+
+      allow delete: if false;
+    }
+
+    match /groupInvites/{inviteId} {
+      allow read: if isRecipientOrSender('from', 'to');
+
+      allow create: if isSignedIn() &&
+        request.resource.data.from == request.auth.uid &&
+        request.resource.data.to is string &&
+        request.resource.data.to != request.auth.uid &&
+        request.resource.data.groupId is string &&
+        request.resource.data.status == 'pending';
+
+      allow update: if isSignedIn() &&
+        resource.data.to == request.auth.uid &&
+        canOnlyChangeStatus() &&
+        request.resource.data.status in ['accepted', 'declined'];
+
+      allow delete: if false;
+    }
+
+    match /habitNotices/{noticeId} {
+      allow read: if isSignedIn() && resource.data.to == request.auth.uid;
+
+      allow create: if isSignedIn() &&
+        request.resource.data.from == request.auth.uid &&
+        request.resource.data.to is string &&
+        request.resource.data.habitId is string &&
+        request.resource.data.status == 'unread' &&
+        exists(/databases/$(database)/documents/habits/$(request.resource.data.habitId)) &&
+        get(/databases/$(database)/documents/habits/$(request.resource.data.habitId)).data.participants.hasAll([
+          request.auth.uid,
+          request.resource.data.to,
+        ]);
+
+      allow update: if isSignedIn() &&
+        resource.data.to == request.auth.uid &&
+        request.resource.data.diff(resource.data).changedKeys().hasOnly(['status', 'notifiedAt']) &&
+        request.resource.data.status in ['notified', 'read'];
+
+      allow delete: if false;
+    }
+
+    match /groups/{groupId} {
+      allow read: if isGroupMember();
+
+      allow create: if isSignedIn() &&
+        request.resource.data.id == groupId &&
+        request.resource.data.memberIds is list &&
+        request.resource.data.memberIds.hasAny([request.auth.uid]);
+
+      allow update: if isGroupMember() || canSelfJoinGroup();
+
+      allow delete: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+
+      match /tasks/{taskId} {
+        allow read: if isSignedIn() &&
+          get(/databases/$(database)/documents/groups/$(groupId)).data.memberIds.hasAny([request.auth.uid]);
+
+        allow create, update, delete: if isSignedIn() &&
+          get(/databases/$(database)/documents/groups/$(groupId)).data.memberIds.hasAny([request.auth.uid]);
+      }
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
