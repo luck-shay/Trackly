@@ -64,6 +64,7 @@ class CalendarActivitySheet {
           create: (_) => MemberActivitySheetProvider(),
           child: Consumer<MemberActivitySheetProvider>(
             builder: (context, sheetProvider, _) {
+              final scheme = Theme.of(context).colorScheme;
               final focusedDay = sheetProvider.focusedDay;
               final completions = _normalizedCompletionSet(habit, user.uid);
               final completed = _completedDaysInMonth(completions, focusedDay);
@@ -91,7 +92,7 @@ class CalendarActivitySheet {
                       Text(
                         'For ${habit.title}',
                         style: GoogleFonts.inter(
-                          color: Colors.grey[500],
+                          color: scheme.onSurface.withValues(alpha: 0.68),
                           fontSize: 13,
                         ),
                       ),
@@ -207,7 +208,7 @@ class CalendarActivitySheet {
                                   Text(
                                     'Did (month)',
                                     style: GoogleFonts.inter(
-                                      color: Colors.grey[500],
+                                      color: scheme.onSurface.withValues(alpha: 0.68),
                                       fontSize: 12,
                                     ),
                                   ),
@@ -236,7 +237,7 @@ class CalendarActivitySheet {
                                   Text(
                                     'Skipped (month)',
                                     style: GoogleFonts.inter(
-                                      color: Colors.grey[500],
+                                      color: scheme.onSurface.withValues(alpha: 0.68),
                                       fontSize: 12,
                                     ),
                                   ),

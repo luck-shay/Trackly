@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/group.dart';
 import '../models/group_task.dart';
@@ -7,8 +8,55 @@ import '../models/habit.dart';
 
 class GroupService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
+  static const String _hiddenGroupsKeyPrefix = 'hidden_groups_';
 
   String get userId => FirebaseAuth.instance.currentUser?.uid ?? '';
+
+  String get _hiddenGroupsPrefsKey => '$_hiddenGroupsKeyPrefix$userId';
+
+  Future<Set<String>> _loadHiddenGroupIds() async {
+    final uid = userId;
+    if (uid.isEmpty) {
+      return <String>{};
+    }
+
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getStringList(_hiddenGroupsPrefsKey)?.toSet() ?? <String>{};
+  }
+
+  Future<void> _saveHiddenGroupIds(Set<String> groupIds) async {
+    final uid = userId;
+    if (uid.isEmpty) {
+      return;
+    }
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(_hiddenGroupsPrefsKey, groupIds.toList());
+  }
+
+  Future<void> markGroupHidden(String groupId) async {
+    final normalized = groupId.trim();
+    if (normalized.isEmpty) {
+      return;
+    }
+
+    final hiddenIds = await _loadHiddenGroupIds();
+    hiddenIds.add(normalized);
+    await _saveHiddenGroupIds(hiddenIds);
+  }
+
+  Future<void> clearHiddenGroup(String groupId) async {
+    final normalized = groupId.trim();
+    if (normalized.isEmpty) {
+      return;
+    }
+
+    final hiddenIds = await _loadHiddenGroupIds();
+    if (!hiddenIds.remove(normalized)) {
+      return;
+    }
+    await _saveHiddenGroupIds(hiddenIds);
+  }
 
   String createGroupId() => _db.collection('groups').doc().id;
 
@@ -25,12 +73,15 @@ class GroupService {
         .collection('groups')
         .where('memberIds', arrayContains: userId)
         .snapshots()
-        .map(
-          (snapshot) => snapshot.docs
+        .asyncMap((snapshot) async {
+          final hiddenGroupIds = await _loadHiddenGroupIds();
+          return snapshot.docs
               .map((doc) => Group.fromMap(doc.data(), id: doc.id))
+              .where((group) => !hiddenGroupIds.contains(group.id))
+              .where((group) => !group.leftMemberIds.contains(userId))
               .toList()
-            ..sort((a, b) => b.createdAt.compareTo(a.createdAt)),
-        );
+            ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        });
   }
 
   Future<Group?> getGroupById(String groupId) async {
@@ -59,6 +110,7 @@ class GroupService {
       ownerId: userId,
       createdAt: DateTime.now(),
       memberIds: members,
+      leftMemberIds: const <String>[],
     );
 
     await _db.collection('groups').doc(group.id).set(group.toMap());
@@ -80,6 +132,7 @@ class GroupService {
 
     await _db.collection('groups').doc(groupId).update({
       'memberIds': FieldValue.arrayUnion([memberId]),
+      'leftMemberIds': FieldValue.arrayRemove([memberId]),
     });
   }
 
@@ -111,11 +164,13 @@ class GroupService {
       }
       batch.delete(groupRef);
       await batch.commit();
+      await markGroupHidden(groupId);
       return;
     }
 
     final updates = <String, dynamic>{
       'memberIds': remainingMembers,
+      'leftMemberIds': FieldValue.arrayUnion([uid]),
     };
 
     if (group.ownerId == uid) {
@@ -123,6 +178,22 @@ class GroupService {
     }
 
     await groupRef.update(updates);
+    await markGroupHidden(groupId);
+
+    // Legacy compatibility: older app versions stored groups in `habits` using
+    // the same id. Remove the current user from that participant list so
+    // migration does not re-add them to the group on next app launch.
+    final legacyGroupHabitRef = _db.collection('habits').doc(groupId);
+    try {
+      await legacyGroupHabitRef.update({
+        'participants': FieldValue.arrayRemove([uid]),
+      });
+    } on FirebaseException catch (error) {
+      // `not-found` is expected when no legacy habit mirror exists.
+      if (error.code != 'not-found') {
+        rethrow;
+      }
+    }
   }
 
   Stream<List<GroupTask>> streamGroupTasks(String groupId) {

@@ -161,7 +161,9 @@ class GroupDetailScreen extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: Theme.of(context).colorScheme.surface,
                     borderRadius: BorderRadius.circular(18),
-                    border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+                    border: Border.all(
+                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1),
+                    ),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -171,7 +173,7 @@ class GroupDetailScreen extends StatelessWidget {
                             ? 'No description yet.'
                             : liveGroup.description,
                         style: GoogleFonts.inter(
-                          color: Colors.grey[300],
+                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.82),
                           height: 1.4,
                         ),
                       ),
@@ -180,7 +182,7 @@ class GroupDetailScreen extends StatelessWidget {
                         '${liveGroup.memberIds.length} member${liveGroup.memberIds.length == 1 ? '' : 's'}',
                         style: GoogleFonts.inter(
                           fontSize: 12,
-                          color: Colors.grey[500],
+                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.68),
                         ),
                       ),
                       const VGap(AppLayout.sm),
@@ -245,7 +247,7 @@ class GroupDetailScreen extends StatelessWidget {
                               color: Theme.of(context).colorScheme.surface,
                               borderRadius: BorderRadius.circular(18),
                               border: Border.all(
-                                color: Colors.white.withValues(alpha: 0.05),
+                                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1),
                               ),
                             ),
                             child: Column(
@@ -262,7 +264,7 @@ class GroupDetailScreen extends StatelessWidget {
                                 Text(
                                   'Create your first task and start tracking progress with the group.',
                                   style: GoogleFonts.inter(
-                                    color: Colors.grey[500],
+                                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
                                     height: 1.4,
                                   ),
                                 ),
@@ -317,7 +319,7 @@ class GroupDetailScreen extends StatelessWidget {
                                   color: Theme.of(context).colorScheme.surface,
                                   borderRadius: BorderRadius.circular(18),
                                   border: Border.all(
-                                    color: Colors.white.withValues(alpha: 0.05),
+                                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1),
                                   ),
                                 ),
                                 child: Column(
@@ -343,7 +345,7 @@ class GroupDetailScreen extends StatelessWidget {
                                                 Text(
                                                   task.description,
                                                   style: GoogleFonts.inter(
-                                                    color: Colors.grey[400],
+                                                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.72),
                                                     height: 1.4,
                                                   ),
                                                 ),
@@ -381,7 +383,7 @@ class GroupDetailScreen extends StatelessWidget {
                                             vertical: 6,
                                           ),
                                           decoration: BoxDecoration(
-                                            color: Colors.white.withValues(alpha: 0.06),
+                                            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.08),
                                             borderRadius: BorderRadius.circular(999),
                                           ),
                                           child: Text(
@@ -389,7 +391,7 @@ class GroupDetailScreen extends StatelessWidget {
                                             style: GoogleFonts.inter(
                                               fontSize: 11,
                                               fontWeight: FontWeight.w700,
-                                              color: Colors.grey[300],
+                                              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.82),
                                             ),
                                           ),
                                         ),
@@ -430,7 +432,10 @@ class GroupDetailScreen extends StatelessWidget {
                                                       .colorScheme
                                                       .primary
                                                       .withValues(alpha: 0.16)
-                                                  : Colors.white.withValues(alpha: 0.06),
+                                                  : Theme.of(context)
+                                                    .colorScheme
+                                                    .onSurface
+                                                    .withValues(alpha: 0.08),
                                               borderRadius: BorderRadius.circular(999),
                                             ),
                                             child: Text(
@@ -444,7 +449,10 @@ class GroupDetailScreen extends StatelessWidget {
                                                     ? Theme.of(context)
                                                         .colorScheme
                                                         .primary
-                                                    : Colors.grey[300],
+                                                    : Theme.of(context)
+                                                        .colorScheme
+                                                        .onSurface
+                                                        .withValues(alpha: 0.82),
                                               ),
                                             ),
                                           ),
@@ -457,7 +465,10 @@ class GroupDetailScreen extends StatelessWidget {
                                         minHeight: 7,
                                         borderRadius: BorderRadius.circular(999),
                                         backgroundColor:
-                                            Colors.white.withValues(alpha: 0.08),
+                                            Theme.of(context)
+                                                .colorScheme
+                                                .onSurface
+                                                .withValues(alpha: 0.12),
                                       ),
                                     ],
                                   ],
@@ -589,7 +600,9 @@ class _GroupPulseCard extends StatelessWidget {
           decoration: BoxDecoration(
             color: Theme.of(context).colorScheme.surface,
             borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+            border: Border.all(
+              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1),
+            ),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -605,7 +618,7 @@ class _GroupPulseCard extends StatelessWidget {
               Text(
                 nextAction,
                 style: GoogleFonts.inter(
-                  color: Colors.grey[400],
+                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.72),
                   height: 1.4,
                 ),
               ),
@@ -641,7 +654,7 @@ class _PulseChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.06),
+        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(999),
       ),
       child: Text(
@@ -649,7 +662,7 @@ class _PulseChip extends StatelessWidget {
         style: GoogleFonts.inter(
           fontSize: 11,
           fontWeight: FontWeight.w700,
-          color: Colors.grey[300],
+          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.82),
         ),
       ),
     );
@@ -742,7 +755,9 @@ class _InviteMembersSheetState extends State<_InviteMembersSheet> {
             const VGap(AppLayout.sm),
             Text(
               'Select friends to invite to ${widget.group.name}.',
-              style: GoogleFonts.inter(color: Colors.grey[400]),
+              style: GoogleFonts.inter(
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.72),
+              ),
             ),
             const VGap(AppLayout.md),
             StreamBuilder<List<UserProfile>>(
@@ -762,7 +777,9 @@ class _InviteMembersSheetState extends State<_InviteMembersSheet> {
                 if (inviteableFriends.isEmpty) {
                   return Text(
                     'All your friends are already in this group, or you have no friends yet.',
-                    style: GoogleFonts.inter(color: Colors.grey[500]),
+                    style: GoogleFonts.inter(
+                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.68),
+                    ),
                   );
                 }
 
@@ -780,9 +797,16 @@ class _InviteMembersSheetState extends State<_InviteMembersSheet> {
                           selectedColor: Theme.of(context).colorScheme.primary,
                           checkmarkColor: Colors.black,
                           labelStyle: GoogleFonts.inter(
-                            color: isSelected ? Colors.black : Colors.white,
+                            color: isSelected
+                                ? Colors.black
+                                : Theme.of(context)
+                                    .colorScheme
+                                    .onSurface,
                           ),
-                          backgroundColor: Colors.black.withValues(alpha: 0.15),
+                          backgroundColor: Theme.of(context)
+                              .colorScheme
+                              .onSurface
+                              .withValues(alpha: 0.08),
                           onSelected: (selected) {
                             setState(() {
                               if (selected) {

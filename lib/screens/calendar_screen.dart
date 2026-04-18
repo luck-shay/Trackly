@@ -59,6 +59,7 @@ class _CalendarViewState extends State<_CalendarView> {
   @override
   Widget build(BuildContext context) {
     final db = DatabaseService();
+    final scheme = Theme.of(context).colorScheme;
 
     return Scaffold(
       appBar: AppBar(
@@ -67,7 +68,23 @@ class _CalendarViewState extends State<_CalendarView> {
           'Activity History',
           style: GoogleFonts.outfit(fontWeight: FontWeight.w600),
         ),
-        
+        actions: [
+          Consumer<CalendarProvider>(
+            builder: (context, calendarProvider, child) {
+              return TextButton(
+                onPressed: calendarProvider.goToToday,
+                child: Text(
+                  'Today',
+                  style: GoogleFonts.inter(
+                    color: Theme.of(context).colorScheme.primary,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              );
+            },
+          ),
+          const SizedBox(width: 8),
+        ],
       ),
       body: StreamBuilder<List<Habit>>(
         stream: db.streamHabits(),
@@ -106,9 +123,11 @@ class _CalendarViewState extends State<_CalendarView> {
                 margin: const EdgeInsets.all(16),
                 padding: const EdgeInsets.only(bottom: 16),
                 decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.surface,
+                  color: scheme.surface,
                   borderRadius: BorderRadius.circular(24),
-                  border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+                  border: Border.all(
+                    color: scheme.onSurface.withValues(alpha: 0.08),
+                  ),
                   boxShadow: [
                     BoxShadow(
                       color: Colors.black.withValues(alpha: 0.2),
@@ -148,26 +167,26 @@ class _CalendarViewState extends State<_CalendarView> {
                       ),
                       daysOfWeekStyle: DaysOfWeekStyle(
                         weekdayStyle: GoogleFonts.inter(
-                          color: Colors.grey[500]!,
+                          color: scheme.onSurface.withValues(alpha: 0.7),
                           fontWeight: FontWeight.w600,
                         ),
                         weekendStyle: GoogleFonts.inter(
-                          color: Colors.grey[600]!,
+                          color: scheme.onSurface.withValues(alpha: 0.6),
                           fontWeight: FontWeight.w600,
                         ),
                       ),
                       calendarStyle: CalendarStyle(
                         defaultTextStyle: GoogleFonts.inter(
-                          color: Colors.white,
+                          color: scheme.onSurface,
                         ),
                         weekendTextStyle: GoogleFonts.inter(
-                          color: Colors.grey[400]!,
+                          color: scheme.onSurface.withValues(alpha: 0.85),
                         ),
                         outsideTextStyle: GoogleFonts.inter(
-                          color: Colors.grey[800]!,
+                          color: scheme.onSurface.withValues(alpha: 0.35),
                         ),
                         markerDecoration: BoxDecoration(
-                          color: Theme.of(context).colorScheme.primary,
+                          color: scheme.secondary,
                           shape: BoxShape.circle,
                         ),
                         todayDecoration: BoxDecoration(
@@ -185,7 +204,7 @@ class _CalendarViewState extends State<_CalendarView> {
                           shape: BoxShape.circle,
                         ),
                         selectedTextStyle: GoogleFonts.inter(
-                          color: Colors.black,
+                          color: scheme.onPrimary,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -206,7 +225,7 @@ class _CalendarViewState extends State<_CalendarView> {
                     style: GoogleFonts.inter(
                       fontSize: 12,
                       fontWeight: FontWeight.bold,
-                      color: Colors.grey[500],
+                      color: scheme.onSurface.withValues(alpha: 0.55),
                       letterSpacing: 1.2,
                     ),
                   ).animate().fade(delay: 200.ms),
@@ -219,7 +238,9 @@ class _CalendarViewState extends State<_CalendarView> {
                       return Center(
                         child: Text(
                           'Select a day to view your progress.',
-                          style: GoogleFonts.inter(color: Colors.grey[600]),
+                          style: GoogleFonts.inter(
+                            color: scheme.onSurface.withValues(alpha: 0.6),
+                          ),
                         ),
                       ).animate().fade(delay: 300.ms);
                     }

@@ -18,6 +18,7 @@ class FriendsScreen extends StatelessWidget {
     final social = SocialService();
     final db = DatabaseService();
     final friendsProvider = context.watch<FriendsProvider>();
+    final scheme = Theme.of(context).colorScheme;
 
     return Scaffold(
       appBar: AppBar(
@@ -40,22 +41,29 @@ class FriendsScreen extends StatelessWidget {
             // Search Bar
             Container(
               decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surface,
+                color: scheme.surface,
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.white10),
+                border: Border.all(
+                  color: scheme.onSurface.withValues(alpha: 0.12),
+                ),
               ),
               child: TextFormField(
                 initialValue: friendsProvider.lastQuery,
-                style: GoogleFonts.inter(color: Colors.white),
+                style: GoogleFonts.inter(color: scheme.onSurface),
                 decoration: InputDecoration(
                   hintText: 'Search by @username...',
-                  hintStyle: GoogleFonts.inter(color: Colors.grey[600]),
+                  hintStyle: GoogleFonts.inter(
+                    color: scheme.onSurface.withValues(alpha: 0.62),
+                  ),
                   border: InputBorder.none,
                   contentPadding: const EdgeInsets.symmetric(
                     horizontal: 20,
                     vertical: 16,
                   ),
-                  suffixIcon: const Icon(Icons.search, color: Colors.white70),
+                  suffixIcon: Icon(
+                    Icons.search,
+                    color: scheme.onSurface.withValues(alpha: 0.7),
+                  ),
                 ),
                 onFieldSubmitted: (val) => context.read<FriendsProvider>().searchUsers(val),
               ),
@@ -83,7 +91,7 @@ class FriendsScreen extends StatelessWidget {
                             ? NetworkImage(user.photoUrl!)
                             : null,
                         child: user.photoUrl == null
-                            ? const Icon(Icons.person, color: Colors.white)
+                          ? Icon(Icons.person, color: scheme.onPrimary)
                             : null,
                       ),
                       title: Text(
@@ -96,7 +104,7 @@ class FriendsScreen extends StatelessWidget {
                             : user.email,
                         style: GoogleFonts.inter(
                           fontSize: 12,
-                          color: Colors.grey,
+                          color: scheme.onSurface.withValues(alpha: 0.68),
                         ),
                       ),
                       trailing: IconButton(
@@ -119,7 +127,10 @@ class FriendsScreen extends StatelessWidget {
                       ),
                     ),
                   ),
-              const Divider(color: Colors.white10, height: 48),
+              Divider(
+                color: scheme.onSurface.withValues(alpha: 0.12),
+                height: 48,
+              ),
             ] else if (friendsProvider.hasSearched && friendsProvider.lastQuery.isNotEmpty) ...[
               Container(
                 padding: const EdgeInsets.all(16),
@@ -205,7 +216,7 @@ class FriendsScreen extends StatelessWidget {
                                   subtitle: Text(
                                     'This invite is no longer valid. Remove it.',
                                     style: GoogleFonts.inter(
-                                      color: Colors.grey,
+                                      color: scheme.onSurface.withValues(alpha: 0.68),
                                     ),
                                   ),
                                   trailing: IconButton(
@@ -238,7 +249,7 @@ class FriendsScreen extends StatelessWidget {
                                   ).colorScheme.secondary.withValues(alpha: 0.2),
                                   child: const Icon(
                                     Icons.track_changes_rounded,
-                                    color: Colors.white,
+                                    color: Colors.black,
                                   ),
                                 ),
                                 title: Text(
@@ -250,7 +261,9 @@ class FriendsScreen extends StatelessWidget {
                                 ),
                                 subtitle: Text(
                                   'Invited by ${user.displayName}',
-                                  style: GoogleFonts.inter(color: Colors.grey),
+                                  style: GoogleFonts.inter(
+                                    color: scheme.onSurface.withValues(alpha: 0.68),
+                                  ),
                                 ),
                                 trailing: Row(
                                   mainAxisSize: MainAxisSize.min,
@@ -310,7 +323,10 @@ class FriendsScreen extends StatelessWidget {
                             },
                       );
                     }),
-                    const Divider(color: Colors.white10, height: 48),
+                    Divider(
+                      color: scheme.onSurface.withValues(alpha: 0.12),
+                      height: 48,
+                    ),
                   ],
                 );
               },
@@ -366,7 +382,7 @@ class FriendsScreen extends StatelessWidget {
                               subtitle: Text(
                                 'This friend request is no longer valid. Remove it.',
                                 style: GoogleFonts.inter(
-                                  color: Colors.grey,
+                                  color: scheme.onSurface.withValues(alpha: 0.68),
                                 ),
                               ),
                               trailing: IconButton(
@@ -469,7 +485,10 @@ class FriendsScreen extends StatelessWidget {
                         },
                       );
                     }),
-                    const Divider(color: Colors.white10, height: 48),
+                    Divider(
+                      color: scheme.onSurface.withValues(alpha: 0.12),
+                      height: 48,
+                    ),
                   ],
                 );
               },
@@ -499,7 +518,9 @@ class FriendsScreen extends StatelessWidget {
                       child: Text(
                         'No friends yet.\nSearch for them above!',
                         textAlign: TextAlign.center,
-                        style: GoogleFonts.inter(color: Colors.grey[500]),
+                        style: GoogleFonts.inter(
+                          color: scheme.onSurface.withValues(alpha: 0.68),
+                        ),
                       ),
                     ),
                   ).animate().fade();
@@ -517,7 +538,7 @@ class FriendsScreen extends StatelessWidget {
                                 ? NetworkImage(friend.photoUrl!)
                                 : null,
                             child: friend.photoUrl == null
-                                ? const Icon(Icons.person, color: Colors.white)
+                              ? Icon(Icons.person, color: scheme.onPrimary)
                                 : null,
                           ),
                           title: Text(
@@ -532,7 +553,7 @@ class FriendsScreen extends StatelessWidget {
                                 : friend.email,
                             style: GoogleFonts.inter(
                               fontSize: 12,
-                              color: Colors.grey,
+                              color: scheme.onSurface.withValues(alpha: 0.68),
                             ),
                           ),
                           onTap: () {

@@ -1,6 +1,7 @@
 import 'dart:ui';
-import 'package:flutter/material.dart';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
@@ -8,17 +9,21 @@ import 'package:provider/provider.dart';
 import '../models/habit.dart';
 import '../providers/navigation_provider.dart';
 import '../services/social_service.dart';
-import 'dashboard_screen.dart';
 import 'calendar_screen.dart';
-import 'create_habit_screen.dart';
 import 'create_group_screen.dart';
-import 'groups_screen.dart';
+import 'create_habit_screen.dart';
+import 'dashboard_screen.dart';
 import 'friends_screen.dart';
+import 'groups_screen.dart';
 
 enum _CreateEntryAction { individualHabit, sharedHabit, group }
 
 class MainLayoutScreen extends StatelessWidget {
   MainLayoutScreen({super.key});
+
+  static const double _navShellRadius = 32;
+  static const double _navItemRadius = 24;
+  static const double _addButtonSize = 60;
 
   final List<Widget> _screens = [
     const DashboardScreen(),
@@ -53,7 +58,9 @@ class MainLayoutScreen extends StatelessWidget {
                 const SizedBox(height: 6),
                 Text(
                   'Choose what you want to create.',
-                  style: GoogleFonts.inter(color: Colors.grey[400]),
+                  style: GoogleFonts.inter(
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.68),
+                  ),
                 ),
                 const SizedBox(height: 14),
                 _CreateOptionTile(
@@ -138,13 +145,14 @@ class MainLayoutScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final currentIndex = context.watch<NavigationProvider>().currentIndex;
     final social = SocialService();
+    final scheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
       extendBody: true,
       body: Stack(
         children: [
           IndexedStack(index: currentIndex, children: _screens),
-
           Positioned(
             left: 24,
             right: 24,
@@ -154,17 +162,38 @@ class MainLayoutScreen extends StatelessWidget {
               children: [
                 Expanded(
                   child: ClipRRect(
-                    borderRadius: BorderRadius.circular(32),
+                    borderRadius: BorderRadius.circular(_navShellRadius),
                     child: BackdropFilter(
-                      filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+                      filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
                       child: Container(
                         height: 72,
                         decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.3),
-                          borderRadius: BorderRadius.circular(32),
-                          border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.1),
+                          color: scheme.surface.withValues(
+                            alpha: isDark ? 0.34 : 0.7,
                           ),
+                          borderRadius: BorderRadius.circular(_navShellRadius),
+                          border: Border.all(
+                            color: scheme.onSurface.withValues(
+                              alpha: isDark ? 0.2 : 0.12,
+                            ),
+                            width: 1.1,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(
+                                alpha: isDark ? 0.34 : 0.12,
+                              ),
+                              blurRadius: 24,
+                              offset: const Offset(0, 10),
+                            ),
+                            BoxShadow(
+                              color: Colors.white.withValues(
+                                alpha: isDark ? 0.03 : 0.35,
+                              ),
+                              blurRadius: 1,
+                              offset: const Offset(0, -1),
+                            ),
+                          ],
                         ),
                         child: LayoutBuilder(
                           builder: (context, constraints) {
@@ -244,17 +273,26 @@ class MainLayoutScreen extends StatelessWidget {
                 ),
                 const SizedBox(width: 16),
                 SizedBox(
-                  width: 60,
-                  height: 60,
+                  width: _addButtonSize,
+                  height: _addButtonSize,
                   child: ClipOval(
                     child: BackdropFilter(
-                      filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+                      filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
                       child: FloatingActionButton(
                         heroTag: 'main_layout_add_fab',
-                        shape: const CircleBorder(),
+                        shape: CircleBorder(
+                          side: BorderSide(
+                            color: scheme.onSurface.withValues(
+                              alpha: isDark ? 0.22 : 0.14,
+                            ),
+                            width: 1.1,
+                          ),
+                        ),
                         elevation: 0,
-                        backgroundColor: Colors.black.withValues(alpha: 0.22),
-                        foregroundColor: Theme.of(context).colorScheme.primary,
+                        backgroundColor: scheme.surface.withValues(
+                          alpha: isDark ? 0.4 : 0.74,
+                        ),
+                        foregroundColor: scheme.primary,
                         onPressed: () async {
                           final result = await _openCreateFlow(context);
                           if (!context.mounted || result == null) {
@@ -269,7 +307,8 @@ class MainLayoutScreen extends StatelessWidget {
                           }
 
                           final snackbarMessage = result['snackbarMessage'];
-                          if (snackbarMessage is String && snackbarMessage.isNotEmpty) {
+                          if (snackbarMessage is String &&
+                              snackbarMessage.isNotEmpty) {
                             ScaffoldMessenger.of(
                               context,
                             ).showSnackBar(SnackBar(content: Text(snackbarMessage)));
@@ -296,11 +335,12 @@ class MainLayoutScreen extends StatelessWidget {
     int badgeCount = 0,
     required bool compact,
   }) {
-    final isSelected =
-        context.watch<NavigationProvider>().currentIndex == index;
-    final color = isSelected
-        ? Theme.of(context).colorScheme.primary
-        : Colors.white60;
+    final isSelected = context.watch<NavigationProvider>().currentIndex == index;
+    final scheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final iconColor = isSelected
+        ? scheme.primary
+        : scheme.onSurface.withValues(alpha: isDark ? 0.72 : 0.62);
 
     return GestureDetector(
       onTap: () {
@@ -308,16 +348,29 @@ class MainLayoutScreen extends StatelessWidget {
       },
       behavior: HitTestBehavior.opaque,
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 300),
+        duration: const Duration(milliseconds: 280),
+        curve: Curves.easeOutCubic,
         width: double.infinity,
         height: double.infinity,
+        margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(_navItemRadius),
+          color: isSelected
+              ? scheme.primary.withValues(alpha: isDark ? 0.16 : 0.2)
+              : Colors.transparent,
+          border: Border.all(
+            color: isSelected
+                ? scheme.primary.withValues(alpha: isDark ? 0.32 : 0.24)
+                : Colors.transparent,
+          ),
+        ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Stack(
               clipBehavior: Clip.none,
               children: [
-                Icon(icon, color: color, size: isSelected ? 26 : 24),
+                Icon(icon, color: iconColor, size: isSelected ? 26 : 24),
                 if (badgeCount > 0)
                   Positioned(
                     top: -5,
@@ -345,20 +398,20 @@ class MainLayoutScreen extends StatelessWidget {
                   ),
               ],
             ),
-              if (isSelected && !compact) ...[
+            if (isSelected && !compact) ...[
               const SizedBox(height: 4),
-                SizedBox(
-                  width: double.infinity,
-                  child: FittedBox(
-                    fit: BoxFit.scaleDown,
-                    child: Text(
-                      label,
-                      style: GoogleFonts.inter(
-                        fontSize: 10,
-                        color: color,
-                        fontWeight: FontWeight.bold,
-                      ),
+              SizedBox(
+                width: double.infinity,
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    label,
+                    style: GoogleFonts.inter(
+                      fontSize: 10,
+                      color: iconColor,
+                      fontWeight: FontWeight.bold,
                     ),
+                  ),
                 ),
               ).animate().fade().scaleXY(),
             ],
@@ -384,6 +437,9 @@ class _CreateOptionTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -392,19 +448,21 @@ class _CreateOptionTile extends StatelessWidget {
         child: Ink(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: Colors.black.withValues(alpha: 0.16),
+            color: scheme.onSurface.withValues(alpha: isDark ? 0.14 : 0.06),
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+            border: Border.all(
+              color: scheme.onSurface.withValues(alpha: isDark ? 0.12 : 0.1),
+            ),
           ),
           child: Row(
             children: [
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.2),
+                  color: scheme.primary.withValues(alpha: 0.2),
                   shape: BoxShape.circle,
                 ),
-                child: Icon(icon, color: Theme.of(context).colorScheme.primary),
+                child: Icon(icon, color: scheme.primary),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -421,12 +479,18 @@ class _CreateOptionTile extends StatelessWidget {
                     const SizedBox(height: 2),
                     Text(
                       subtitle,
-                      style: GoogleFonts.inter(fontSize: 12, color: Colors.grey[400]),
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        color: scheme.onSurface.withValues(alpha: 0.62),
+                      ),
                     ),
                   ],
                 ),
               ),
-              Icon(Icons.chevron_right_rounded, color: Colors.grey[500]),
+              Icon(
+                Icons.chevron_right_rounded,
+                color: scheme.onSurface.withValues(alpha: 0.58),
+              ),
             ],
           ),
         ),

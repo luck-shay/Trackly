@@ -84,6 +84,8 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
     return Scaffold(
       appBar: AppBar(
         title: Text(
@@ -102,7 +104,7 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
                 'Group becomes its own workspace. Add as many tasks as you want inside it.',
                 style: GoogleFonts.inter(
                   fontSize: 14,
-                  color: Colors.grey[400],
+                  color: scheme.onSurface.withValues(alpha: 0.72),
                   height: 1.5,
                 ),
               ),
@@ -113,10 +115,25 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
                   labelText: 'Group name',
                   hintText: 'e.g. Home Members',
                   filled: true,
-                  fillColor: Theme.of(context).colorScheme.surface,
+                  fillColor: scheme.surface,
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide(
+                      color: scheme.onSurface.withValues(alpha: 0.1),
+                    ),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide(
+                      color: scheme.primary.withValues(alpha: 0.8),
+                      width: 1.4,
+                    ),
+                  ),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide.none,
+                    borderSide: BorderSide(
+                      color: scheme.onSurface.withValues(alpha: 0.1),
+                    ),
                   ),
                 ),
                 validator: (value) {
@@ -135,10 +152,25 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
                   labelText: 'Description (optional)',
                   hintText: 'What is this group for?',
                   filled: true,
-                  fillColor: Theme.of(context).colorScheme.surface,
+                  fillColor: scheme.surface,
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide(
+                      color: scheme.onSurface.withValues(alpha: 0.1),
+                    ),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide(
+                      color: scheme.primary.withValues(alpha: 0.8),
+                      width: 1.4,
+                    ),
+                  ),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide.none,
+                    borderSide: BorderSide(
+                      color: scheme.onSurface.withValues(alpha: 0.1),
+                    ),
                   ),
                 ),
               ),
@@ -148,7 +180,7 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
                 style: GoogleFonts.inter(
                   fontSize: 13,
                   fontWeight: FontWeight.w700,
-                  color: Colors.grey[300],
+                  color: scheme.onSurface.withValues(alpha: 0.82),
                 ),
               ),
               const VGap(AppLayout.sm),
@@ -166,7 +198,9 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
                   if (friends.isEmpty) {
                     return Text(
                       'No friends found. You can invite members later from the group page.',
-                      style: GoogleFonts.inter(color: Colors.grey[500]),
+                      style: GoogleFonts.inter(
+                        color: scheme.onSurface.withValues(alpha: 0.68),
+                      ),
                     );
                   }
 
@@ -178,12 +212,18 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
                       return FilterChip(
                         label: Text(friend.displayName),
                         selected: isSelected,
-                        selectedColor: Theme.of(context).colorScheme.primary,
+                        selectedColor: scheme.primary,
                         checkmarkColor: Colors.black,
                         labelStyle: GoogleFonts.inter(
-                          color: isSelected ? Colors.black : Colors.white,
+                          color: isSelected
+                              ? Colors.black
+                              : scheme.onSurface.withValues(alpha: 0.9),
                         ),
-                        backgroundColor: Theme.of(context).colorScheme.surface,
+                        backgroundColor:
+                            scheme.onSurface.withValues(alpha: 0.06),
+                        side: BorderSide(
+                          color: scheme.onSurface.withValues(alpha: 0.2),
+                        ),
                         onSelected: (selected) {
                           setState(() {
                             if (selected) {
@@ -205,7 +245,7 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
                 child: ElevatedButton(
                   onPressed: _isSaving ? null : _createGroup,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Theme.of(context).colorScheme.primary,
+                    backgroundColor: scheme.primary,
                     foregroundColor: Colors.black,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(16),

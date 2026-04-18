@@ -78,6 +78,8 @@ class _CreateGroupTaskScreenState extends State<CreateGroupTaskScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
     return Scaffold(
       appBar: AppBar(
         title: Text(
@@ -96,7 +98,7 @@ class _CreateGroupTaskScreenState extends State<CreateGroupTaskScreen> {
                 'Add a task to ${widget.group.name}',
                 style: GoogleFonts.inter(
                   fontSize: 14,
-                  color: Colors.grey[400],
+                  color: scheme.onSurface.withValues(alpha: 0.72),
                 ),
               ),
               const VGap(AppLayout.lg),
@@ -106,10 +108,25 @@ class _CreateGroupTaskScreenState extends State<CreateGroupTaskScreen> {
                   labelText: 'Task title',
                   hintText: 'e.g. Kitchen cleanup rotation',
                   filled: true,
-                  fillColor: Theme.of(context).colorScheme.surface,
+                  fillColor: scheme.surface,
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide(
+                      color: scheme.onSurface.withValues(alpha: 0.1),
+                    ),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide(
+                      color: scheme.primary.withValues(alpha: 0.8),
+                      width: 1.4,
+                    ),
+                  ),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide.none,
+                    borderSide: BorderSide(
+                      color: scheme.onSurface.withValues(alpha: 0.1),
+                    ),
                   ),
                 ),
                 validator: (value) {
@@ -128,10 +145,25 @@ class _CreateGroupTaskScreenState extends State<CreateGroupTaskScreen> {
                   labelText: 'Description (optional)',
                   hintText: 'Add context, acceptance criteria, or schedule.',
                   filled: true,
-                  fillColor: Theme.of(context).colorScheme.surface,
+                  fillColor: scheme.surface,
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide(
+                      color: scheme.onSurface.withValues(alpha: 0.1),
+                    ),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide(
+                      color: scheme.primary.withValues(alpha: 0.8),
+                      width: 1.4,
+                    ),
+                  ),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide.none,
+                    borderSide: BorderSide(
+                      color: scheme.onSurface.withValues(alpha: 0.1),
+                    ),
                   ),
                 ),
               ),
@@ -152,7 +184,10 @@ class _CreateGroupTaskScreenState extends State<CreateGroupTaskScreen> {
                   _isQuantified
                       ? 'Members log a value instead of simple checkbox completion.'
                       : 'Simple completed / not completed toggle.',
-                  style: GoogleFonts.inter(fontSize: 12, color: Colors.grey[500]),
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    color: scheme.onSurface.withValues(alpha: 0.68),
+                  ),
                 ),
               ),
               if (_isQuantified) ...[
@@ -162,10 +197,25 @@ class _CreateGroupTaskScreenState extends State<CreateGroupTaskScreen> {
                   decoration: InputDecoration(
                     labelText: 'Unit',
                     filled: true,
-                    fillColor: Theme.of(context).colorScheme.surface,
+                    fillColor: scheme.surface,
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: BorderSide(
+                        color: scheme.onSurface.withValues(alpha: 0.1),
+                      ),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: BorderSide(
+                        color: scheme.primary.withValues(alpha: 0.8),
+                        width: 1.4,
+                      ),
+                    ),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(16),
-                      borderSide: BorderSide.none,
+                      borderSide: BorderSide(
+                        color: scheme.onSurface.withValues(alpha: 0.1),
+                      ),
                     ),
                   ),
                   items: const [
@@ -212,8 +262,8 @@ class _CreateGroupTaskScreenState extends State<CreateGroupTaskScreen> {
                 child: ElevatedButton(
                   onPressed: _isSaving ? null : _save,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Theme.of(context).colorScheme.primary,
-                    foregroundColor: Colors.black,
+                    backgroundColor: scheme.primary,
+                    foregroundColor: scheme.onPrimary,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(16),
                     ),

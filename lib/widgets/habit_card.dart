@@ -40,6 +40,7 @@ class _HabitCardState extends State<HabitCard>
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     DateTime now = DateTime.now();
     final groupTaskTitle = widget.habit.hasMemberDefinedGroupTasks
       ? (widget.habit.taskFor(widget.currentUserId).trim().isEmpty
@@ -85,8 +86,8 @@ class _HabitCardState extends State<HabitCard>
         borderRadius: BorderRadius.circular(24),
         border: Border.all(
           color: completedToday
-              ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.3)
-              : Colors.white.withValues(alpha: 0.05),
+            ? scheme.primary.withValues(alpha: 0.35)
+            : scheme.onSurface.withValues(alpha: 0.08),
         ),
         boxShadow: [
           BoxShadow(
@@ -124,12 +125,12 @@ class _HabitCardState extends State<HabitCard>
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           color: completedToday
-                              ? Theme.of(context).colorScheme.primary
+                                ? scheme.primary
                               : Colors.transparent,
                           border: Border.all(
                             color: completedToday
-                                ? Theme.of(context).colorScheme.primary
-                                : Colors.grey[600]!,
+                                ? scheme.primary
+                                : scheme.onSurface.withValues(alpha: 0.45),
                             width: 2,
                           ),
                         ),
@@ -181,8 +182,8 @@ class _HabitCardState extends State<HabitCard>
                                     fontSize: 20,
                                     fontWeight: FontWeight.w600,
                                     color: completedToday
-                                        ? Colors.grey[300]
-                                        : Colors.white,
+                                      ? scheme.onSurface.withValues(alpha: 0.6)
+                                      : scheme.onSurface,
                                     decoration: completedToday
                                         ? TextDecoration.lineThrough
                                         : null,
@@ -206,7 +207,7 @@ class _HabitCardState extends State<HabitCard>
                                   ? Theme.of(
                                       context,
                                     ).colorScheme.secondary.withValues(alpha: 0.14)
-                                  : Colors.white.withValues(alpha: 0.05),
+                                  : scheme.onSurface.withValues(alpha: 0.06),
                               borderRadius: BorderRadius.circular(999),
                             ),
                             child: Text(
@@ -216,7 +217,7 @@ class _HabitCardState extends State<HabitCard>
                                 fontWeight: FontWeight.w600,
                                 color: widget.habit.isGroup
                                     ? Theme.of(context).colorScheme.secondary
-                                    : Colors.grey[400],
+                                    : scheme.onSurface.withValues(alpha: 0.65),
                               ),
                             ),
                           ),
@@ -227,7 +228,7 @@ class _HabitCardState extends State<HabitCard>
                               'Group: $groupLabel',
                               style: GoogleFonts.inter(
                                 fontSize: 12,
-                                color: Colors.grey[500],
+                                color: scheme.onSurface.withValues(alpha: 0.6),
                               ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
@@ -261,7 +262,7 @@ class _HabitCardState extends State<HabitCard>
                               widget.habit.description,
                               style: GoogleFonts.inter(
                                 fontSize: 14,
-                                color: Colors.grey[500],
+                                color: scheme.onSurface.withValues(alpha: 0.58),
                               ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
@@ -283,7 +284,7 @@ class _HabitCardState extends State<HabitCard>
                                 ) >
                                 0
                             ? Colors.orange.withValues(alpha: 0.1)
-                            : Colors.white.withValues(alpha: 0.05),
+                            : scheme.onSurface.withValues(alpha: 0.06),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Row(
@@ -296,7 +297,7 @@ class _HabitCardState extends State<HabitCard>
                                         ) >
                                         0
                                     ? Colors.orange
-                                    : Colors.grey[600],
+                                    : scheme.onSurface.withValues(alpha: 0.45),
                                 size: 20,
                               )
                               .animate(
@@ -324,7 +325,7 @@ class _HabitCardState extends State<HabitCard>
                                       ) >
                                       0
                                   ? Colors.orange
-                                  : Colors.grey[600],
+                                  : scheme.onSurface.withValues(alpha: 0.45),
                             ),
                           ),
                         ],
@@ -352,12 +353,12 @@ class _HabitCardState extends State<HabitCard>
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         color: isCompleted
-                            ? Theme.of(context).colorScheme.primary
+                            ? scheme.primary
                             : Colors.transparent,
                         border: Border.all(
                           color: isCompleted
-                              ? Theme.of(context).colorScheme.primary
-                              : Colors.grey[700]!,
+                              ? scheme.primary
+                              : scheme.onSurface.withValues(alpha: 0.5),
                           width: 1.5,
                         ),
                       ),

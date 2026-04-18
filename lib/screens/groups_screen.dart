@@ -58,6 +58,7 @@ class GroupsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final social = SocialService();
+    final scheme = Theme.of(context).colorScheme;
 
     return Scaffold(
       appBar: AppBar(
@@ -71,8 +72,8 @@ class GroupsScreen extends StatelessWidget {
         stream: GroupService().streamGroupsForCurrentUser(),
         builder: (context, groupSnapshot) {
           if (!groupSnapshot.hasData) {
-            return const Center(
-              child: CircularProgressIndicator(color: Color(0xFF00E676)),
+            return Center(
+              child: CircularProgressIndicator(color: scheme.primary),
             );
           }
 
@@ -93,7 +94,7 @@ class GroupsScreen extends StatelessWidget {
                       Text(
                         'Create communities and manage multiple tasks in each group.',
                         style: GoogleFonts.inter(
-                          color: Colors.grey[500],
+                          color: scheme.onSurface.withValues(alpha: 0.68),
                           fontSize: 14,
                           height: 1.5,
                         ),
@@ -168,7 +169,7 @@ class GroupsScreen extends StatelessWidget {
                                 color: Theme.of(context).colorScheme.surface,
                                 borderRadius: BorderRadius.circular(18),
                                 border: Border.all(
-                                  color: Colors.white.withValues(alpha: 0.05),
+                                  color: scheme.onSurface.withValues(alpha: 0.08),
                                 ),
                               ),
                               child: Column(
@@ -187,7 +188,7 @@ class GroupsScreen extends StatelessWidget {
                                   Text(
                                     'You were invited to join this group.',
                                     style: GoogleFonts.inter(
-                                      color: Colors.grey[500],
+                                      color: scheme.onSurface.withValues(alpha: 0.68),
                                       fontSize: 13,
                                     ),
                                   ),
@@ -293,7 +294,7 @@ class GroupsScreen extends StatelessWidget {
                           Text(
                             'Create a group and manage multiple tasks in one shared place.',
                             style: GoogleFonts.inter(
-                              color: Colors.grey[500],
+                              color: scheme.onSurface.withValues(alpha: 0.68),
                               fontSize: 15,
                               height: 1.5,
                             ),
@@ -344,7 +345,7 @@ class GroupsScreen extends StatelessWidget {
                             color: Theme.of(context).colorScheme.surface,
                             borderRadius: BorderRadius.circular(22),
                             border: Border.all(
-                              color: Colors.white.withValues(alpha: 0.06),
+                              color: scheme.onSurface.withValues(alpha: 0.08),
                             ),
                           ),
                           child: Material(
@@ -404,7 +405,7 @@ class GroupsScreen extends StatelessWidget {
                                                 '${group.memberIds.length} members',
                                                 style: GoogleFonts.inter(
                                                   fontSize: 12,
-                                                  color: Colors.grey[500],
+                                                  color: scheme.onSurface.withValues(alpha: 0.68),
                                                 ),
                                               ),
                                             ],
@@ -412,7 +413,7 @@ class GroupsScreen extends StatelessWidget {
                                         ),
                                         Icon(
                                           Icons.chevron_right_rounded,
-                                          color: Colors.grey[500],
+                                          color: scheme.onSurface.withValues(alpha: 0.58),
                                         ),
                                       ],
                                     ),
@@ -434,7 +435,7 @@ class GroupsScreen extends StatelessWidget {
                                         group.description,
                                         style: GoogleFonts.inter(
                                           fontSize: 13,
-                                          color: Colors.grey[400],
+                                          color: scheme.onSurface.withValues(alpha: 0.64),
                                           height: 1.4,
                                         ),
                                       ),
@@ -468,7 +469,7 @@ class _MetricChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.06),
+        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(999),
       ),
       child: Text(
@@ -476,7 +477,7 @@ class _MetricChip extends StatelessWidget {
         style: GoogleFonts.inter(
           fontSize: 11,
           fontWeight: FontWeight.w700,
-          color: Colors.grey[300],
+          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.86),
         ),
       ),
     );
@@ -502,7 +503,9 @@ class _StatPill extends StatelessWidget {
         decoration: BoxDecoration(
           color: Theme.of(context).colorScheme.surface,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+          border: Border.all(
+            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.08),
+          ),
         ),
         child: Row(
           children: [
@@ -530,7 +533,7 @@ class _StatPill extends StatelessWidget {
                 Text(
                   label,
                   style: GoogleFonts.inter(
-                    color: Colors.grey[500],
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.68),
                     fontSize: 12,
                   ),
                 ),

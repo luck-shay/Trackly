@@ -7,6 +7,7 @@ class Group {
   final String ownerId;
   final DateTime createdAt;
   final List<String> memberIds;
+  final List<String> leftMemberIds;
 
   const Group({
     required this.id,
@@ -15,6 +16,7 @@ class Group {
     required this.ownerId,
     required this.createdAt,
     required this.memberIds,
+    this.leftMemberIds = const <String>[],
   });
 
   Group copyWith({
@@ -24,6 +26,7 @@ class Group {
     String? ownerId,
     DateTime? createdAt,
     List<String>? memberIds,
+    List<String>? leftMemberIds,
   }) {
     return Group(
       id: id ?? this.id,
@@ -32,6 +35,7 @@ class Group {
       ownerId: ownerId ?? this.ownerId,
       createdAt: createdAt ?? this.createdAt,
       memberIds: memberIds ?? this.memberIds,
+      leftMemberIds: leftMemberIds ?? this.leftMemberIds,
     );
   }
 
@@ -43,6 +47,7 @@ class Group {
       'ownerId': ownerId,
       'createdAt': createdAt.toIso8601String(),
       'memberIds': memberIds,
+      'leftMemberIds': leftMemberIds,
     };
   }
 
@@ -67,6 +72,9 @@ class Group {
       ownerId: (map['ownerId'] as String? ?? '').trim(),
       createdAt: parseDate(map['createdAt']) ?? DateTime.now(),
       memberIds: List<String>.from(map['memberIds'] ?? const <String>[]),
+      leftMemberIds: List<String>.from(
+        map['leftMemberIds'] ?? const <String>[],
+      ),
     );
   }
 }

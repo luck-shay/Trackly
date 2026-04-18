@@ -1,4 +1,5 @@
 import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -20,6 +21,7 @@ class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key});
 
   static const double _bottomNavClearance = 124;
+  static int _celebrationSnackVersion = 0;
 
   Future<void> _showCompletionCelebration(
     BuildContext context,
@@ -27,7 +29,17 @@ class DashboardScreen extends StatelessWidget {
     Habit habit,
   ) async {
     if (!context.mounted) return;
-    final controller = ScaffoldMessenger.of(context).showSnackBar(
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    if (messenger == null) {
+      return;
+    }
+
+    _celebrationSnackVersion++;
+    final shownVersion = _celebrationSnackVersion;
+
+    messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
       SnackBar(
         duration: const Duration(seconds: 3),
         content: Text('Nice work! "${habit.displayTitle}" completed.'),
@@ -40,12 +52,13 @@ class DashboardScreen extends StatelessWidget {
       ),
     );
 
-    // On some Android accessibility/device settings, action snackbars can linger.
-    // Force-close it after the intended timeout for consistent UX.
-    Timer(const Duration(seconds: 3), () {
-      if (context.mounted) {
-        controller.close();
-      }
+    // On some devices/accessibility modes a SnackBar with action can linger.
+    // Force-dismiss only if this is still the latest celebration SnackBar.
+    Timer(const Duration(seconds: 4), () {
+      if (!context.mounted) return;
+      if (shownVersion != _celebrationSnackVersion) return;
+      final currentMessenger = ScaffoldMessenger.maybeOf(context);
+      currentMessenger?.removeCurrentSnackBar();
     });
   }
 
@@ -593,10 +606,13 @@ class DashboardScreen extends StatelessWidget {
                                       child: const Text('Cancel'),
                                     ),
                                     ElevatedButton(
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor:Color.fromARGB(255, 217, 4, 4),
+                                      ),
                                       onPressed: () =>
                                           Navigator.pop(dialogContext, true),
-                                      child: Text(isShared ? 'Leave' : 'Delete'),
-                                    ),
+                                      child: Text(isShared ? 'Leave' : 'Delete', style: TextStyle(color: const Color.fromARGB(255, 255, 255, 255)),),
+                                      ),
                                   ],
                                 );
                               },

@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../services/auth_service.dart';
 import '../models/user_profile.dart';
 import '../providers/profile_provider.dart';
+import '../providers/theme_mode_provider.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -19,7 +20,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final _usernameController = TextEditingController();
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      context.read<ProfileProvider>().cancelEditing();
+    });
+  }
+
+  @override
   void dispose() {
+    // Ensure profile always reopens in view mode.
+    context.read<ProfileProvider>().cancelEditing();
     _nameController.dispose();
     _usernameController.dispose();
     super.dispose();
@@ -28,14 +42,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final profileProvider = context.watch<ProfileProvider>();
+    final themeModeProvider = context.watch<ThemeModeProvider>();
     final userId = FirebaseAuth.instance.currentUser?.uid ?? '';
 
-    return Scaffold(
-      appBar: AppBar(
-        automaticallyImplyLeading: true,
-        title: Text('Profile', style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
-      ),
-      body: StreamBuilder<DocumentSnapshot>(
+    return PopScope(
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) {
+          context.read<ProfileProvider>().cancelEditing();
+        }
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          automaticallyImplyLeading: true,
+          title: Text('Profile', style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
+        ),
+        body: StreamBuilder<DocumentSnapshot>(
         stream: FirebaseFirestore.instance.collection('users').doc(userId).snapshots(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
@@ -125,10 +146,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     label: const Text('Edit Profile'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Theme.of(context).colorScheme.surface,
-                      foregroundColor: Colors.white,
+                      foregroundColor: Theme.of(context).colorScheme.onSurface,
                       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                      side: const BorderSide(color: Colors.white10),
+                      side: BorderSide(
+                        color: Theme.of(context).dividerColor.withValues(alpha: 0.5),
+                      ),
                     ),
                     onPressed: () {
                       context.read<ProfileProvider>().startEditing();
@@ -154,7 +177,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           onPressed: () {
                             context.read<ProfileProvider>().cancelEditing();
                           },
-                          child: Text('Cancel', style: GoogleFonts.inter(color: Colors.grey)),
+                          child: Text(
+                            'Cancel',
+                            style: GoogleFonts.inter(
+                              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                            ),
+                          ),
                         ),
                         const SizedBox(width: 16),
                         ElevatedButton(
@@ -181,7 +209,49 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                 ],
                 
-                const SizedBox(height: 64),
+                const SizedBox(height: 48),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surface,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: Theme.of(context).dividerColor.withValues(alpha: 0.3),
+                    ),
+                  ),
+                  child: SwitchListTile.adaptive(
+                    value: themeModeProvider.isDarkMode,
+                    onChanged: (value) {
+                      context.read<ThemeModeProvider>().setDarkModeEnabled(value);
+                    },
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(
+                      'Dark Mode',
+                      style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+                    ),
+                    subtitle: Text(
+                      themeModeProvider.isDarkMode
+                          ? 'Using dark appearance'
+                          : 'Using light appearance',
+                      style: GoogleFonts.inter(
+                        color: Colors.grey[500],
+                        fontSize: 12,
+                      ),
+                    ),
+                    secondary: Icon(
+                      themeModeProvider.isDarkMode
+                          ? Icons.dark_mode_rounded
+                          : Icons.light_mode_rounded,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                    activeThumbColor: Theme.of(context).colorScheme.primary,
+                  ),
+                ),
+                const SizedBox(height: 24),
                 ElevatedButton.icon(
                   icon: const Icon(Icons.logout),
                   label: const Text('Sign Out'),
@@ -205,6 +275,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
           );
         }
+        ),
       ),
     );
   }

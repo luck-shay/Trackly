@@ -344,6 +344,18 @@ class SocialService {
     await batch.commit();
 
     if (groupDoc.exists) {
+      try {
+        await groupRef.update({
+          'leftMemberIds': FieldValue.arrayRemove([userId]),
+        });
+      } catch (_) {
+        // Best effort cleanup for users rejoining a previously left group.
+      }
+      try {
+        await GroupService().clearHiddenGroup(groupId);
+      } catch (_) {
+        // Best effort cleanup for local leave tombstone.
+      }
       await GroupService().syncTaskMirrorsForGroup(groupId);
     }
   }

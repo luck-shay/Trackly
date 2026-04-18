@@ -13,12 +13,15 @@ import 'providers/habits_provider.dart';
 import 'providers/friends_provider.dart';
 import 'providers/profile_provider.dart';
 import 'providers/login_provider.dart';
+import 'providers/theme_mode_provider.dart';
+import 'package:trackly/theme/color_scheme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   if (kDebugMode) debugPrint('Trackly: App Starting...');
   
   Object? bootstrapError;
+  final themeModeProvider = ThemeModeProvider();
 
   try {
     if (kDebugMode) debugPrint('Trackly: Initializing Firebase...');
@@ -47,13 +50,25 @@ void main() async {
     );
   }
 
-  runApp(MyApp(bootstrapError: bootstrapError));
+  await themeModeProvider.loadThemePreference();
+
+  runApp(
+    MyApp(
+      bootstrapError: bootstrapError,
+      themeModeProvider: themeModeProvider,
+    ),
+  );
 }
 
 class MyApp extends StatelessWidget {
   final Object? bootstrapError;
+  final ThemeModeProvider themeModeProvider;
 
-  const MyApp({super.key, this.bootstrapError});
+  const MyApp({
+    super.key,
+    this.bootstrapError,
+    required this.themeModeProvider,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -67,79 +82,50 @@ class MyApp extends StatelessWidget {
 
     return MultiProvider(
       providers: [
+        ChangeNotifierProvider<ThemeModeProvider>.value(
+          value: themeModeProvider,
+        ),
         ChangeNotifierProvider(create: (_) => NavigationProvider()),
         ChangeNotifierProvider(create: (_) => FriendsProvider()),
         ChangeNotifierProvider(create: (_) => HabitsProvider()),
         ChangeNotifierProvider(create: (_) => ProfileProvider()),
         ChangeNotifierProvider(create: (_) => LoginProvider()),
       ],
-      child: MaterialApp(
-        debugShowCheckedModeBanner: false,
-        title: 'Trackly',
-        themeMode: ThemeMode.dark,
-        darkTheme: ThemeData(
-          brightness: Brightness.dark,
-          scaffoldBackgroundColor: const Color(0xFF101010),
-          colorScheme: const ColorScheme.dark(
-            primary: Color(0xFF00E676),
-            secondary: Color(0xFF2979FF),
-            surface: Color(0xFF1A1A1A),
-            onSurface: Colors.white,
-          ),
-          textTheme: GoogleFonts.outfitTextTheme(ThemeData.dark().textTheme)
-              .copyWith(
-                titleLarge: GoogleFonts.outfit(fontWeight: FontWeight.bold),
-                bodyMedium: GoogleFonts.inter(),
-              ),
-          appBarTheme: const AppBarTheme(
-            backgroundColor: Colors.transparent,
-            elevation: 0,
-            centerTitle: false,
-          ),
-          floatingActionButtonTheme: const FloatingActionButtonThemeData(
-            backgroundColor: Color(0xFF00E676),
-            foregroundColor: Colors.black,
-            elevation: 4,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.all(Radius.circular(20)),
+      child: Consumer<ThemeModeProvider>(
+        builder: (context, themeProvider, _) {
+          return MaterialApp(
+            debugShowCheckedModeBanner: false,
+            title: 'Trackly',
+            theme: AppTheme.light(),
+            darkTheme: AppTheme.dark(),
+            themeMode: themeProvider.themeMode,
+            home: StreamBuilder<User?>(
+              stream: FirebaseAuth.instance.authStateChanges(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Scaffold(
+                    backgroundColor: Color(0xFF101010),
+                    body: Center(
+                      child: CircularProgressIndicator(
+                        color: Color(0xFF00E676),
+                      ),
+                    ),
+                  );
+                }
+                if (snapshot.hasData && snapshot.data != null) {
+                  if (kDebugMode) {
+                    debugPrint('Trackly: Session Found. Routing to Main.');
+                  }
+                  return MainLayoutScreen();
+                }
+                if (kDebugMode) {
+                  debugPrint('Trackly: No Session. Routing to Login.');
+                }
+                return const LoginScreen();
+              },
             ),
-          ),
-          snackBarTheme: SnackBarThemeData(
-            behavior: SnackBarBehavior.floating,
-            elevation: 0,
-            backgroundColor: const Color(0xFF1C1F24),
-            contentTextStyle: GoogleFonts.inter(
-              color: Colors.white,
-              fontWeight: FontWeight.w600,
-            ),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-              side: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
-            ),
-            actionTextColor: const Color(0xFF00E676),
-            dismissDirection: DismissDirection.horizontal,
-          ),
-          useMaterial3: true,
-        ),
-        home: StreamBuilder<User?>(
-          stream: FirebaseAuth.instance.authStateChanges(),
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Scaffold(
-                backgroundColor: Color(0xFF101010),
-                body: Center(
-                  child: CircularProgressIndicator(color: Color(0xFF00E676)),
-                ),
-              );
-            }
-            if (snapshot.hasData && snapshot.data != null) {
-              if (kDebugMode) debugPrint('Trackly: Session Found. Routing to Main.');
-              return MainLayoutScreen();
-            }
-            if (kDebugMode) debugPrint('Trackly: No Session. Routing to Login.');
-            return const LoginScreen();
-          },
-        ),
+          );
+        },
       ),
     );
   }
