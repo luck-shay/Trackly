@@ -206,6 +206,29 @@ class SocialService {
     });
   }
 
+  // Remove an existing friend connection from both user profiles.
+  Future<void> removeFriend(String friendUserId) async {
+    if (userId.isEmpty) {
+      throw StateError('You must be signed in to remove a friend.');
+    }
+    if (friendUserId.isEmpty || friendUserId == userId) {
+      return;
+    }
+
+    final batch = _db.batch();
+    final myRef = _db.collection('users').doc(userId);
+    final friendRef = _db.collection('users').doc(friendUserId);
+
+    batch.update(myRef, {
+      'friends': FieldValue.arrayRemove([friendUserId]),
+    });
+    batch.update(friendRef, {
+      'friends': FieldValue.arrayRemove([userId]),
+    });
+
+    await batch.commit();
+  }
+
   // ---------------- HABIT INVITES ----------------
 
   // Stream of pending habit invites FOR the current user
