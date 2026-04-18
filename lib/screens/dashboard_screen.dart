@@ -14,7 +14,6 @@ import '../providers/habits_provider.dart';
 import '../providers/navigation_provider.dart';
 import '../providers/quantified_log_provider.dart';
 import '../utils/quantity_format.dart';
-import 'create_habit_screen.dart';
 import 'habit_leaderboard_screen.dart';
 import 'profile_screen.dart';
 
@@ -858,25 +857,12 @@ class DashboardScreen extends StatelessWidget {
                                         }
                                       },
                                       onCardTap: () {
-                                        if (habit.participants.length > 1) {
-                                          Navigator.push(
-                                            context,
-                                            MaterialPageRoute(
-                                              builder: (context) =>
-                                                  HabitLeaderboardScreen(
-                                                    habit: habit,
-                                                  ),
-                                            ),
-                                          );
-                                          return;
-                                        }
-
                                         Navigator.push(
                                           context,
                                           MaterialPageRoute(
                                             builder: (context) =>
-                                                CreateHabitScreen(
-                                                  initialHabit: habit,
+                                                HabitLeaderboardScreen(
+                                                  habit: habit,
                                                 ),
                                           ),
                                         );

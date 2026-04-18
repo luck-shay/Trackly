@@ -42,6 +42,30 @@ class HabitLeaderboardScreen extends StatelessWidget {
 class _HabitLeaderboardView extends StatelessWidget {
   const _HabitLeaderboardView();
 
+  String _displayName(UserProfile friend) {
+    final name = friend.displayName.trim();
+    return name.isEmpty ? friend.uid : name;
+  }
+
+  String? _subtitleForFriend(UserProfile friend, bool hasDuplicateDisplayName) {
+    final username = friend.username?.trim() ?? '';
+    final email = friend.email.trim();
+
+    if (username.isNotEmpty && hasDuplicateDisplayName && email.isNotEmpty) {
+      return '@$username • $email';
+    }
+    if (username.isNotEmpty) {
+      return '@$username';
+    }
+    if (email.isNotEmpty) {
+      return email;
+    }
+    if (hasDuplicateDisplayName) {
+      return 'ID: ${friend.uid.substring(0, friend.uid.length < 8 ? friend.uid.length : 8)}';
+    }
+    return null;
+  }
+
   Future<void> _confirmLeaveGroup(BuildContext context, Habit habit) async {
     final shouldLeave = await showDialog<bool>(
       context: context,
@@ -83,202 +107,410 @@ class _HabitLeaderboardView extends StatelessWidget {
     Habit habit,
   ) async {
     final social = SocialService();
+    final searchController = TextEditingController();
+    var searchQuery = '';
 
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (sheetContext) {
-        return ChangeNotifierProvider(
-          create: (_) => GroupInviteSelectionProvider(),
-          child: SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
-              child: Consumer<GroupInviteSelectionProvider>(
-                builder: (context, inviteProvider, _) {
-                  return StreamBuilder<List<UserProfile>>(
-                    stream: social.streamFriends(),
-                    builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting) {
-                        return const SizedBox(
-                          height: 260,
-                          child: Center(child: CircularProgressIndicator()),
-                        );
-                      }
-
-                      final friends = snapshot.data ?? [];
-                      final eligible = friends
-                          .where(
-                            (friend) =>
-                                !habit.participants.contains(friend.uid),
-                          )
-                          .toList();
-
-                      return Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Invite members',
-                            style: GoogleFonts.outfit(
-                              fontSize: 22,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'Select friends to invite to ${habit.groupName?.isNotEmpty == true ? habit.groupName : habit.title}.',
-                            style: GoogleFonts.inter(
-                              color: Colors.grey[400],
-                              height: 1.4,
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          if (eligible.isEmpty)
-                            Padding(
-                              padding: const EdgeInsets.only(bottom: 8),
-                              child: Text(
-                                'All your friends are already part of this group, or you have no friends yet.',
-                                style: GoogleFonts.inter(
-                                  color: Colors.grey[500],
+    try {
+      await showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        builder: (sheetContext) {
+          return ChangeNotifierProvider(
+            create: (_) => GroupInviteSelectionProvider(),
+            child: SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+                child: Consumer<GroupInviteSelectionProvider>(
+                  builder: (context, inviteProvider, _) {
+                    return StatefulBuilder(
+                      builder: (context, setSheetState) {
+                        return StreamBuilder<List<UserProfile>>(
+                          stream: social.streamFriends(),
+                          builder: (context, snapshot) {
+                            if (snapshot.connectionState ==
+                                ConnectionState.waiting) {
+                              return const SizedBox(
+                                height: 260,
+                                child: Center(
+                                  child: CircularProgressIndicator(),
                                 ),
-                              ),
-                            )
-                          else
-                            Flexible(
-                              child: ListView.separated(
-                                shrinkWrap: true,
-                                itemCount: eligible.length,
-                                separatorBuilder: (_, index) => const Divider(
-                                  height: 1,
-                                  color: Colors.white10,
-                                ),
-                                itemBuilder: (context, index) {
-                                  final friend = eligible[index];
-                                  final isSelected = inviteProvider.isSelected(
-                                    friend.uid,
+                              );
+                            }
+
+                            final friends = snapshot.data ?? [];
+                            final eligible =
+                                friends
+                                    .where(
+                                      (friend) => !habit.participants.contains(
+                                        friend.uid,
+                                      ),
+                                    )
+                                    .toList()
+                                  ..sort(
+                                    (a, b) =>
+                                        _displayName(a).toLowerCase().compareTo(
+                                          _displayName(b).toLowerCase(),
+                                        ),
                                   );
 
-                                  return CheckboxListTile(
-                                    value: isSelected,
-                                    onChanged: inviteProvider.isSending
-                                        ? null
-                                        : (value) {
-                                            inviteProvider.toggle(
-                                              friend.uid,
-                                              value == true,
-                                            );
-                                          },
-                                    title: Text(
-                                      friend.displayName,
-                                      style: GoogleFonts.inter(
-                                        fontWeight: FontWeight.w600,
+                            final nameCounts = <String, int>{};
+                            for (final friend in eligible) {
+                              final key = _displayName(friend).toLowerCase();
+                              nameCounts[key] = (nameCounts[key] ?? 0) + 1;
+                            }
+
+                            final filtered = eligible.where((friend) {
+                              if (searchQuery.isEmpty) {
+                                return true;
+                              }
+                              final displayName = _displayName(
+                                friend,
+                              ).toLowerCase();
+                              final username = (friend.username ?? '')
+                                  .trim()
+                                  .toLowerCase();
+                              final email = friend.email.trim().toLowerCase();
+                              return displayName.contains(searchQuery) ||
+                                  username.contains(searchQuery) ||
+                                  email.contains(searchQuery);
+                            }).toList();
+
+                            return Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Invite members',
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 22,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  'Select friends to invite to ${habit.groupName?.isNotEmpty == true ? habit.groupName : habit.title}.',
+                                  style: GoogleFonts.inter(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurface
+                                        .withValues(alpha: 0.68),
+                                    height: 1.4,
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                Text(
+                                  '${inviteProvider.selected.length} selected',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurface
+                                        .withValues(alpha: 0.68),
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                TextField(
+                                  controller: searchController,
+                                  onChanged: (value) {
+                                    setSheetState(() {
+                                      searchQuery = value.trim().toLowerCase();
+                                    });
+                                  },
+                                  decoration: InputDecoration(
+                                    hintText:
+                                        'Search by name, username, or email',
+                                    prefixIcon: const Icon(
+                                      Icons.search_rounded,
+                                    ),
+                                    filled: true,
+                                    fillColor: Theme.of(context)
+                                        .colorScheme
+                                        .onSurface
+                                        .withValues(alpha: 0.05),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(14),
+                                      borderSide: BorderSide(
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .onSurface
+                                            .withValues(alpha: 0.12),
                                       ),
                                     ),
-                                    subtitle: Text(
-                                      friend.username != null
-                                          ? '@${friend.username}'
-                                          : friend.email,
-                                      style: GoogleFonts.inter(
-                                        color: Colors.grey[500],
-                                        fontSize: 12,
+                                    enabledBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(14),
+                                      borderSide: BorderSide(
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .onSurface
+                                            .withValues(alpha: 0.12),
                                       ),
                                     ),
-                                    controlAffinity:
-                                        ListTileControlAffinity.leading,
-                                    contentPadding: EdgeInsets.zero,
-                                    fillColor: WidgetStatePropertyAll(
-                                      Theme.of(context).colorScheme.primary,
-                                    ),
-                                    checkColor: Colors.black,
-                                  );
-                                },
-                              ),
-                            ),
-                          const SizedBox(height: 16),
-                          SizedBox(
-                            width: double.infinity,
-                            height: 50,
-                            child: ElevatedButton(
-                              onPressed:
-                                  inviteProvider.isSending ||
-                                      inviteProvider.selected.isEmpty
-                                  ? null
-                                  : () async {
-                                      inviteProvider.setSending(true);
-
-                                      for (final uid
-                                          in inviteProvider.selected) {
-                                        if (habit.isGroup) {
-                                          await social.sendGroupInvite(
-                                            groupId: habit.id,
-                                            groupName:
-                                                habit.groupName ?? habit.title,
-                                            toUserId: uid,
-                                          );
-                                        } else {
-                                          await social.sendHabitInvite(
-                                            habitId: habit.id,
-                                            toUserId: uid,
-                                          );
-                                        }
-                                      }
-
-                                      if (context.mounted) {
-                                        Navigator.pop(sheetContext);
-                                        final inviteLabel = habit.isGroup
-                                            ? 'group invite'
-                                            : 'task invite';
-                                        ScaffoldMessenger.of(
+                                    focusedBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(14),
+                                      borderSide: BorderSide(
+                                        color: Theme.of(
                                           context,
-                                        ).showSnackBar(
-                                          SnackBar(
-                                            content: Text(
-                                              'Sent ${inviteProvider.selected.length} $inviteLabel${inviteProvider.selected.length == 1 ? '' : 's'}.',
+                                        ).colorScheme.primary,
+                                        width: 1.2,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                if (eligible.isEmpty)
+                                  Padding(
+                                    padding: const EdgeInsets.only(bottom: 8),
+                                    child: Text(
+                                      'All your friends are already part of this group, or you have no friends yet.',
+                                      style: GoogleFonts.inter(
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .onSurface
+                                            .withValues(alpha: 0.68),
+                                      ),
+                                    ),
+                                  )
+                                else if (filtered.isEmpty)
+                                  Padding(
+                                    padding: const EdgeInsets.only(bottom: 8),
+                                    child: Text(
+                                      'No friends match your search.',
+                                      style: GoogleFonts.inter(
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .onSurface
+                                            .withValues(alpha: 0.68),
+                                      ),
+                                    ),
+                                  )
+                                else
+                                  Flexible(
+                                    child: ListView.separated(
+                                      shrinkWrap: true,
+                                      itemCount: filtered.length,
+                                      separatorBuilder: (_, __) => Divider(
+                                        height: 1,
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .onSurface
+                                            .withValues(alpha: 0.08),
+                                      ),
+                                      itemBuilder: (context, index) {
+                                        final friend = filtered[index];
+                                        final isSelected = inviteProvider
+                                            .isSelected(friend.uid);
+                                        final subtitle = _subtitleForFriend(
+                                          friend,
+                                          (nameCounts[_displayName(
+                                                    friend,
+                                                  ).toLowerCase()] ??
+                                                  0) >
+                                              1,
+                                        );
+
+                                        return ListTile(
+                                          contentPadding: EdgeInsets.zero,
+                                          onTap: inviteProvider.isSending
+                                              ? null
+                                              : () {
+                                                  inviteProvider.toggle(
+                                                    friend.uid,
+                                                    !isSelected,
+                                                  );
+                                                },
+                                          leading: CircleAvatar(
+                                            backgroundColor: Theme.of(context)
+                                                .colorScheme
+                                                .onSurface
+                                                .withValues(alpha: 0.08),
+                                            backgroundImage:
+                                                friend.photoUrl != null &&
+                                                    friend.photoUrl!
+                                                        .trim()
+                                                        .isNotEmpty
+                                                ? NetworkImage(
+                                                    friend.photoUrl!.trim(),
+                                                  )
+                                                : null,
+                                            child:
+                                                friend.photoUrl != null &&
+                                                    friend.photoUrl!
+                                                        .trim()
+                                                        .isNotEmpty
+                                                ? null
+                                                : Text(
+                                                    (_displayName(
+                                                              friend,
+                                                            ).isEmpty
+                                                            ? '?'
+                                                            : _displayName(
+                                                                friend,
+                                                              )[0])
+                                                        .toUpperCase(),
+                                                    style: GoogleFonts.inter(
+                                                      fontWeight:
+                                                          FontWeight.w700,
+                                                    ),
+                                                  ),
+                                          ),
+                                          title: Text(
+                                            _displayName(friend),
+                                            style: GoogleFonts.inter(
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                          subtitle: subtitle == null
+                                              ? null
+                                              : Text(
+                                                  subtitle,
+                                                  style: GoogleFonts.inter(
+                                                    color: Theme.of(context)
+                                                        .colorScheme
+                                                        .onSurface
+                                                        .withValues(
+                                                          alpha: 0.62,
+                                                        ),
+                                                  ),
+                                                ),
+                                          trailing: AnimatedContainer(
+                                            duration: const Duration(
+                                              milliseconds: 140,
+                                            ),
+                                            width: 28,
+                                            height: 28,
+                                            decoration: BoxDecoration(
+                                              shape: BoxShape.circle,
+                                              color: isSelected
+                                                  ? Theme.of(
+                                                      context,
+                                                    ).colorScheme.primary
+                                                  : Theme.of(context)
+                                                        .colorScheme
+                                                        .onSurface
+                                                        .withValues(
+                                                          alpha: 0.08,
+                                                        ),
+                                              border: Border.all(
+                                                color: isSelected
+                                                    ? Theme.of(
+                                                        context,
+                                                      ).colorScheme.primary
+                                                    : Theme.of(context)
+                                                          .colorScheme
+                                                          .onSurface
+                                                          .withValues(
+                                                            alpha: 0.18,
+                                                          ),
+                                              ),
+                                            ),
+                                            child: Icon(
+                                              isSelected
+                                                  ? Icons.check_rounded
+                                                  : Icons.add_rounded,
+                                              size: 18,
+                                              color: isSelected
+                                                  ? Colors.black
+                                                  : Theme.of(
+                                                      context,
+                                                    ).colorScheme.onSurface,
                                             ),
                                           ),
                                         );
-                                      }
-                                    },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Theme.of(
-                                  context,
-                                ).colorScheme.primary,
-                                foregroundColor: Colors.black,
-                              ),
-                              child: inviteProvider.isSending
-                                  ? const SizedBox(
-                                      height: 20,
-                                      width: 20,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        color: Colors.black,
-                                      ),
-                                    )
-                                  : Text(
-                                      inviteProvider.selected.isEmpty
-                                          ? 'Select friends to invite'
-                                          : 'Send invites',
-                                      style: GoogleFonts.outfit(
-                                        fontWeight: FontWeight.bold,
-                                      ),
+                                      },
                                     ),
-                            ),
-                          ),
-                        ],
-                      );
-                    },
-                  );
-                },
+                                  ),
+                                const SizedBox(height: 16),
+                                SizedBox(
+                                  width: double.infinity,
+                                  height: 50,
+                                  child: ElevatedButton(
+                                    onPressed:
+                                        inviteProvider.isSending ||
+                                            inviteProvider.selected.isEmpty
+                                        ? null
+                                        : () async {
+                                            inviteProvider.setSending(true);
+
+                                            for (final uid
+                                                in inviteProvider.selected) {
+                                              if (habit.isGroup) {
+                                                await social.sendGroupInvite(
+                                                  groupId: habit.id,
+                                                  groupName:
+                                                      habit.groupName ??
+                                                      habit.title,
+                                                  toUserId: uid,
+                                                );
+                                              } else {
+                                                await social.sendHabitInvite(
+                                                  habitId: habit.id,
+                                                  toUserId: uid,
+                                                );
+                                              }
+                                            }
+
+                                            if (context.mounted) {
+                                              Navigator.pop(sheetContext);
+                                              final inviteLabel = habit.isGroup
+                                                  ? 'group invite'
+                                                  : 'task invite';
+                                              ScaffoldMessenger.of(
+                                                context,
+                                              ).showSnackBar(
+                                                SnackBar(
+                                                  content: Text(
+                                                    'Sent ${inviteProvider.selected.length} $inviteLabel${inviteProvider.selected.length == 1 ? '' : 's'}.',
+                                                  ),
+                                                ),
+                                              );
+                                            }
+                                          },
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Theme.of(
+                                        context,
+                                      ).colorScheme.primary,
+                                      foregroundColor: Colors.black,
+                                    ),
+                                    child: inviteProvider.isSending
+                                        ? const SizedBox(
+                                            height: 20,
+                                            width: 20,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                              color: Colors.black,
+                                            ),
+                                          )
+                                        : Text(
+                                            inviteProvider.selected.isEmpty
+                                                ? 'Select friends to invite'
+                                                : 'Send invites',
+                                            style: GoogleFonts.outfit(
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                  ),
+                                ),
+                              ],
+                            );
+                          },
+                        );
+                      },
+                    );
+                  },
+                ),
               ),
             ),
-          ),
-        );
-      },
-    );
+          );
+        },
+      );
+    } finally {
+      searchController.dispose();
+    }
   }
 
   Future<void> _showEditMyGroupTaskSheet(
@@ -480,11 +712,46 @@ class _HabitLeaderboardView extends StatelessWidget {
   Widget build(BuildContext context) {
     final provider = context.watch<HabitLeaderboardProvider>();
     final habit = provider.habit;
+    final isGroup = habit.isGroup;
+    final isPersonal =
+        habit.spaceType == HabitSpaceType.individual && !habit.isGroup;
+
+    final screenTitle = isGroup
+        ? 'Group Task'
+        : isPersonal
+        ? 'Task Details'
+        : 'Shared Task';
+
+    final headerMetaText = isGroup
+        ? habit.hasMemberDefinedGroupTasks
+              ? 'Member-defined group task'
+              : 'Group task'
+        : isPersonal
+        ? 'Personal task'
+        : 'Shared task';
+
+    final participantSummary = isGroup
+        ? '${habit.participants.length} member${habit.participants.length == 1 ? '' : 's'}'
+        : isPersonal && habit.participants.length <= 1
+        ? 'Just you'
+        : '${habit.participants.length} participant${habit.participants.length == 1 ? '' : 's'}';
+
+    final inviteCtaLabel = isPersonal
+        ? 'Share task'
+        : isGroup
+        ? 'Invite members'
+        : 'Invite participants';
+
+    final headerIcon = isGroup
+        ? Icons.groups_rounded
+        : isPersonal
+        ? Icons.task_alt_rounded
+        : Icons.people_alt_rounded;
 
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          'Leaderboard',
+          screenTitle,
           style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
         ),
         actions: [
@@ -500,7 +767,7 @@ class _HabitLeaderboardView extends StatelessWidget {
             },
             icon: const Icon(Icons.edit_rounded),
           ),
-          if (habit.isGroup)
+          if (isGroup)
             IconButton(
               tooltip: 'Leave group',
               onPressed: () => _confirmLeaveGroup(context, habit),
@@ -523,7 +790,7 @@ class _HabitLeaderboardView extends StatelessWidget {
                     shape: BoxShape.circle,
                   ),
                   child: Icon(
-                    Icons.leaderboard_rounded,
+                    headerIcon,
                     color: Theme.of(context).colorScheme.primary,
                     size: 32,
                   ),
@@ -542,11 +809,7 @@ class _HabitLeaderboardView extends StatelessWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        habit.isGroup && (habit.groupName ?? '').isNotEmpty
-                            ? habit.hasMemberDefinedGroupTasks
-                                  ? 'Member-defined group tasks'
-                                  : 'Task: ${habit.title}'
-                            : habit.spaceType.label,
+                        headerMetaText,
                         style: GoogleFonts.inter(
                           color: Theme.of(context).colorScheme.secondary,
                           fontWeight: FontWeight.w600,
@@ -555,13 +818,13 @@ class _HabitLeaderboardView extends StatelessWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        '${habit.participants.length} ${habit.isGroup ? 'Member' : 'Participant'}${habit.participants.length != 1 ? 's' : ''}',
+                        participantSummary,
                         style: GoogleFonts.inter(
                           color: Colors.grey[500],
                           fontSize: 14,
                         ),
                       ),
-                      if (habit.isGroup) ...[
+                      if (isGroup) ...[
                         const SizedBox(height: 10),
                         if (habit.hasMemberDefinedGroupTasks) ...[
                           OutlinedButton.icon(
@@ -576,7 +839,7 @@ class _HabitLeaderboardView extends StatelessWidget {
                           const SizedBox(height: 8),
                         ],
                       ],
-                      if (!habit.isGroup) const SizedBox(height: 10),
+                      if (!isGroup) const SizedBox(height: 10),
                       ElevatedButton.icon(
                         onPressed: () async {
                           if (habit.spaceType == HabitSpaceType.individual) {
@@ -592,7 +855,7 @@ class _HabitLeaderboardView extends StatelessWidget {
                           Icons.person_add_alt_1_rounded,
                           size: 18,
                         ),
-                        label: const Text('Invite members'),
+                        label: Text(inviteCtaLabel),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Theme.of(
                             context,
@@ -736,9 +999,7 @@ class _HabitLeaderboardView extends StatelessWidget {
                           user.displayName,
                           style: GoogleFonts.inter(
                             fontWeight: FontWeight.bold,
-                            color: index == 0
-                                ? medalColor
-                                : Theme.of(context).colorScheme.onSurface,
+                            color: index == 0 ? medalColor : Colors.white,
                           ),
                         ),
                         subtitle: Text(

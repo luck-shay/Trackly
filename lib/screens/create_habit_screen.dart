@@ -1138,82 +1138,74 @@ class _FriendSelectionSheetState extends State<_FriendSelectionSheet> {
                       (nameCounts[_displayName(friend).toLowerCase()] ?? 0) > 1,
                     );
 
-                    return AnimatedContainer(
-                      duration: const Duration(milliseconds: 150),
-                      color: isSelected
-                          ? Theme.of(
-                              context,
-                            ).colorScheme.onSurface.withValues(alpha: 0.08)
-                          : Colors.transparent,
-                      child: ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        onTap: () {
-                          setState(() {
-                            widget.onToggle(friend.uid);
-                          });
-                        },
-                        leading: CircleAvatar(
-                          backgroundColor: Theme.of(
-                            context,
-                          ).colorScheme.onSurface.withValues(alpha: 0.08),
-                          backgroundImage:
-                              friend.photoUrl != null &&
-                                  friend.photoUrl!.trim().isNotEmpty
-                              ? NetworkImage(friend.photoUrl!.trim())
-                              : null,
-                          child:
-                              friend.photoUrl != null &&
-                                  friend.photoUrl!.trim().isNotEmpty
-                              ? null
-                              : Text(
-                                  (_displayName(friend).isEmpty
-                                          ? '?'
-                                          : _displayName(friend)[0])
-                                      .toUpperCase(),
-                                  style: GoogleFonts.inter(
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                        ),
-                        title: Text(
-                          _displayName(friend),
-                          style: GoogleFonts.inter(fontWeight: FontWeight.w600),
-                        ),
-                        subtitle: subtitle == null
+                    return ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      onTap: () {
+                        setState(() {
+                          widget.onToggle(friend.uid);
+                        });
+                      },
+                      leading: CircleAvatar(
+                        backgroundColor: Theme.of(
+                          context,
+                        ).colorScheme.onSurface.withValues(alpha: 0.08),
+                        backgroundImage:
+                            friend.photoUrl != null &&
+                                friend.photoUrl!.trim().isNotEmpty
+                            ? NetworkImage(friend.photoUrl!.trim())
+                            : null,
+                        child:
+                            friend.photoUrl != null &&
+                                friend.photoUrl!.trim().isNotEmpty
                             ? null
                             : Text(
-                                subtitle,
+                                (_displayName(friend).isEmpty
+                                        ? '?'
+                                        : _displayName(friend)[0])
+                                    .toUpperCase(),
                                 style: GoogleFonts.inter(
-                                  color: Theme.of(context).colorScheme.onSurface
-                                      .withValues(alpha: 0.62),
+                                  fontWeight: FontWeight.w700,
                                 ),
                               ),
-                        trailing: AnimatedContainer(
-                          duration: const Duration(milliseconds: 140),
-                          width: 28,
-                          height: 28,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
+                      ),
+                      title: Text(
+                        _displayName(friend),
+                        style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+                      ),
+                      subtitle: subtitle == null
+                          ? null
+                          : Text(
+                              subtitle,
+                              style: GoogleFonts.inter(
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurface.withValues(alpha: 0.62),
+                              ),
+                            ),
+                      trailing: AnimatedContainer(
+                        duration: const Duration(milliseconds: 140),
+                        width: 28,
+                        height: 28,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: isSelected
+                              ? Theme.of(context).colorScheme.primary
+                              : Theme.of(
+                                  context,
+                                ).colorScheme.onSurface.withValues(alpha: 0.08),
+                          border: Border.all(
                             color: isSelected
                                 ? Theme.of(context).colorScheme.primary
                                 : Theme.of(context).colorScheme.onSurface
-                                      .withValues(alpha: 0.08),
-                            border: Border.all(
-                              color: isSelected
-                                  ? Theme.of(context).colorScheme.primary
-                                  : Theme.of(context).colorScheme.onSurface
-                                        .withValues(alpha: 0.18),
-                            ),
+                                      .withValues(alpha: 0.18),
                           ),
-                          child: Icon(
-                            isSelected
-                                ? Icons.check_rounded
-                                : Icons.add_rounded,
-                            size: 18,
-                            color: isSelected
-                                ? Colors.black
-                                : Theme.of(context).colorScheme.onSurface,
-                          ),
+                        ),
+                        child: Icon(
+                          isSelected ? Icons.check_rounded : Icons.add_rounded,
+                          size: 18,
+                          color: isSelected
+                              ? Colors.black
+                              : Theme.of(context).colorScheme.onSurface,
                         ),
                       ),
                     );
