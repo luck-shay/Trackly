@@ -1,4 +1,8 @@
-const {onDocumentCreated, onDocumentUpdated} = require("firebase-functions/v2/firestore");
+const {
+  onDocumentCreated,
+  onDocumentUpdated,
+  onDocumentUpdatedWithAuthContext,
+} = require("firebase-functions/v2/firestore");
 const {setGlobalOptions, logger} = require("firebase-functions/v2");
 const admin = require("firebase-admin");
 
@@ -483,6 +487,105 @@ exports.notifyGroupTaskCreated = onDocumentCreated(
       taskId,
       createdBy,
       recipientCount: recipientUids.length,
+    });
+  },
+);
+
+exports.notifySharedTaskEdited = onDocumentUpdatedWithAuthContext(
+  "habits/{habitId}",
+  async (event) => {
+    if (!(await reserveEventOnce(event, "notifySharedTaskEdited"))) return;
+
+    const before = event.data?.before?.data() || null;
+    const after = event.data?.after?.data() || null;
+    if (!before || !after) return;
+
+    const editorUid = typeof event.authId === "string" ? event.authId.trim() : "";
+    if (!editorUid) {
+      logger.info("Skipping shared task edit notification without auth context", {
+        habitId: event.params.habitId,
+      });
+      return;
+    }
+
+    const beforeParticipants = Array.isArray(before.participants) ? before.participants : [];
+    const afterParticipants = Array.isArray(after.participants) ? after.participants : [];
+
+    const isSharedTaskAfter =
+      (after.spaceType || "sharedTask") !== "group" &&
+      afterParticipants.length > 1;
+    if (!isSharedTaskAfter) {
+      return;
+    }
+
+    const metadataFields = [
+      "title",
+      "description",
+      "targetDaysPerWeek",
+      "spaceType",
+      "isQuantified",
+      "quantUnit",
+      "quantMin",
+      "quantMax",
+      "participants",
+      "requiresPhotoValidation",
+      "reminderTime",
+    ];
+
+    const beforeMetadata = {};
+    const afterMetadata = {};
+    for (const field of metadataFields) {
+      beforeMetadata[field] = before[field];
+      afterMetadata[field] = after[field];
+    }
+
+    if (JSON.stringify(beforeMetadata) === JSON.stringify(afterMetadata)) {
+      return;
+    }
+
+    const changedFields = metadataFields.filter(
+      (field) => JSON.stringify(before[field]) !== JSON.stringify(after[field]),
+    );
+
+    const recipientUids = [...new Set(afterParticipants
+      .map((uid) => (typeof uid === "string" ? uid.trim() : ""))
+      .filter((uid) => uid.length > 0)
+      .filter((uid) => uid !== editorUid))];
+
+    if (!recipientUids.length) {
+      logger.info("No recipients for shared task edit notification", {
+        habitId: event.params.habitId,
+      });
+      return;
+    }
+
+    const editorProfile = await getUserProfile(editorUid);
+    const editorName = editorProfile?.displayName || "A participant";
+
+    const habitTitle =
+      typeof after.title === "string" && after.title.trim().length > 0
+        ? after.title.trim()
+        : "a shared task";
+
+    await Promise.all(recipientUids.map((uid) => sendPushToUser({
+      uid,
+      title: "Shared Task Updated",
+      body: `${editorName} updated "${habitTitle}".`,
+      data: {
+        type: "sharedTaskUpdated",
+        habitId: event.params.habitId,
+        updatedBy: editorUid,
+        changedFields: changedFields.join(","),
+      },
+    })));
+
+    logger.info("Shared task edit notification sent", {
+      habitId: event.params.habitId,
+      editorUid,
+      recipientCount: recipientUids.length,
+      changedFields,
+      beforeParticipantCount: beforeParticipants.length,
+      afterParticipantCount: afterParticipants.length,
     });
   },
 );

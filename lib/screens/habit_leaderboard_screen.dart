@@ -820,7 +820,9 @@ class _HabitLeaderboardView extends StatelessWidget {
                       Text(
                         participantSummary,
                         style: GoogleFonts.inter(
-                          color: Colors.grey[500],
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.onSurface.withValues(alpha: 0.72),
                           fontSize: 14,
                         ),
                       ),
@@ -895,6 +897,7 @@ class _HabitLeaderboardView extends StatelessWidget {
                   padding: const EdgeInsets.all(16.0),
                   itemCount: participants.length,
                   itemBuilder: (context, index) {
+                    final scheme = Theme.of(context).colorScheme;
                     final user = participants[index];
                     final streak = habit.currentStreakFor(user.uid);
                     final today = DateTime.now();
@@ -931,7 +934,7 @@ class _HabitLeaderboardView extends StatelessWidget {
                         style: TextStyle(fontSize: 24),
                       );
                     } else {
-                      medalColor = Colors.grey[800]!;
+                      medalColor = scheme.onSurface.withValues(alpha: 0.7);
                       rankBadge = Container(
                         width: 24,
                         alignment: Alignment.center,
@@ -939,7 +942,7 @@ class _HabitLeaderboardView extends StatelessWidget {
                           '#${index + 1}',
                           style: GoogleFonts.inter(
                             fontWeight: FontWeight.bold,
-                            color: Colors.grey[500],
+                            color: scheme.onSurface.withValues(alpha: 0.62),
                           ),
                         ),
                       );
@@ -953,7 +956,7 @@ class _HabitLeaderboardView extends StatelessWidget {
                         border: Border.all(
                           color: index == 0
                               ? medalColor.withValues(alpha: 0.5)
-                              : Colors.white.withValues(alpha: 0.05),
+                              : scheme.onSurface.withValues(alpha: 0.1),
                         ),
                         boxShadow: index == 0
                             ? [
@@ -999,7 +1002,7 @@ class _HabitLeaderboardView extends StatelessWidget {
                           user.displayName,
                           style: GoogleFonts.inter(
                             fontWeight: FontWeight.bold,
-                            color: index == 0 ? medalColor : Colors.white,
+                            color: index == 0 ? medalColor : scheme.onSurface,
                           ),
                         ),
                         subtitle: Text(
@@ -1009,8 +1012,9 @@ class _HabitLeaderboardView extends StatelessWidget {
                               ? '${formatQuantity(todayValue, maxDecimals: 1)} / ${formatQuantity(userQuantMax, maxDecimals: 1)} $userQuantUnit ($todayProgress%)'
                               : 'Tap for activity'}',
                           style: GoogleFonts.inter(
-                            fontSize: 12,
-                            color: Colors.grey[500],
+                            fontSize: 13,
+                            height: 1.35,
+                            color: scheme.onSurface.withValues(alpha: 0.72),
                           ),
                         ),
                         trailing: Container(
@@ -1021,7 +1025,7 @@ class _HabitLeaderboardView extends StatelessWidget {
                           decoration: BoxDecoration(
                             color: streak > 0
                                 ? Colors.orange.withValues(alpha: 0.1)
-                                : Colors.black26,
+                                : scheme.onSurface.withValues(alpha: 0.14),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Row(
@@ -1031,7 +1035,7 @@ class _HabitLeaderboardView extends StatelessWidget {
                                 Icons.local_fire_department_rounded,
                                 color: streak > 0
                                     ? Colors.orange
-                                    : Colors.grey[600],
+                                    : scheme.onSurface.withValues(alpha: 0.62),
                                 size: 20,
                               ),
                               const SizedBox(width: 4),
@@ -1042,7 +1046,7 @@ class _HabitLeaderboardView extends StatelessWidget {
                                   fontSize: 18,
                                   color: streak > 0
                                       ? Colors.orange
-                                      : Colors.grey[600],
+                                      : scheme.onSurface.withValues(alpha: 0.62),
                                 ),
                               ),
                             ],

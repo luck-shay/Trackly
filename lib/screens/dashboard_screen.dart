@@ -7,21 +7,120 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/habit.dart';
 import '../models/user_profile.dart';
 import '../widgets/habit_card.dart';
 import '../providers/habits_provider.dart';
 import '../providers/navigation_provider.dart';
 import '../providers/quantified_log_provider.dart';
+import '../services/group_service.dart';
 import '../utils/quantity_format.dart';
+import 'group_detail_screen.dart';
 import 'habit_leaderboard_screen.dart';
 import 'profile_screen.dart';
 
-class DashboardScreen extends StatelessWidget {
+class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
 
   static const double _bottomNavClearance = 124;
   static int _celebrationSnackVersion = 0;
+
+  @override
+  State<DashboardScreen> createState() => _DashboardScreenState();
+}
+
+class _DashboardScreenState extends State<DashboardScreen> {
+  bool _groupsExpanded = true;
+  bool _personalExpanded = true;
+  bool _isLoadingSectionPrefs = true;
+
+  String get _currentUserId => FirebaseAuth.instance.currentUser?.uid ?? '';
+  String get _groupsExpandedKey => 'dashboard_groups_expanded_$_currentUserId';
+  String get _personalExpandedKey =>
+      'dashboard_personal_expanded_$_currentUserId';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSectionPrefs();
+  }
+
+  Future<void> _loadSectionPrefs() async {
+    final uid = _currentUserId;
+    if (uid.isEmpty) {
+      if (!mounted) return;
+      setState(() {
+        _isLoadingSectionPrefs = false;
+      });
+      return;
+    }
+
+    final prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
+    setState(() {
+      _groupsExpanded = prefs.getBool(_groupsExpandedKey) ?? true;
+      _personalExpanded = prefs.getBool(_personalExpandedKey) ?? true;
+      _isLoadingSectionPrefs = false;
+    });
+  }
+
+  Future<void> _setGroupsExpanded(bool value) async {
+    setState(() => _groupsExpanded = value);
+    final uid = _currentUserId;
+    if (uid.isEmpty) return;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_groupsExpandedKey, value);
+  }
+
+  Future<void> _setPersonalExpanded(bool value) async {
+    setState(() => _personalExpanded = value);
+    final uid = _currentUserId;
+    if (uid.isEmpty) return;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_personalExpandedKey, value);
+  }
+
+  Widget _buildSectionHeader(
+    BuildContext context, {
+    required String title,
+    required int count,
+    required bool expanded,
+    required VoidCallback onToggle,
+  }) {
+    final muted = Theme.of(
+      context,
+    ).colorScheme.onSurface.withValues(alpha: 0.55);
+    return InkWell(
+      onTap: onToggle,
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(24, 4, 24, 8),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                '$title ($count)',
+                style: GoogleFonts.inter(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: muted,
+                  letterSpacing: 1.2,
+                ),
+              ),
+            ),
+            Icon(
+              expanded
+                  ? Icons.keyboard_arrow_up_rounded
+                  : Icons.keyboard_arrow_down_rounded,
+              color: muted,
+              size: 20,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   Future<void> _showCompletionCelebration(
     BuildContext context,
@@ -34,8 +133,8 @@ class DashboardScreen extends StatelessWidget {
       return;
     }
 
-    _celebrationSnackVersion++;
-    final shownVersion = _celebrationSnackVersion;
+    DashboardScreen._celebrationSnackVersion++;
+    final shownVersion = DashboardScreen._celebrationSnackVersion;
 
     messenger
       ..hideCurrentSnackBar()
@@ -56,7 +155,7 @@ class DashboardScreen extends StatelessWidget {
     // Force-dismiss only if this is still the latest celebration SnackBar.
     Timer(const Duration(seconds: 4), () {
       if (!context.mounted) return;
-      if (shownVersion != _celebrationSnackVersion) return;
+      if (shownVersion != DashboardScreen._celebrationSnackVersion) return;
       final currentMessenger = ScaffoldMessenger.maybeOf(context);
       currentMessenger?.removeCurrentSnackBar();
     });
@@ -350,6 +449,48 @@ class DashboardScreen extends StatelessWidget {
     return '$weekday, $month ${date.day}';
   }
 
+  Future<void> _openGroupForHabit(BuildContext context, Habit habit) async {
+    final groupId = (habit.groupEntityId ?? '').trim();
+    if (groupId.isEmpty) {
+      context.read<NavigationProvider>().setIndex(2);
+      return;
+    }
+
+    try {
+      final group = await GroupService().getGroupById(groupId);
+      if (!mounted || !context.mounted) {
+        return;
+      }
+
+      if (group == null) {
+        context.read<NavigationProvider>().setIndex(2);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Could not find that group. Opened Groups instead.'),
+          ),
+        );
+        return;
+      }
+
+      await Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => GroupDetailScreen(group: group)),
+      );
+    } catch (error) {
+      if (!mounted || !context.mounted) {
+        return;
+      }
+      context.read<NavigationProvider>().setIndex(2);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Could not open group. ${error.toString().split('\n').first}',
+          ),
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final today = DateTime.now();
@@ -497,6 +638,10 @@ class DashboardScreen extends StatelessWidget {
                       .where((habit) => habit.isGroup)
                       .toList();
 
+                  if (_isLoadingSectionPrefs) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+
                   if (personalHabits.isEmpty && groupHabits.isEmpty) {
                     return Center(
                       child: Column(
@@ -576,304 +721,313 @@ class DashboardScreen extends StatelessWidget {
                       children: [
                         const SizedBox(height: 8),
                         if (groupHabits.isNotEmpty) ...[
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(24, 4, 24, 8),
-                            child: Text(
-                              'GROUPS',
-                              style: GoogleFonts.inter(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.grey[500],
-                                letterSpacing: 1.2,
-                              ),
-                            ),
-                          ),
-                          ...groupHabits.map((habit) {
-                            return HabitCard(
-                                  habit: habit,
-                                  currentUserId: provider.userId,
-                                  onCheck: () async {
-                                    final now = DateTime.now();
-                                    final uid = provider.userId;
-                                    final isQuantified = habit.isQuantifiedFor(
-                                      uid,
-                                    );
-                                    final quantMin = habit.quantMinFor(uid);
-                                    final quantMax = habit.quantMaxFor(uid);
-                                    final quantUnit = habit.quantUnitFor(uid);
-
-                                    if (!isQuantified) {
-                                      final wasCompleted = habit
-                                          .isCompletedOnDate(
-                                            provider.userId,
-                                            now,
-                                          );
-                                      await provider.toggleHabitCompletion(
-                                        habit,
-                                      );
-                                      if (!wasCompleted && context.mounted) {
-                                        await _showCompletionCelebration(
-                                          context,
-                                          provider,
-                                          habit,
-                                        );
-                                      }
-                                      return;
-                                    }
-
-                                    if (habit.isCompletedOnDate(
-                                      provider.userId,
-                                      now,
-                                    )) {
-                                      await provider.clearTodayProgress(habit);
-                                      return;
-                                    }
-
-                                    final existingValue = habit
-                                        .completionValueFor(
-                                          provider.userId,
-                                          now,
-                                        );
-
-                                    final value = await _askQuantifiedValue(
-                                      context,
-                                      habit,
-                                      quantUnit,
-                                      quantMin,
-                                      quantMax,
-                                      initialValue: existingValue,
-                                    );
-
-                                    if (value == null) {
-                                      return;
-                                    }
-
-                                    if (!context.mounted) {
-                                      return;
-                                    }
-
-                                    await provider.saveQuantifiedProgress(
-                                      habit,
-                                      value,
-                                    );
-                                    if (value >= quantMax && context.mounted) {
-                                      ScaffoldMessenger.of(
-                                        context,
-                                      ).showSnackBar(
-                                        SnackBar(
-                                          content: Text(
-                                            'Awesome! You hit today\'s ${habit.quantUnitFor(provider.userId)} goal.',
-                                          ),
-                                        ),
-                                      );
-                                    }
-                                  },
-                                  onCardTap: () {
-                                    // Keep group edits/settings centralized in Groups tab.
-                                    context.read<NavigationProvider>().setIndex(
-                                      2,
-                                    );
-                                  },
-                                )
-                                .animate(
-                                  key: ValueKey('group_anim_${habit.id}'),
-                                )
-                                .fade()
-                                .slideY(begin: 0.15);
-                          }),
-                          const SizedBox(height: 8),
-                        ],
-                        if (personalHabits.isNotEmpty)
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(24, 4, 24, 8),
-                            child: Text(
-                              'PERSONAL/SHARED TASKS',
-                              style: GoogleFonts.inter(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.grey[500],
-                                letterSpacing: 1.2,
-                              ),
-                            ),
-                          ),
-                        ...personalHabits.map((habit) {
-                          return Dismissible(
-                            key: Key(habit.id),
-                            direction: DismissDirection.endToStart,
-                            confirmDismiss: (direction) async {
-                              final isShared = habit.participants.length > 1;
-                              final shouldDelete = await showDialog<bool>(
-                                context: context,
-                                builder: (dialogContext) {
-                                  return AlertDialog(
-                                    title: Text(
-                                      isShared
-                                          ? 'Leave shared habit?'
-                                          : 'Delete habit?',
-                                    ),
-                                    content: Text(
-                                      isShared
-                                          ? 'You will be removed from "${habit.title}". Others will keep it and be notified that you left.'
-                                          : 'Are you sure you want to delete "${habit.title}"? This cannot be undone.',
-                                    ),
-                                    actions: [
-                                      TextButton(
-                                        onPressed: () =>
-                                            Navigator.pop(dialogContext, false),
-                                        child: const Text('Cancel'),
-                                      ),
-                                      ElevatedButton(
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: Color.fromARGB(
-                                            255,
-                                            217,
-                                            4,
-                                            4,
-                                          ),
-                                        ),
-                                        onPressed: () =>
-                                            Navigator.pop(dialogContext, true),
-                                        child: Text(
-                                          isShared ? 'Leave' : 'Delete',
-                                          style: TextStyle(
-                                            color: const Color.fromARGB(
-                                              255,
-                                              255,
-                                              255,
-                                              255,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  );
-                                },
-                              );
-                              return shouldDelete ?? false;
+                          _buildSectionHeader(
+                            context,
+                            title: 'GROUP TASKS',
+                            count: groupHabits.length,
+                            expanded: _groupsExpanded,
+                            onToggle: () {
+                              _setGroupsExpanded(!_groupsExpanded);
                             },
-                            background: Container(
-                              alignment: Alignment.centerRight,
-                              padding: const EdgeInsets.only(right: 30),
-                              margin: const EdgeInsets.symmetric(
-                                horizontal: 24,
-                                vertical: 8,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.redAccent.withValues(alpha: 0.8),
-                                borderRadius: BorderRadius.circular(24),
-                              ),
-                              child: const Icon(
-                                Icons.delete_sweep_rounded,
-                                color: Colors.white,
-                                size: 32,
-                              ),
-                            ),
-                            onDismissed: (direction) {
-                              provider.deleteHabit(habit);
-                            },
-                            child:
-                                HabitCard(
-                                      habit: habit,
-                                      currentUserId: provider.userId,
-                                      onCheck: () async {
-                                        final now = DateTime.now();
-                                        final uid = provider.userId;
-                                        final isQuantified = habit
-                                            .isQuantifiedFor(uid);
-                                        final quantMin = habit.quantMinFor(uid);
-                                        final quantMax = habit.quantMaxFor(uid);
-                                        final quantUnit = habit.quantUnitFor(
-                                          uid,
-                                        );
+                          ),
+                          if (_groupsExpanded)
+                            ...groupHabits.map((habit) {
+                              return HabitCard(
+                                    habit: habit,
+                                    currentUserId: provider.userId,
+                                    onCheck: () async {
+                                      final now = DateTime.now();
+                                      final uid = provider.userId;
+                                      final isQuantified = habit
+                                          .isQuantifiedFor(uid);
+                                      final quantMin = habit.quantMinFor(uid);
+                                      final quantMax = habit.quantMaxFor(uid);
+                                      final quantUnit = habit.quantUnitFor(uid);
 
-                                        if (!isQuantified) {
-                                          final wasCompleted = habit
-                                              .isCompletedOnDate(
-                                                provider.userId,
-                                                now,
-                                              );
-                                          await provider.toggleHabitCompletion(
-                                            habit,
-                                          );
-                                          if (!wasCompleted &&
-                                              context.mounted) {
-                                            await _showCompletionCelebration(
-                                              context,
-                                              provider,
-                                              habit,
-                                            );
-                                          }
-                                          return;
-                                        }
-
-                                        if (habit.isCompletedOnDate(
-                                          provider.userId,
-                                          now,
-                                        )) {
-                                          await provider.clearTodayProgress(
-                                            habit,
-                                          );
-                                          return;
-                                        }
-
-                                        final existingValue = habit
-                                            .completionValueFor(
+                                      if (!isQuantified) {
+                                        final wasCompleted = habit
+                                            .isCompletedOnDate(
                                               provider.userId,
                                               now,
                                             );
-
-                                        final value = await _askQuantifiedValue(
-                                          context,
+                                        await provider.toggleHabitCompletion(
                                           habit,
-                                          quantUnit,
-                                          quantMin,
-                                          quantMax,
-                                          initialValue: existingValue,
                                         );
-
-                                        if (value == null) {
-                                          return;
-                                        }
-
-                                        if (!context.mounted) {
-                                          return;
-                                        }
-
-                                        await provider.saveQuantifiedProgress(
-                                          habit,
-                                          value,
-                                        );
-                                        if (value >= quantMax &&
-                                            context.mounted) {
-                                          ScaffoldMessenger.of(
+                                        if (!wasCompleted && context.mounted) {
+                                          await _showCompletionCelebration(
                                             context,
-                                          ).showSnackBar(
-                                            SnackBar(
-                                              content: Text(
-                                                'Awesome! You hit today\'s ${habit.quantUnitFor(provider.userId)} goal.',
-                                              ),
-                                            ),
+                                            provider,
+                                            habit,
                                           );
                                         }
-                                      },
-                                      onCardTap: () {
-                                        Navigator.push(
+                                        return;
+                                      }
+
+                                      if (habit.isCompletedOnDate(
+                                        provider.userId,
+                                        now,
+                                      )) {
+                                        await provider.clearTodayProgress(
+                                          habit,
+                                        );
+                                        return;
+                                      }
+
+                                      final existingValue = habit
+                                          .completionValueFor(
+                                            provider.userId,
+                                            now,
+                                          );
+
+                                      final value = await _askQuantifiedValue(
+                                        context,
+                                        habit,
+                                        quantUnit,
+                                        quantMin,
+                                        quantMax,
+                                        initialValue: existingValue,
+                                      );
+
+                                      if (value == null) {
+                                        return;
+                                      }
+
+                                      if (!context.mounted) {
+                                        return;
+                                      }
+
+                                      await provider.saveQuantifiedProgress(
+                                        habit,
+                                        value,
+                                      );
+                                      if (value >= quantMax &&
+                                          context.mounted) {
+                                        ScaffoldMessenger.of(
                                           context,
-                                          MaterialPageRoute(
-                                            builder: (context) =>
-                                                HabitLeaderboardScreen(
-                                                  habit: habit,
-                                                ),
+                                        ).showSnackBar(
+                                          SnackBar(
+                                            content: Text(
+                                              'Awesome! You hit today\'s ${habit.quantUnitFor(provider.userId)} goal.',
+                                            ),
                                           ),
                                         );
-                                      },
-                                    )
-                                    .animate(key: ValueKey('anim_${habit.id}'))
-                                    .fade()
-                                    .slideY(begin: 0.2),
-                          );
-                        }),
-                        const SizedBox(height: _bottomNavClearance),
+                                      }
+                                    },
+                                    onCardTap: () {
+                                      _openGroupForHabit(context, habit);
+                                    },
+                                  )
+                                  .animate(
+                                    key: ValueKey('group_anim_${habit.id}'),
+                                  )
+                                  .fade()
+                                  .slideY(begin: 0.15);
+                            }),
+                          const SizedBox(height: 8),
+                        ],
+                        if (personalHabits.isNotEmpty)
+                          _buildSectionHeader(
+                            context,
+                            title: 'PERSONAL/SHARED TASKS',
+                            count: personalHabits.length,
+                            expanded: _personalExpanded,
+                            onToggle: () {
+                              _setPersonalExpanded(!_personalExpanded);
+                            },
+                          ),
+                        if (_personalExpanded)
+                          ...personalHabits.map((habit) {
+                            return Dismissible(
+                              key: Key(habit.id),
+                              direction: DismissDirection.endToStart,
+                              confirmDismiss: (direction) async {
+                                final isShared = habit.participants.length > 1;
+                                final shouldDelete = await showDialog<bool>(
+                                  context: context,
+                                  builder: (dialogContext) {
+                                    return AlertDialog(
+                                      title: Text(
+                                        isShared
+                                            ? 'Leave shared habit?'
+                                            : 'Delete habit?',
+                                      ),
+                                      content: Text(
+                                        isShared
+                                            ? 'You will be removed from "${habit.title}". Others will keep it and be notified that you left.'
+                                            : 'Are you sure you want to delete "${habit.title}"? This cannot be undone.',
+                                      ),
+                                      actions: [
+                                        TextButton(
+                                          onPressed: () => Navigator.pop(
+                                            dialogContext,
+                                            false,
+                                          ),
+                                          child: const Text('Cancel'),
+                                        ),
+                                        ElevatedButton(
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: Color.fromARGB(
+                                              255,
+                                              217,
+                                              4,
+                                              4,
+                                            ),
+                                          ),
+                                          onPressed: () => Navigator.pop(
+                                            dialogContext,
+                                            true,
+                                          ),
+                                          child: Text(
+                                            isShared ? 'Leave' : 'Delete',
+                                            style: TextStyle(
+                                              color: const Color.fromARGB(
+                                                255,
+                                                255,
+                                                255,
+                                                255,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    );
+                                  },
+                                );
+                                return shouldDelete ?? false;
+                              },
+                              background: Container(
+                                alignment: Alignment.centerRight,
+                                padding: const EdgeInsets.only(right: 30),
+                                margin: const EdgeInsets.symmetric(
+                                  horizontal: 24,
+                                  vertical: 8,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.redAccent.withValues(
+                                    alpha: 0.8,
+                                  ),
+                                  borderRadius: BorderRadius.circular(24),
+                                ),
+                                child: const Icon(
+                                  Icons.delete_sweep_rounded,
+                                  color: Colors.white,
+                                  size: 32,
+                                ),
+                              ),
+                              onDismissed: (direction) {
+                                provider.deleteHabit(habit);
+                              },
+                              child:
+                                  HabitCard(
+                                        habit: habit,
+                                        currentUserId: provider.userId,
+                                        onCheck: () async {
+                                          final now = DateTime.now();
+                                          final uid = provider.userId;
+                                          final isQuantified = habit
+                                              .isQuantifiedFor(uid);
+                                          final quantMin = habit.quantMinFor(
+                                            uid,
+                                          );
+                                          final quantMax = habit.quantMaxFor(
+                                            uid,
+                                          );
+                                          final quantUnit = habit.quantUnitFor(
+                                            uid,
+                                          );
+
+                                          if (!isQuantified) {
+                                            final wasCompleted = habit
+                                                .isCompletedOnDate(
+                                                  provider.userId,
+                                                  now,
+                                                );
+                                            await provider
+                                                .toggleHabitCompletion(habit);
+                                            if (!wasCompleted &&
+                                                context.mounted) {
+                                              await _showCompletionCelebration(
+                                                context,
+                                                provider,
+                                                habit,
+                                              );
+                                            }
+                                            return;
+                                          }
+
+                                          if (habit.isCompletedOnDate(
+                                            provider.userId,
+                                            now,
+                                          )) {
+                                            await provider.clearTodayProgress(
+                                              habit,
+                                            );
+                                            return;
+                                          }
+
+                                          final existingValue = habit
+                                              .completionValueFor(
+                                                provider.userId,
+                                                now,
+                                              );
+
+                                          final value =
+                                              await _askQuantifiedValue(
+                                                context,
+                                                habit,
+                                                quantUnit,
+                                                quantMin,
+                                                quantMax,
+                                                initialValue: existingValue,
+                                              );
+
+                                          if (value == null) {
+                                            return;
+                                          }
+
+                                          if (!context.mounted) {
+                                            return;
+                                          }
+
+                                          await provider.saveQuantifiedProgress(
+                                            habit,
+                                            value,
+                                          );
+                                          if (value >= quantMax &&
+                                              context.mounted) {
+                                            ScaffoldMessenger.of(
+                                              context,
+                                            ).showSnackBar(
+                                              SnackBar(
+                                                content: Text(
+                                                  'Awesome! You hit today\'s ${habit.quantUnitFor(provider.userId)} goal.',
+                                                ),
+                                              ),
+                                            );
+                                          }
+                                        },
+                                        onCardTap: () {
+                                          Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder: (context) =>
+                                                  HabitLeaderboardScreen(
+                                                    habit: habit,
+                                                  ),
+                                            ),
+                                          );
+                                        },
+                                      )
+                                      .animate(
+                                        key: ValueKey('anim_${habit.id}'),
+                                      )
+                                      .fade()
+                                      .slideY(begin: 0.2),
+                            );
+                          }),
+                        const SizedBox(
+                          height: DashboardScreen._bottomNavClearance,
+                        ),
                       ],
                     ),
                   );

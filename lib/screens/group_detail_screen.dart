@@ -318,6 +318,8 @@ class GroupDetailScreen extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         _GroupPulseCard(group: liveGroup, tasks: tasks),
+                        const VGap(AppLayout.md),
+                        _GroupLeaderboardCard(group: liveGroup, tasks: tasks),
                         const VGap(AppLayout.lg),
                         Text(
                           'Tasks',
@@ -892,6 +894,433 @@ class _PulseChip extends StatelessWidget {
             context,
           ).colorScheme.onSurface.withValues(alpha: 0.82),
         ),
+      ),
+    );
+  }
+}
+
+enum _LeaderboardWindow { today, week, allTime }
+
+class _GroupLeaderboardCard extends StatefulWidget {
+  final Group group;
+  final List<GroupTask> tasks;
+
+  const _GroupLeaderboardCard({required this.group, required this.tasks});
+
+  @override
+  State<_GroupLeaderboardCard> createState() => _GroupLeaderboardCardState();
+}
+
+class _GroupLeaderboardCardState extends State<_GroupLeaderboardCard> {
+  _LeaderboardWindow _window = _LeaderboardWindow.week;
+
+  bool _isSameDay(DateTime a, DateTime b) {
+    return a.year == b.year && a.month == b.month && a.day == b.day;
+  }
+
+  bool _isWithinRange(DateTime value, DateTime start, DateTime end) {
+    return !value.isBefore(start) && !value.isAfter(end);
+  }
+
+  DateTime _dayOnly(DateTime value) {
+    return DateTime(value.year, value.month, value.day);
+  }
+
+  Future<Map<String, UserProfile?>> _loadProfiles(
+    List<String> memberIds,
+  ) async {
+    final social = SocialService();
+    final profiles = await Future.wait(
+      memberIds.map((memberId) => social.getUserProfile(memberId)),
+    );
+
+    final byId = <String, UserProfile?>{};
+    for (var index = 0; index < memberIds.length; index++) {
+      byId[memberIds[index]] = profiles[index];
+    }
+    return byId;
+  }
+
+  String _displayNameFor(String uid, Map<String, UserProfile?> profiles) {
+    final profile = profiles[uid];
+    final displayName = profile?.displayName.trim() ?? '';
+    if (displayName.isNotEmpty) {
+      return displayName;
+    }
+    final username = profile?.username?.trim() ?? '';
+    if (username.isNotEmpty) {
+      return '@$username';
+    }
+    return uid;
+  }
+
+  int _completionEventsForUser({
+    required String uid,
+    required DateTime start,
+    required DateTime end,
+  }) {
+    var total = 0;
+    for (final task in widget.tasks) {
+      final dates = task.completions[uid] ?? const <DateTime>[];
+      total += dates.where((date) => _isWithinRange(date, start, end)).length;
+    }
+    return total;
+  }
+
+  int _activeDaysForUser({
+    required String uid,
+    required DateTime start,
+    required DateTime end,
+  }) {
+    final days = <DateTime>{};
+    for (final task in widget.tasks) {
+      final dates = task.completions[uid] ?? const <DateTime>[];
+      for (final date in dates) {
+        if (_isWithinRange(date, start, end)) {
+          days.add(_dayOnly(date));
+        }
+      }
+    }
+    return days.length;
+  }
+
+  int _todayTaskCompletions(GroupTask task, DateTime now) {
+    var total = 0;
+    for (final dates in task.completions.values) {
+      total += dates.where((date) => _isSameDay(date, now)).length;
+    }
+    return total;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final now = DateTime.now();
+    final todayStart = DateTime(now.year, now.month, now.day);
+    final todayEnd = DateTime(now.year, now.month, now.day, 23, 59, 59);
+    final weekStart = todayStart.subtract(const Duration(days: 6));
+
+    return FutureBuilder<Map<String, UserProfile?>>(
+      future: _loadProfiles(widget.group.memberIds),
+      builder: (context, snapshot) {
+        final profiles = snapshot.data ?? const <String, UserProfile?>{};
+
+        final rankRows =
+            widget.group.memberIds.map((uid) {
+              final todayEvents = _completionEventsForUser(
+                uid: uid,
+                start: todayStart,
+                end: todayEnd,
+              );
+              final weekEvents = _completionEventsForUser(
+                uid: uid,
+                start: weekStart,
+                end: todayEnd,
+              );
+              final allEvents = _completionEventsForUser(
+                uid: uid,
+                start: DateTime(2020, 1, 1),
+                end: todayEnd,
+              );
+
+              final weekActiveDays = _activeDaysForUser(
+                uid: uid,
+                start: weekStart,
+                end: todayEnd,
+              );
+
+              final score = switch (_window) {
+                _LeaderboardWindow.today => todayEvents,
+                _LeaderboardWindow.week => weekEvents,
+                _LeaderboardWindow.allTime => allEvents,
+              };
+
+              return _LeaderboardMemberRow(
+                uid: uid,
+                name: _displayNameFor(uid, profiles),
+                photoUrl: profiles[uid]?.photoUrl,
+                score: score,
+                todayEvents: todayEvents,
+                weekEvents: weekEvents,
+                allEvents: allEvents,
+                weekActiveDays: weekActiveDays,
+              );
+            }).toList()..sort((a, b) {
+              final scoreCompare = b.score.compareTo(a.score);
+              if (scoreCompare != 0) {
+                return scoreCompare;
+              }
+              final consistencyCompare = b.weekActiveDays.compareTo(
+                a.weekActiveDays,
+              );
+              if (consistencyCompare != 0) {
+                return consistencyCompare;
+              }
+              return a.name.toLowerCase().compareTo(b.name.toLowerCase());
+            });
+
+        _LeaderboardMemberRow? mostConsistent;
+        _LeaderboardMemberRow? mostActiveToday;
+        for (final row in rankRows) {
+          if (mostConsistent == null ||
+              row.weekActiveDays > mostConsistent.weekActiveDays) {
+            mostConsistent = row;
+          }
+          if (mostActiveToday == null ||
+              row.todayEvents > mostActiveToday.todayEvents) {
+            mostActiveToday = row;
+          }
+        }
+
+        GroupTask? topTaskToday;
+        var topTaskTodayCompletions = 0;
+        for (final task in widget.tasks) {
+          final taskCompletions = _todayTaskCompletions(task, now);
+          if (taskCompletions > topTaskTodayCompletions) {
+            topTaskTodayCompletions = taskCompletions;
+            topTaskToday = task;
+          }
+        }
+
+        final scoreLabel = switch (_window) {
+          _LeaderboardWindow.today => 'today',
+          _LeaderboardWindow.week => 'this week',
+          _LeaderboardWindow.allTime => 'all time',
+        };
+
+        return Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(AppLayout.md),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surface,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color: Theme.of(
+                context,
+              ).colorScheme.onSurface.withValues(alpha: 0.1),
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Group Leaderboard',
+                style: GoogleFonts.outfit(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const VGap(AppLayout.xs),
+              Text(
+                'Ranked by completions $scoreLabel.',
+                style: GoogleFonts.inter(
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.onSurface.withValues(alpha: 0.72),
+                  height: 1.4,
+                ),
+              ),
+              const VGap(AppLayout.sm),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  ChoiceChip(
+                    label: const Text('Today'),
+                    selected: _window == _LeaderboardWindow.today,
+                    onSelected: (_) {
+                      setState(() => _window = _LeaderboardWindow.today);
+                    },
+                  ),
+                  ChoiceChip(
+                    label: const Text('Week'),
+                    selected: _window == _LeaderboardWindow.week,
+                    onSelected: (_) {
+                      setState(() => _window = _LeaderboardWindow.week);
+                    },
+                  ),
+                  ChoiceChip(
+                    label: const Text('All time'),
+                    selected: _window == _LeaderboardWindow.allTime,
+                    onSelected: (_) {
+                      setState(() => _window = _LeaderboardWindow.allTime);
+                    },
+                  ),
+                ],
+              ),
+              const VGap(AppLayout.sm),
+              if (rankRows.isEmpty)
+                Text(
+                  'No members yet.',
+                  style: GoogleFonts.inter(
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.onSurface.withValues(alpha: 0.68),
+                  ),
+                )
+              else
+                ...rankRows.asMap().entries.map((entry) {
+                  final index = entry.key;
+                  final row = entry.value;
+                  return _LeaderboardTile(
+                    rank: index + 1,
+                    row: row,
+                    metricLabel: scoreLabel,
+                  );
+                }),
+              const VGap(AppLayout.sm),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  _PulseChip(
+                    label: 'Most consistent',
+                    value: mostConsistent == null
+                        ? 'No data yet'
+                        : '${mostConsistent.name} • ${mostConsistent.weekActiveDays}/7 days',
+                  ),
+                  _PulseChip(
+                    label: 'Most active today',
+                    value: mostActiveToday == null
+                        ? 'No data yet'
+                        : '${mostActiveToday.name} • ${mostActiveToday.todayEvents} completions',
+                  ),
+                  _PulseChip(
+                    label: 'Top task today',
+                    value: topTaskToday == null || topTaskTodayCompletions == 0
+                        ? 'No completions yet'
+                        : '${topTaskToday.title} • $topTaskTodayCompletions',
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _LeaderboardMemberRow {
+  final String uid;
+  final String name;
+  final String? photoUrl;
+  final int score;
+  final int todayEvents;
+  final int weekEvents;
+  final int allEvents;
+  final int weekActiveDays;
+
+  const _LeaderboardMemberRow({
+    required this.uid,
+    required this.name,
+    required this.photoUrl,
+    required this.score,
+    required this.todayEvents,
+    required this.weekEvents,
+    required this.allEvents,
+    required this.weekActiveDays,
+  });
+}
+
+class _LeaderboardTile extends StatelessWidget {
+  final int rank;
+  final _LeaderboardMemberRow row;
+  final String metricLabel;
+
+  const _LeaderboardTile({
+    required this.rank,
+    required this.row,
+    required this.metricLabel,
+  });
+
+  IconData _rankIcon(int rank) {
+    if (rank == 1) return Icons.emoji_events_rounded;
+    if (rank == 2) return Icons.workspace_premium_rounded;
+    if (rank == 3) return Icons.military_tech_rounded;
+    return Icons.tag_rounded;
+  }
+
+  Color _rankColor(BuildContext context, int rank) {
+    if (rank == 1) return const Color(0xFFFFC107);
+    if (rank == 2) return const Color(0xFFB0BEC5);
+    if (rank == 3) return const Color(0xFFCD7F32);
+    return Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.55);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.04),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: Theme.of(
+            context,
+          ).colorScheme.onSurface.withValues(alpha: 0.08),
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(_rankIcon(rank), color: _rankColor(context, rank), size: 20),
+          const HGap(10),
+          CircleAvatar(
+            radius: 16,
+            backgroundColor: Theme.of(
+              context,
+            ).colorScheme.onSurface.withValues(alpha: 0.1),
+            backgroundImage:
+                row.photoUrl != null && row.photoUrl!.trim().isNotEmpty
+                ? NetworkImage(row.photoUrl!.trim())
+                : null,
+            child: row.photoUrl != null && row.photoUrl!.trim().isNotEmpty
+                ? null
+                : Text(
+                    (row.name.isEmpty ? '?' : row.name[0]).toUpperCase(),
+                    style: GoogleFonts.inter(fontWeight: FontWeight.w700),
+                  ),
+          ),
+          const HGap(10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  row.name,
+                  style: GoogleFonts.inter(fontWeight: FontWeight.w700),
+                ),
+                Text(
+                  '${row.todayEvents} today • ${row.weekEvents} week • ${row.allEvents} total',
+                  style: GoogleFonts.inter(
+                    fontSize: 11,
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.onSurface.withValues(alpha: 0.68),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Text(
+            '${row.score}',
+            style: GoogleFonts.outfit(
+              fontSize: 22,
+              fontWeight: FontWeight.w800,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+          ),
+          const HGap(4),
+          Text(
+            metricLabel,
+            style: GoogleFonts.inter(
+              fontSize: 11,
+              color: Theme.of(
+                context,
+              ).colorScheme.onSurface.withValues(alpha: 0.62),
+            ),
+          ),
+        ],
       ),
     );
   }
