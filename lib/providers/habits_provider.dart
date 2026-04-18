@@ -23,6 +23,7 @@ class HabitsProvider extends ChangeNotifier {
       <String, StreamSubscription<List<GroupTask>>>{};
   final Map<String, List<Habit>> _groupHabitsByGroupId =
       <String, List<Habit>>{};
+  bool _permissionRetryScheduled = false;
   List<Habit> _baseHabits = [];
   bool _baseLoaded = false;
   bool _groupsLoaded = false;
@@ -38,7 +39,7 @@ class HabitsProvider extends ChangeNotifier {
   String get userId => _db.userId;
 
   HabitsProvider() {
-    _authSubscription = FirebaseAuth.instance.authStateChanges().listen((_) {
+    _authSubscription = FirebaseAuth.instance.idTokenChanges().listen((_) {
       unawaited(GroupMigrationService().migrateLegacyGroupsForCurrentUser());
       _initStream();
     });
@@ -66,28 +67,47 @@ class HabitsProvider extends ChangeNotifier {
       (data) {
         _baseHabits = data;
         _baseLoaded = true;
+        _permissionRetryScheduled = false;
         _error = null;
         _publishMergedHabits();
       },
       onError: (err) {
-        _error = err.toString();
-        _isLoading = false;
-        notifyListeners();
+        _handleStreamError(err);
       },
     );
 
     _groupsSubscription = _groupService.streamGroupsForCurrentUser().listen(
       (groups) {
         _groupsLoaded = true;
+        _permissionRetryScheduled = false;
         _error = null;
         _bindGroupTaskStreams(groups);
       },
       onError: (err) {
-        _error = err.toString();
-        _isLoading = false;
-        notifyListeners();
+        _handleStreamError(err);
       },
     );
+  }
+
+  void _handleStreamError(Object err) {
+    final message = err.toString();
+    if (message.contains('permission-denied')) {
+      if (!_permissionRetryScheduled) {
+        _permissionRetryScheduled = true;
+        Future<void>.delayed(const Duration(seconds: 2), () {
+          _permissionRetryScheduled = false;
+          _initStream();
+        });
+      }
+      _error = null;
+      _isLoading = true;
+      notifyListeners();
+      return;
+    }
+
+    _error = message;
+    _isLoading = false;
+    notifyListeners();
   }
 
   void _bindGroupTaskStreams(List<Group> groups) {
@@ -111,15 +131,14 @@ class HabitsProvider extends ChangeNotifier {
       _groupTaskSubscriptions[group.id] =
           _groupService.streamGroupTasks(group.id).listen(
                 (tasks) {
+                  _permissionRetryScheduled = false;
                   _groupHabitsByGroupId[group.id] = tasks
                       .map((task) => _habitFromGroupTask(group, task))
                       .toList();
                   _publishMergedHabits();
                 },
                 onError: (err) {
-                  _error = err.toString();
-                  _isLoading = false;
-                  notifyListeners();
+                  _handleStreamError(err);
                 },
               );
     }

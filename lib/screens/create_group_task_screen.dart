@@ -158,7 +158,7 @@ class _CreateGroupTaskScreenState extends State<CreateGroupTaskScreen> {
               if (_isQuantified) ...[
                 const VGap(AppLayout.sm),
                 DropdownButtonFormField<String>(
-                  value: _quantUnit,
+                  initialValue: _quantUnit,
                   decoration: InputDecoration(
                     labelText: 'Unit',
                     filled: true,

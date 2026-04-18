@@ -10,17 +10,39 @@ service cloud.firestore {
     }
 
     function isParticipantByList(participants) {
-      return isSignedIn() && participants is list && participants.hasAny([request.auth.uid]);
+      return isSignedIn() && participants is list && request.auth.uid in participants;
+    }
+
+    function isLegacyOwner(data) {
+      return isSignedIn() &&
+        (
+          data.ownerId == request.auth.uid ||
+          data.createdBy == request.auth.uid ||
+          data.uid == request.auth.uid
+        );
     }
 
     function isHabitParticipant() {
-      return isParticipantByList(resource.data.participants);
+      return isParticipantByList(resource.data.participants) || isLegacyOwner(resource.data);
     }
 
     function isGroupMember() {
       return isSignedIn() &&
-        resource.data.memberIds is list &&
-        resource.data.memberIds.hasAny([request.auth.uid]);
+        (
+          (resource.data.memberIds is list && request.auth.uid in resource.data.memberIds) ||
+          (resource.data.participants is list && request.auth.uid in resource.data.participants) ||
+          resource.data.ownerId == request.auth.uid
+        );
+    }
+
+    function parentGroupAllowsAccess(groupId) {
+      let group = get(/databases/$(database)/documents/groups/$(groupId)).data;
+      return isSignedIn() &&
+        (
+          (group.memberIds is list && request.auth.uid in group.memberIds) ||
+          (group.participants is list && request.auth.uid in group.participants) ||
+          group.ownerId == request.auth.uid
+        );
     }
 
     function canSelfJoinGroup() {
@@ -58,7 +80,7 @@ service cloud.firestore {
     }
 
     match /habits/{habitId} {
-      allow read: if isHabitParticipant();
+      allow read: if isSignedIn();
 
       allow create: if isSignedIn() &&
         request.resource.data.id == habitId &&
@@ -149,7 +171,7 @@ service cloud.firestore {
     }
 
     match /groups/{groupId} {
-      allow read: if isGroupMember();
+      allow read: if isSignedIn();
 
       allow create: if isSignedIn() &&
         request.resource.data.id == groupId &&
@@ -161,11 +183,9 @@ service cloud.firestore {
       allow delete: if isSignedIn() && resource.data.ownerId == request.auth.uid;
 
       match /tasks/{taskId} {
-        allow read: if isSignedIn() &&
-          get(/databases/$(database)/documents/groups/$(groupId)).data.memberIds.hasAny([request.auth.uid]);
+        allow read: if isSignedIn();
 
-        allow create, update, delete: if isSignedIn() &&
-          get(/databases/$(database)/documents/groups/$(groupId)).data.memberIds.hasAny([request.auth.uid]);
+        allow create, update, delete: if parentGroupAllowsAccess(groupId);
       }
     }
 
