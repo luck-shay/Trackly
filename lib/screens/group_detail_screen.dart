@@ -914,6 +914,43 @@ class _GroupLeaderboardCard extends StatefulWidget {
 class _GroupLeaderboardCardState extends State<_GroupLeaderboardCard> {
   _LeaderboardWindow _window = _LeaderboardWindow.week;
 
+  Widget _buildWindowChip(
+    BuildContext context, {
+    required String label,
+    required bool selected,
+    required VoidCallback onTap,
+  }) {
+    final scheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return ChoiceChip(
+      label: Text(
+        label,
+        style: GoogleFonts.inter(
+          fontWeight: FontWeight.w700,
+          color: selected
+              ? (isDark ? Colors.white : scheme.onPrimary)
+              : scheme.onSurface.withValues(alpha: isDark ? 0.88 : 0.78),
+        ),
+      ),
+      selected: selected,
+      selectedColor: isDark
+          ? scheme.primary.withValues(alpha: 0.36)
+          : scheme.primary.withValues(alpha: 0.2),
+      backgroundColor: scheme.onSurface.withValues(alpha: isDark ? 0.12 : 0.04),
+      checkmarkColor: isDark ? Colors.white : scheme.onPrimary,
+      side: BorderSide(
+        color: selected
+            ? (isDark
+                  ? scheme.primary.withValues(alpha: 0.72)
+                  : scheme.primary.withValues(alpha: 0.35))
+            : scheme.onSurface.withValues(alpha: isDark ? 0.5 : 0.25),
+        width: 1.5,
+      ),
+      onSelected: (_) => onTap(),
+    );
+  }
+
   bool _isSameDay(DateTime a, DateTime b) {
     return a.year == b.year && a.month == b.month && a.day == b.day;
   }
@@ -1124,24 +1161,27 @@ class _GroupLeaderboardCardState extends State<_GroupLeaderboardCard> {
                 spacing: 8,
                 runSpacing: 8,
                 children: [
-                  ChoiceChip(
-                    label: const Text('Today'),
+                  _buildWindowChip(
+                    context,
+                    label: 'Today',
                     selected: _window == _LeaderboardWindow.today,
-                    onSelected: (_) {
+                    onTap: () {
                       setState(() => _window = _LeaderboardWindow.today);
                     },
                   ),
-                  ChoiceChip(
-                    label: const Text('Week'),
+                  _buildWindowChip(
+                    context,
+                    label: 'Week',
                     selected: _window == _LeaderboardWindow.week,
-                    onSelected: (_) {
+                    onTap: () {
                       setState(() => _window = _LeaderboardWindow.week);
                     },
                   ),
-                  ChoiceChip(
-                    label: const Text('All time'),
+                  _buildWindowChip(
+                    context,
+                    label: 'All time',
                     selected: _window == _LeaderboardWindow.allTime,
-                    onSelected: (_) {
+                    onTap: () {
                       setState(() => _window = _LeaderboardWindow.allTime);
                     },
                   ),
