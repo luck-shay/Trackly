@@ -722,21 +722,29 @@ class _CreateHabitViewState extends State<_CreateHabitView> {
                               final isSelected = provider.selectedFriends
                                   .contains(friend.uid);
                               return FilterChip(
-                                label: Text(
-                                  friend.displayName,
-                                  style: GoogleFonts.inter(
-                                    color: isSelected
-                                        ? Colors.black
-                                        : Colors.white,
-                                  ),
-                                ),
+                                label: Text(friend.displayName),
                                 selected: isSelected,
                                 selectedColor: Theme.of(
                                   context,
                                 ).colorScheme.primary,
-                                backgroundColor: Theme.of(
-                                  context,
-                                ).colorScheme.surface,
+                                labelStyle: GoogleFonts.inter(
+                                  color: isSelected
+                                      ? Theme.of(context).colorScheme.onPrimary
+                                      : Theme.of(context)
+                                            .colorScheme
+                                            .onSurface
+                                            .withValues(alpha: 0.9),
+                                ),
+                                backgroundColor: Theme.of(context)
+                                    .colorScheme
+                                    .onSurface
+                                    .withValues(alpha: 0.06),
+                                side: BorderSide(
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurface
+                                      .withValues(alpha: 0.2),
+                                ),
                                 checkmarkColor: Colors.black,
                                 onSelected: (_) {
                                   provider.toggleFriend(friend.uid);

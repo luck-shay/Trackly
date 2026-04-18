@@ -414,6 +414,79 @@ exports.notifyHabitNoticeCreated = onDocumentCreated(
   },
 );
 
+exports.notifyGroupTaskCreated = onDocumentCreated(
+  "groups/{groupId}/tasks/{taskId}",
+  async (event) => {
+    if (!(await reserveEventOnce(event, "notifyGroupTaskCreated"))) return;
+
+    const task = event.data?.data();
+    if (!task) return;
+
+    const groupId = event.params.groupId;
+    const taskId = event.params.taskId;
+    if (!groupId || !taskId) return;
+
+    const title =
+      typeof task.title === "string" && task.title.trim().length > 0
+        ? task.title.trim()
+        : "New task";
+    const createdBy = typeof task.createdBy === "string" ? task.createdBy.trim() : "";
+
+    const groupDoc = await admin.firestore().collection("groups").doc(groupId).get();
+    if (!groupDoc.exists) {
+      logger.info("Skipping group task notification because group was not found", {
+        groupId,
+        taskId,
+      });
+      return;
+    }
+
+    const groupData = groupDoc.data() || {};
+    const groupName =
+      typeof groupData.name === "string" && groupData.name.trim().length > 0
+        ? groupData.name.trim()
+        : "your group";
+
+    const memberIds = Array.isArray(groupData.memberIds) ? groupData.memberIds : [];
+    const leftMemberIds = new Set(
+      Array.isArray(groupData.leftMemberIds) ? groupData.leftMemberIds : [],
+    );
+
+    const recipientUids = [...new Set(memberIds
+      .map((uid) => (typeof uid === "string" ? uid.trim() : ""))
+      .filter((uid) => uid.length > 0)
+      .filter((uid) => !leftMemberIds.has(uid))
+      .filter((uid) => uid !== createdBy))];
+
+    if (!recipientUids.length) {
+      logger.info("No recipients for group task notification", {groupId, taskId});
+      return;
+    }
+
+    const creatorProfile = await getUserProfile(createdBy);
+    const creatorName = creatorProfile?.displayName || "A group member";
+
+    await Promise.all(recipientUids.map((uid) => sendPushToUser({
+      uid,
+      title: "New Group Task",
+      body: `${creatorName} added "${title}" in ${groupName}.`,
+      data: {
+        type: "groupTaskCreated",
+        groupId,
+        taskId,
+        createdBy,
+      },
+    })));
+
+    logger.info("Group task notification sent", {
+      groupId,
+      taskId,
+      createdBy,
+      recipientCount: recipientUids.length,
+    });
+  },
+);
+
 exports.cleanupOldProfilePictureOnUpdate = onDocumentUpdated(
   "users/{uid}",
   async (event) => {
