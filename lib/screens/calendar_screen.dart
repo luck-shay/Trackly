@@ -291,8 +291,11 @@ class _CalendarViewState extends State<_CalendarView> {
       itemCount: completedHabits.length,
       itemBuilder: (context, index) {
         final habit = completedHabits[index];
-        final dayParticipantsCompleted = habit.participants.where((participantId) {
-          final completions = habit.completions[participantId] ?? const <DateTime>[];
+        final dayParticipantsCompleted = habit.participants.where((
+          participantId,
+        ) {
+          final completions =
+              habit.completions[participantId] ?? const <DateTime>[];
           return completions.any(
             (d) =>
                 d.year == selectedDay.year &&
@@ -307,9 +310,27 @@ class _CalendarViewState extends State<_CalendarView> {
         return Container(
           margin: const EdgeInsets.only(bottom: 12),
           decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surface,
+            color: Theme.of(
+              context,
+            ).colorScheme.surface.withValues(alpha: 0.96),
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+            border: Border.all(
+              color: Theme.of(
+                context,
+              ).colorScheme.onSurface.withValues(alpha: 0.08),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.1),
+                blurRadius: 16,
+                offset: const Offset(0, 8),
+              ),
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.06),
+                blurRadius: 4,
+                offset: const Offset(0, 2),
+              ),
+            ],
           ),
           child: ListTile(
             contentPadding: const EdgeInsets.symmetric(
@@ -319,7 +340,9 @@ class _CalendarViewState extends State<_CalendarView> {
             leading: Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.2),
+                color: Theme.of(
+                  context,
+                ).colorScheme.primary.withValues(alpha: 0.2),
                 shape: BoxShape.circle,
               ),
               child: Icon(
