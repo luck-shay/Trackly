@@ -688,7 +688,7 @@ class DashboardScreen extends StatelessWidget {
                           Padding(
                             padding: const EdgeInsets.fromLTRB(24, 4, 24, 8),
                             child: Text(
-                              'PERSONAL TASKS',
+                              'PERSONAL/SHARED TASKS',
                               style: GoogleFonts.inter(
                                 fontSize: 12,
                                 fontWeight: FontWeight.bold,

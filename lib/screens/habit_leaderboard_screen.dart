@@ -736,7 +736,9 @@ class _HabitLeaderboardView extends StatelessWidget {
                           user.displayName,
                           style: GoogleFonts.inter(
                             fontWeight: FontWeight.bold,
-                            color: index == 0 ? medalColor : Colors.white,
+                            color: index == 0
+                                ? medalColor
+                                : Theme.of(context).colorScheme.onSurface,
                           ),
                         ),
                         subtitle: Text(

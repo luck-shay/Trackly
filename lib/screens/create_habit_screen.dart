@@ -109,6 +109,30 @@ class _CreateHabitViewState extends State<_CreateHabitView> {
     super.dispose();
   }
 
+  Future<void> _openFriendSelectionSheet(
+    BuildContext context, {
+    required List<UserProfile> friends,
+    required CreateHabitProvider provider,
+    required String title,
+  }) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      builder: (_) {
+        return _FriendSelectionSheet(
+          title: title,
+          friends: friends,
+          selectedIds: provider.selectedFriends,
+          onToggle: provider.toggleFriend,
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -680,6 +704,20 @@ class _CreateHabitViewState extends State<_CreateHabitView> {
                           ? 'INVITE MEMBERS (OPTIONAL)'
                           : 'SHARE WITH FRIENDS (OPTIONAL)';
 
+                      final friends = List<UserProfile>.from(snapshot.data!)
+                        ..sort(
+                          (a, b) => a.displayName.toLowerCase().compareTo(
+                            b.displayName.toLowerCase(),
+                          ),
+                        );
+
+                      final selectedFriends = friends
+                          .where(
+                            (friend) =>
+                                provider.selectedFriends.contains(friend.uid),
+                          )
+                          .toList();
+
                       if (!snapshot.hasData || snapshot.data!.isEmpty) {
                         return Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -715,37 +753,71 @@ class _CreateHabitViewState extends State<_CreateHabitView> {
                             ),
                           ).animate().fade(delay: 400.ms),
                           const VGap(AppLayout.sm),
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 8,
-                            children: snapshot.data!.map((friend) {
-                              final isSelected = provider.selectedFriends
-                                  .contains(friend.uid);
-                              return FilterChip(
-                                label: Text(friend.displayName),
-                                selected: isSelected,
-                                selectedColor: Theme.of(
-                                  context,
-                                ).colorScheme.primary,
-                                labelStyle: GoogleFonts.inter(
-                                  color: isSelected
-                                      ? Theme.of(context).colorScheme.onPrimary
-                                      : Theme.of(context).colorScheme.onSurface
-                                            .withValues(alpha: 0.9),
-                                ),
-                                backgroundColor: Theme.of(
-                                  context,
-                                ).colorScheme.onSurface.withValues(alpha: 0.06),
-                                side: BorderSide(
-                                  color: Theme.of(context).colorScheme.onSurface
-                                      .withValues(alpha: 0.2),
-                                ),
-                                checkmarkColor: Colors.black,
-                                onSelected: (_) {
-                                  provider.toggleFriend(friend.uid);
-                                },
-                              );
-                            }).toList(),
+                          OutlinedButton.icon(
+                            onPressed: () => _openFriendSelectionSheet(
+                              context,
+                              friends: friends,
+                              provider: provider,
+                              title: shareTitle,
+                            ),
+                            icon: const Icon(Icons.group_add_rounded),
+                            label: Text(
+                              provider.selectedFriends.isEmpty
+                                  ? 'Select friends'
+                                  : '${provider.selectedFriends.length} selected',
+                            ),
+                          ),
+                          const VGap(AppLayout.sm),
+                          if (selectedFriends.isEmpty)
+                            Text(
+                              'No friends selected yet.',
+                              style: GoogleFonts.inter(
+                                color: Colors.grey[600],
+                                fontSize: 13,
+                              ),
+                            )
+                          else
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: selectedFriends.map((friend) {
+                                return InputChip(
+                                  label: Text(friend.displayName),
+                                  onDeleted: () {
+                                    provider.toggleFriend(friend.uid);
+                                  },
+                                  deleteIcon: const Icon(
+                                    Icons.close_rounded,
+                                    size: 16,
+                                  ),
+                                  labelStyle: GoogleFonts.inter(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurface
+                                        .withValues(alpha: 0.9),
+                                  ),
+                                  backgroundColor: Theme.of(context)
+                                      .colorScheme
+                                      .onSurface
+                                      .withValues(alpha: 0.06),
+                                  side: BorderSide(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurface
+                                        .withValues(alpha: 0.2),
+                                  ),
+                                );
+                              }).toList(),
+                            ),
+                          const VGap(AppLayout.xs),
+                          Text(
+                            'Tap "Select friends" to add or remove people.',
+                            style: GoogleFonts.inter(
+                              fontSize: 12,
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onSurface.withValues(alpha: 0.62),
+                            ),
                           ),
                         ],
                       ).animate().fade(delay: 450.ms);
@@ -874,6 +946,281 @@ class _CreateHabitViewState extends State<_CreateHabitView> {
               ).animate().fade(delay: 450.ms).slideY(begin: 0.2),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _FriendSelectionSheet extends StatefulWidget {
+  final String title;
+  final List<UserProfile> friends;
+  final List<String> selectedIds;
+  final ValueChanged<String> onToggle;
+
+  const _FriendSelectionSheet({
+    required this.title,
+    required this.friends,
+    required this.selectedIds,
+    required this.onToggle,
+  });
+
+  @override
+  State<_FriendSelectionSheet> createState() => _FriendSelectionSheetState();
+}
+
+class _FriendSelectionSheetState extends State<_FriendSelectionSheet> {
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _searchController.addListener(() {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _searchQuery = _searchController.text.trim().toLowerCase();
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  String _displayName(UserProfile friend) {
+    final name = friend.displayName.trim();
+    return name.isEmpty ? friend.uid : name;
+  }
+
+  String? _subtitleForFriend(UserProfile friend, bool hasDuplicateDisplayName) {
+    final username = friend.username?.trim() ?? '';
+    final email = friend.email.trim();
+
+    if (username.isNotEmpty && hasDuplicateDisplayName && email.isNotEmpty) {
+      return '@$username • $email';
+    }
+    if (username.isNotEmpty) {
+      return '@$username';
+    }
+    if (email.isNotEmpty) {
+      return email;
+    }
+    if (hasDuplicateDisplayName) {
+      return 'ID: ${friend.uid.substring(0, friend.uid.length < 8 ? friend.uid.length : 8)}';
+    }
+    return null;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final sortedFriends = List<UserProfile>.from(widget.friends)
+      ..sort(
+        (a, b) => _displayName(
+          a,
+        ).toLowerCase().compareTo(_displayName(b).toLowerCase()),
+      );
+
+    final nameCounts = <String, int>{};
+    for (final friend in sortedFriends) {
+      final key = _displayName(friend).toLowerCase();
+      nameCounts[key] = (nameCounts[key] ?? 0) + 1;
+    }
+
+    final filteredFriends = sortedFriends.where((friend) {
+      if (_searchQuery.isEmpty) {
+        return true;
+      }
+      final displayName = _displayName(friend).toLowerCase();
+      final username = (friend.username ?? '').trim().toLowerCase();
+      final email = friend.email.trim().toLowerCase();
+      return displayName.contains(_searchQuery) ||
+          username.contains(_searchQuery) ||
+          email.contains(_searchQuery);
+    }).toList();
+
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          AppLayout.lg,
+          AppLayout.md,
+          AppLayout.lg,
+          AppLayout.md + MediaQuery.of(context).viewInsets.bottom,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              widget.title,
+              style: GoogleFonts.outfit(
+                fontSize: 22,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const VGap(AppLayout.xs),
+            Text(
+              '${widget.selectedIds.length} selected',
+              style: GoogleFonts.inter(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: Theme.of(
+                  context,
+                ).colorScheme.onSurface.withValues(alpha: 0.68),
+              ),
+            ),
+            const VGap(AppLayout.sm),
+            TextField(
+              controller: _searchController,
+              decoration: InputDecoration(
+                hintText: 'Search by name, username, or email',
+                prefixIcon: const Icon(Icons.search_rounded),
+                filled: true,
+                fillColor: Theme.of(
+                  context,
+                ).colorScheme.onSurface.withValues(alpha: 0.05),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide(
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.onSurface.withValues(alpha: 0.12),
+                  ),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide(
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.onSurface.withValues(alpha: 0.12),
+                  ),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide(
+                    color: Theme.of(context).colorScheme.primary,
+                    width: 1.2,
+                  ),
+                ),
+              ),
+            ),
+            const VGap(AppLayout.sm),
+            if (filteredFriends.isEmpty)
+              Text(
+                'No friends match your search.',
+                style: GoogleFonts.inter(
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.onSurface.withValues(alpha: 0.68),
+                ),
+              )
+            else
+              SizedBox(
+                height: MediaQuery.of(context).size.height * 0.45,
+                child: ListView.separated(
+                  itemCount: filteredFriends.length,
+                  separatorBuilder: (_, _) => Divider(
+                    height: 1,
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.onSurface.withValues(alpha: 0.08),
+                  ),
+                  itemBuilder: (context, index) {
+                    final friend = filteredFriends[index];
+                    final isSelected = widget.selectedIds.contains(friend.uid);
+                    final subtitle = _subtitleForFriend(
+                      friend,
+                      (nameCounts[_displayName(friend).toLowerCase()] ?? 0) > 1,
+                    );
+
+                    return AnimatedContainer(
+                      duration: const Duration(milliseconds: 150),
+                      color: isSelected
+                          ? Theme.of(
+                              context,
+                            ).colorScheme.onSurface.withValues(alpha: 0.08)
+                          : Colors.transparent,
+                      child: ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        onTap: () {
+                          setState(() {
+                            widget.onToggle(friend.uid);
+                          });
+                        },
+                        leading: CircleAvatar(
+                          backgroundColor: Theme.of(
+                            context,
+                          ).colorScheme.onSurface.withValues(alpha: 0.08),
+                          backgroundImage:
+                              friend.photoUrl != null &&
+                                  friend.photoUrl!.trim().isNotEmpty
+                              ? NetworkImage(friend.photoUrl!.trim())
+                              : null,
+                          child:
+                              friend.photoUrl != null &&
+                                  friend.photoUrl!.trim().isNotEmpty
+                              ? null
+                              : Text(
+                                  (_displayName(friend).isEmpty
+                                          ? '?'
+                                          : _displayName(friend)[0])
+                                      .toUpperCase(),
+                                  style: GoogleFonts.inter(
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                        ),
+                        title: Text(
+                          _displayName(friend),
+                          style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+                        ),
+                        subtitle: subtitle == null
+                            ? null
+                            : Text(
+                                subtitle,
+                                style: GoogleFonts.inter(
+                                  color: Theme.of(context).colorScheme.onSurface
+                                      .withValues(alpha: 0.62),
+                                ),
+                              ),
+                        trailing: AnimatedContainer(
+                          duration: const Duration(milliseconds: 140),
+                          width: 28,
+                          height: 28,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: isSelected
+                                ? Theme.of(context).colorScheme.primary
+                                : Theme.of(context).colorScheme.onSurface
+                                      .withValues(alpha: 0.08),
+                            border: Border.all(
+                              color: isSelected
+                                  ? Theme.of(context).colorScheme.primary
+                                  : Theme.of(context).colorScheme.onSurface
+                                        .withValues(alpha: 0.18),
+                            ),
+                          ),
+                          child: Icon(
+                            isSelected
+                                ? Icons.check_rounded
+                                : Icons.add_rounded,
+                            size: 18,
+                            color: isSelected
+                                ? Colors.black
+                                : Theme.of(context).colorScheme.onSurface,
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+          ],
         ),
       ),
     );

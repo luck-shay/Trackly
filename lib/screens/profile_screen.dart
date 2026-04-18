@@ -51,7 +51,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         child: Image.network(
                           photoUrl,
                           fit: BoxFit.contain,
-                          errorBuilder: (_, __, ___) => Icon(
+                          errorBuilder: (_, _, _) => Icon(
                             Icons.broken_image_rounded,
                             size: 72,
                             color: Colors.grey[400],
