@@ -7,6 +7,7 @@ import '../models/user_profile.dart';
 import '../services/group_service.dart';
 import '../services/social_service.dart';
 import '../theme/app_layout.dart';
+import '../utils/quantity_format.dart';
 import 'create_group_task_screen.dart';
 
 class GroupDetailScreen extends StatelessWidget {
@@ -64,7 +65,10 @@ class GroupDetailScreen extends StatelessWidget {
     }
   }
 
-  Future<void> _openInviteMembersSheet(BuildContext context, Group group) async {
+  Future<void> _openInviteMembersSheet(
+    BuildContext context,
+    Group group,
+  ) async {
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -81,9 +85,7 @@ class GroupDetailScreen extends StatelessWidget {
   Future<void> _createTask(BuildContext context, Group group) async {
     final createdTask = await Navigator.push<GroupTask>(
       context,
-      MaterialPageRoute(
-        builder: (_) => CreateGroupTaskScreen(group: group),
-      ),
+      MaterialPageRoute(builder: (_) => CreateGroupTaskScreen(group: group)),
     );
 
     if (!context.mounted || createdTask == null) {
@@ -92,6 +94,41 @@ class GroupDetailScreen extends StatelessWidget {
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('Task created: ${createdTask.title}')),
+    );
+  }
+
+  Future<void> _editTask(
+    BuildContext context,
+    Group group,
+    GroupTask task,
+  ) async {
+    final updatedTask = await Navigator.push<GroupTask>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => CreateGroupTaskScreen(group: group, initialTask: task),
+      ),
+    );
+
+    if (!context.mounted || updatedTask == null) {
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Task updated: ${updatedTask.title}')),
+    );
+  }
+
+  Future<void> _openMembersSheet(BuildContext context, Group group) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      builder: (sheetContext) {
+        return _GroupMembersSheet(group: group);
+      },
     );
   }
 
@@ -122,9 +159,9 @@ class GroupDetailScreen extends StatelessWidget {
       if (!context.mounted) {
         return;
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Task deleted: ${task.title}')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Task deleted: ${task.title}')));
     } catch (error) {
       if (!context.mounted) {
         return;
@@ -189,7 +226,9 @@ class GroupDetailScreen extends StatelessWidget {
                     color: Theme.of(context).colorScheme.surface,
                     borderRadius: BorderRadius.circular(18),
                     border: Border.all(
-                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1),
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withValues(alpha: 0.1),
                     ),
                   ),
                   child: Column(
@@ -200,7 +239,9 @@ class GroupDetailScreen extends StatelessWidget {
                             ? 'No description yet.'
                             : liveGroup.description,
                         style: GoogleFonts.inter(
-                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.82),
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.onSurface.withValues(alpha: 0.82),
                           height: 1.4,
                         ),
                       ),
@@ -209,7 +250,24 @@ class GroupDetailScreen extends StatelessWidget {
                         '${liveGroup.memberIds.length} member${liveGroup.memberIds.length == 1 ? '' : 's'}',
                         style: GoogleFonts.inter(
                           fontSize: 12,
-                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.68),
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.onSurface.withValues(alpha: 0.68),
+                        ),
+                      ),
+                      const VGap(AppLayout.xs),
+                      TextButton.icon(
+                        onPressed: () => _openMembersSheet(context, liveGroup),
+                        icon: const Icon(Icons.people_alt_rounded, size: 18),
+                        label: const Text('View members'),
+                        style: TextButton.styleFrom(
+                          padding: EdgeInsets.zero,
+                          minimumSize: const Size(0, 36),
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          visualDensity: const VisualDensity(
+                            horizontal: -3,
+                            vertical: -2,
+                          ),
                         ),
                       ),
                       const VGap(AppLayout.sm),
@@ -230,8 +288,9 @@ class GroupDetailScreen extends StatelessWidget {
                               icon: const Icon(Icons.add_task_rounded),
                               label: const Text('Add Task'),
                               style: ElevatedButton.styleFrom(
-                                backgroundColor:
-                                    Theme.of(context).colorScheme.primary,
+                                backgroundColor: Theme.of(
+                                  context,
+                                ).colorScheme.primary,
                                 foregroundColor: Colors.black,
                               ),
                             ),
@@ -253,7 +312,7 @@ class GroupDetailScreen extends StatelessWidget {
                     final now = DateTime.now();
                     final uid = GroupService().userId;
                     final isGroupAdmin =
-                      uid.isNotEmpty && uid == liveGroup.ownerId;
+                        uid.isNotEmpty && uid == liveGroup.ownerId;
 
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -276,7 +335,9 @@ class GroupDetailScreen extends StatelessWidget {
                               color: Theme.of(context).colorScheme.surface,
                               borderRadius: BorderRadius.circular(18),
                               border: Border.all(
-                                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1),
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurface.withValues(alpha: 0.1),
                               ),
                             ),
                             child: Column(
@@ -293,7 +354,10 @@ class GroupDetailScreen extends StatelessWidget {
                                 Text(
                                   'Create your first task and start tracking progress with the group.',
                                   style: GoogleFonts.inter(
-                                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurface
+                                        .withValues(alpha: 0.7),
                                     height: 1.4,
                                   ),
                                 ),
@@ -301,12 +365,16 @@ class GroupDetailScreen extends StatelessWidget {
                                 SizedBox(
                                   width: double.infinity,
                                   child: ElevatedButton.icon(
-                                    onPressed: () => _createTask(context, liveGroup),
+                                    onPressed: () =>
+                                        _createTask(context, liveGroup),
                                     icon: const Icon(Icons.add_task_rounded),
-                                    label: const Text('Create First Group Task'),
+                                    label: const Text(
+                                      'Create First Group Task',
+                                    ),
                                     style: ElevatedButton.styleFrom(
-                                      backgroundColor:
-                                          Theme.of(context).colorScheme.primary,
+                                      backgroundColor: Theme.of(
+                                        context,
+                                      ).colorScheme.primary,
                                       foregroundColor: Colors.black,
                                     ),
                                   ),
@@ -318,44 +386,56 @@ class GroupDetailScreen extends StatelessWidget {
                           Column(
                             children: tasks.map((task) {
                               final completedToday =
-                                  uid.isNotEmpty && task.isCompletedOnDate(uid, now);
-                              final completedTodayCount = task.completions.values
+                                  uid.isNotEmpty &&
+                                  task.isCompletedOnDate(uid, now);
+                              final completedTodayCount = task
+                                  .completions
+                                  .values
                                   .map(
-                                    (dates) => dates.where(
-                                      (date) =>
-                                          date.year == now.year &&
-                                          date.month == now.month &&
-                                          date.day == now.day,
-                                    ).length,
+                                    (dates) => dates
+                                        .where(
+                                          (date) =>
+                                              date.year == now.year &&
+                                              date.month == now.month &&
+                                              date.day == now.day,
+                                        )
+                                        .length,
                                   )
                                   .fold<int>(0, (sum, value) => sum + value);
                               final todayValue = uid.isEmpty
                                   ? null
                                   : task.completionValueFor(uid, now);
-                                final progress = (task.isQuantified &&
-                                    task.quantMax > 0 &&
-                                    todayValue != null)
+                              final progress =
+                                  (task.isQuantified &&
+                                      task.quantMax > 0 &&
+                                      todayValue != null)
                                   ? (todayValue / task.quantMax)
-                                    .clamp(0.0, 1.0)
-                                    .toDouble()
+                                        .clamp(0.0, 1.0)
+                                        .toDouble()
                                   : 0.0;
 
-                                final taskCard = Container(
+                              final taskCard = Container(
                                 width: double.infinity,
-                                margin: const EdgeInsets.only(bottom: AppLayout.sm),
+                                margin: const EdgeInsets.only(
+                                  bottom: AppLayout.sm,
+                                ),
                                 padding: const EdgeInsets.all(AppLayout.md),
                                 decoration: BoxDecoration(
                                   color: Theme.of(context).colorScheme.surface,
                                   borderRadius: BorderRadius.circular(18),
                                   border: Border.all(
-                                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1),
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurface
+                                        .withValues(alpha: 0.1),
                                   ),
                                 ),
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Row(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
                                         Expanded(
                                           child: Column(
@@ -369,12 +449,19 @@ class GroupDetailScreen extends StatelessWidget {
                                                   fontWeight: FontWeight.w700,
                                                 ),
                                               ),
-                                              if (task.description.isNotEmpty) ...[
+                                              if (task
+                                                  .description
+                                                  .isNotEmpty) ...[
                                                 const VGap(AppLayout.xs),
                                                 Text(
                                                   task.description,
                                                   style: GoogleFonts.inter(
-                                                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.72),
+                                                    color: Theme.of(context)
+                                                        .colorScheme
+                                                        .onSurface
+                                                        .withValues(
+                                                          alpha: 0.72,
+                                                        ),
                                                     height: 1.4,
                                                   ),
                                                 ),
@@ -382,23 +469,42 @@ class GroupDetailScreen extends StatelessWidget {
                                             ],
                                           ),
                                         ),
-                                        if (!task.isQuantified)
-                                          IconButton.filledTonal(
-                                            tooltip: completedToday
-                                                ? 'Undo today'
-                                                : 'Mark done today',
-                                            onPressed: uid.isEmpty
-                                                ? null
-                                                : () => _toggleCheckboxTask(
-                                                      context,
-                                                      task,
-                                                    ),
-                                            icon: Icon(
-                                              completedToday
-                                                  ? Icons.check_circle_rounded
-                                                  : Icons.radio_button_unchecked_rounded,
-                                            ),
-                                          ),
+                                        Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            if (!task.isQuantified)
+                                              IconButton.filledTonal(
+                                                tooltip: completedToday
+                                                    ? 'Undo today'
+                                                    : 'Mark done today',
+                                                onPressed: uid.isEmpty
+                                                    ? null
+                                                    : () => _toggleCheckboxTask(
+                                                        context,
+                                                        task,
+                                                      ),
+                                                icon: Icon(
+                                                  completedToday
+                                                      ? Icons
+                                                            .check_circle_rounded
+                                                      : Icons
+                                                            .radio_button_unchecked_rounded,
+                                                ),
+                                              ),
+                                            if (isGroupAdmin)
+                                              IconButton(
+                                                tooltip: 'Edit task',
+                                                onPressed: () => _editTask(
+                                                  context,
+                                                  liveGroup,
+                                                  task,
+                                                ),
+                                                icon: const Icon(
+                                                  Icons.edit_rounded,
+                                                ),
+                                              ),
+                                          ],
+                                        ),
                                       ],
                                     ),
                                     const VGap(AppLayout.sm),
@@ -412,15 +518,23 @@ class GroupDetailScreen extends StatelessWidget {
                                             vertical: 6,
                                           ),
                                           decoration: BoxDecoration(
-                                            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.08),
-                                            borderRadius: BorderRadius.circular(999),
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .onSurface
+                                                .withValues(alpha: 0.08),
+                                            borderRadius: BorderRadius.circular(
+                                              999,
+                                            ),
                                           ),
                                           child: Text(
                                             '$completedTodayCount completed today',
                                             style: GoogleFonts.inter(
                                               fontSize: 11,
                                               fontWeight: FontWeight.w700,
-                                              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.82),
+                                              color: Theme.of(context)
+                                                  .colorScheme
+                                                  .onSurface
+                                                  .withValues(alpha: 0.82),
                                             ),
                                           ),
                                         ),
@@ -439,13 +553,13 @@ class GroupDetailScreen extends StatelessWidget {
                                                   BorderRadius.circular(999),
                                             ),
                                             child: Text(
-                                              'Today: ${(todayValue ?? 0).toStringAsFixed(1)}/${task.quantMax.toStringAsFixed(1)} ${task.quantUnit}',
+                                              'Today: ${formatQuantity(todayValue ?? 0, maxDecimals: 1)}/${formatQuantity(task.quantMax, maxDecimals: 1)} ${task.quantUnit}',
                                               style: GoogleFonts.inter(
                                                 fontSize: 11,
                                                 fontWeight: FontWeight.w700,
-                                                color: Theme.of(context)
-                                                    .colorScheme
-                                                    .primary,
+                                                color: Theme.of(
+                                                  context,
+                                                ).colorScheme.primary,
                                               ),
                                             ),
                                           )
@@ -458,14 +572,17 @@ class GroupDetailScreen extends StatelessWidget {
                                             decoration: BoxDecoration(
                                               color: completedToday
                                                   ? Theme.of(context)
-                                                      .colorScheme
-                                                      .primary
-                                                      .withValues(alpha: 0.16)
+                                                        .colorScheme
+                                                        .primary
+                                                        .withValues(alpha: 0.16)
                                                   : Theme.of(context)
-                                                    .colorScheme
-                                                    .onSurface
-                                                    .withValues(alpha: 0.08),
-                                              borderRadius: BorderRadius.circular(999),
+                                                        .colorScheme
+                                                        .onSurface
+                                                        .withValues(
+                                                          alpha: 0.08,
+                                                        ),
+                                              borderRadius:
+                                                  BorderRadius.circular(999),
                                             ),
                                             child: Text(
                                               completedToday
@@ -475,13 +592,15 @@ class GroupDetailScreen extends StatelessWidget {
                                                 fontSize: 11,
                                                 fontWeight: FontWeight.w700,
                                                 color: completedToday
-                                                    ? Theme.of(context)
-                                                        .colorScheme
-                                                        .primary
+                                                    ? Theme.of(
+                                                        context,
+                                                      ).colorScheme.primary
                                                     : Theme.of(context)
-                                                        .colorScheme
-                                                        .onSurface
-                                                        .withValues(alpha: 0.82),
+                                                          .colorScheme
+                                                          .onSurface
+                                                          .withValues(
+                                                            alpha: 0.82,
+                                                          ),
                                               ),
                                             ),
                                           ),
@@ -492,12 +611,13 @@ class GroupDetailScreen extends StatelessWidget {
                                       LinearProgressIndicator(
                                         value: progress,
                                         minHeight: 7,
-                                        borderRadius: BorderRadius.circular(999),
-                                        backgroundColor:
-                                            Theme.of(context)
-                                                .colorScheme
-                                                .onSurface
-                                                .withValues(alpha: 0.12),
+                                        borderRadius: BorderRadius.circular(
+                                          999,
+                                        ),
+                                        backgroundColor: Theme.of(context)
+                                            .colorScheme
+                                            .onSurface
+                                            .withValues(alpha: 0.12),
                                       ),
                                     ],
                                   ],
@@ -530,12 +650,12 @@ class GroupDetailScreen extends StatelessWidget {
                                               ),
                                               FilledButton(
                                                 style: FilledButton.styleFrom(
-                                                  backgroundColor: Theme.of(context)
-                                                      .colorScheme
-                                                      .error,
-                                                  foregroundColor: Theme.of(context)
-                                                      .colorScheme
-                                                      .onError,
+                                                  backgroundColor: Theme.of(
+                                                    context,
+                                                  ).colorScheme.error,
+                                                  foregroundColor: Theme.of(
+                                                    context,
+                                                  ).colorScheme.onError,
                                                 ),
                                                 onPressed: () => Navigator.pop(
                                                   dialogContext,
@@ -555,17 +675,20 @@ class GroupDetailScreen extends StatelessWidget {
                                 background: Container(
                                   alignment: Alignment.centerRight,
                                   padding: const EdgeInsets.only(right: 30),
-                                  margin: const EdgeInsets.only(bottom: AppLayout.sm),
+                                  margin: const EdgeInsets.only(
+                                    bottom: AppLayout.sm,
+                                  ),
                                   decoration: BoxDecoration(
-                                    color: Theme.of(context)
-                                        .colorScheme
-                                        .error
-                                        .withValues(alpha: 0.85),
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.error.withValues(alpha: 0.85),
                                     borderRadius: BorderRadius.circular(18),
                                   ),
                                   child: Icon(
                                     Icons.delete_sweep_rounded,
-                                    color: Theme.of(context).colorScheme.onError,
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.onError,
                                     size: 30,
                                   ),
                                 ),
@@ -610,9 +733,11 @@ class _GroupPulseCard extends StatelessWidget {
   }
 
   Map<String, int> _weekCounts(DateTime now) {
-    final start = DateTime(now.year, now.month, now.day).subtract(
-      const Duration(days: 6),
-    );
+    final start = DateTime(
+      now.year,
+      now.month,
+      now.day,
+    ).subtract(const Duration(days: 6));
     final end = DateTime(now.year, now.month, now.day, 23, 59, 59);
 
     final counts = <String, int>{};
@@ -698,7 +823,9 @@ class _GroupPulseCard extends StatelessWidget {
             color: Theme.of(context).colorScheme.surface,
             borderRadius: BorderRadius.circular(18),
             border: Border.all(
-              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1),
+              color: Theme.of(
+                context,
+              ).colorScheme.onSurface.withValues(alpha: 0.1),
             ),
           ),
           child: Column(
@@ -715,7 +842,9 @@ class _GroupPulseCard extends StatelessWidget {
               Text(
                 nextAction,
                 style: GoogleFonts.inter(
-                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.72),
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.onSurface.withValues(alpha: 0.72),
                   height: 1.4,
                 ),
               ),
@@ -759,7 +888,9 @@ class _PulseChip extends StatelessWidget {
         style: GoogleFonts.inter(
           fontSize: 11,
           fontWeight: FontWeight.w700,
-          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.82),
+          color: Theme.of(
+            context,
+          ).colorScheme.onSurface.withValues(alpha: 0.82),
         ),
       ),
     );
@@ -773,6 +904,207 @@ class _InviteMembersSheet extends StatefulWidget {
 
   @override
   State<_InviteMembersSheet> createState() => _InviteMembersSheetState();
+}
+
+class _GroupMembersSheet extends StatelessWidget {
+  final Group group;
+
+  const _GroupMembersSheet({required this.group});
+
+  Future<List<UserProfile>> _loadMembers() async {
+    final social = SocialService();
+    final memberIds = group.memberIds
+        .map((id) => id.trim())
+        .where((id) => id.isNotEmpty)
+        .toList();
+
+    final profiles = await Future.wait(
+      memberIds.map((id) => social.getUserProfile(id)),
+    );
+
+    final resolved = <UserProfile>[];
+    for (var i = 0; i < memberIds.length; i++) {
+      final uid = memberIds[i];
+      final profile = profiles[i];
+      if (profile != null) {
+        resolved.add(profile);
+      } else {
+        resolved.add(
+          UserProfile(
+            uid: uid,
+            email: '',
+            displayName: uid,
+            username: null,
+            photoUrl: null,
+            friends: const <String>[],
+          ),
+        );
+      }
+    }
+
+    resolved.sort((a, b) {
+      if (a.uid == group.ownerId) return -1;
+      if (b.uid == group.ownerId) return 1;
+      return a.displayName.toLowerCase().compareTo(b.displayName.toLowerCase());
+    });
+    return resolved;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          AppLayout.lg,
+          AppLayout.md,
+          AppLayout.lg,
+          AppLayout.md + MediaQuery.of(context).viewInsets.bottom,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Group members',
+              style: GoogleFonts.outfit(
+                fontSize: 22,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const VGap(AppLayout.xs),
+            Text(
+              '${group.memberIds.length} member${group.memberIds.length == 1 ? '' : 's'} in ${group.name}',
+              style: GoogleFonts.inter(
+                color: Theme.of(
+                  context,
+                ).colorScheme.onSurface.withValues(alpha: 0.72),
+              ),
+            ),
+            const VGap(AppLayout.md),
+            Flexible(
+              child: FutureBuilder<List<UserProfile>>(
+                future: _loadMembers(),
+                builder: (context, snapshot) {
+                  if (!snapshot.hasData) {
+                    return const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 18),
+                      child: Center(child: CircularProgressIndicator()),
+                    );
+                  }
+
+                  final members = snapshot.data!;
+                  if (members.isEmpty) {
+                    return Text(
+                      'No members found in this group.',
+                      style: GoogleFonts.inter(
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.onSurface.withValues(alpha: 0.68),
+                      ),
+                    );
+                  }
+
+                  return ListView.separated(
+                    shrinkWrap: true,
+                    itemCount: members.length,
+                    separatorBuilder: (_, _) => Divider(
+                      height: 1,
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withValues(alpha: 0.08),
+                    ),
+                    itemBuilder: (context, index) {
+                      final member = members[index];
+                      final isOwner = member.uid == group.ownerId;
+                      final subtitle =
+                          member.username != null &&
+                              member.username!.trim().isNotEmpty
+                          ? '@${member.username!.trim()}'
+                          : null;
+
+                      return ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: CircleAvatar(
+                          backgroundColor: Theme.of(
+                            context,
+                          ).colorScheme.onSurface.withValues(alpha: 0.08),
+                          backgroundImage:
+                              member.photoUrl != null &&
+                                  member.photoUrl!.trim().isNotEmpty
+                              ? NetworkImage(member.photoUrl!.trim())
+                              : null,
+                          child:
+                              member.photoUrl != null &&
+                                  member.photoUrl!.trim().isNotEmpty
+                              ? null
+                              : Text(
+                                  (member.displayName.isEmpty
+                                          ? '?'
+                                          : member.displayName[0])
+                                      .toUpperCase(),
+                                  style: GoogleFonts.inter(
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                        ),
+                        title: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                member.displayName.isEmpty
+                                    ? member.uid
+                                    : member.displayName,
+                                style: GoogleFonts.inter(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                            if (isOwner)
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.primary.withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(999),
+                                ),
+                                child: Text(
+                                  'Admin',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.primary,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                        subtitle: subtitle == null
+                            ? null
+                            : Text(
+                                subtitle,
+                                style: GoogleFonts.inter(
+                                  color: Theme.of(context).colorScheme.onSurface
+                                      .withValues(alpha: 0.62),
+                                ),
+                              ),
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class _InviteMembersSheetState extends State<_InviteMembersSheet> {
@@ -804,9 +1136,9 @@ class _InviteMembersSheetState extends State<_InviteMembersSheet> {
       }
 
       Navigator.pop(context);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Group invites sent.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Group invites sent.')));
     } catch (error) {
       if (!mounted) {
         return;
@@ -853,7 +1185,9 @@ class _InviteMembersSheetState extends State<_InviteMembersSheet> {
             Text(
               'Select friends to invite to ${widget.group.name}.',
               style: GoogleFonts.inter(
-                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.72),
+                color: Theme.of(
+                  context,
+                ).colorScheme.onSurface.withValues(alpha: 0.72),
               ),
             ),
             const VGap(AppLayout.md),
@@ -868,14 +1202,18 @@ class _InviteMembersSheetState extends State<_InviteMembersSheet> {
                 }
 
                 final inviteableFriends = snapshot.data!
-                    .where((friend) => !widget.group.memberIds.contains(friend.uid))
+                    .where(
+                      (friend) => !widget.group.memberIds.contains(friend.uid),
+                    )
                     .toList();
 
                 if (inviteableFriends.isEmpty) {
                   return Text(
                     'All your friends are already in this group, or you have no friends yet.',
                     style: GoogleFonts.inter(
-                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.68),
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withValues(alpha: 0.68),
                     ),
                   );
                 }
@@ -887,7 +1225,9 @@ class _InviteMembersSheetState extends State<_InviteMembersSheet> {
                       spacing: 8,
                       runSpacing: 8,
                       children: inviteableFriends.map((friend) {
-                        final isSelected = _selectedFriendIds.contains(friend.uid);
+                        final isSelected = _selectedFriendIds.contains(
+                          friend.uid,
+                        );
                         return FilterChip(
                           label: Text(friend.displayName),
                           selected: isSelected,
@@ -896,14 +1236,11 @@ class _InviteMembersSheetState extends State<_InviteMembersSheet> {
                           labelStyle: GoogleFonts.inter(
                             color: isSelected
                                 ? Colors.black
-                                : Theme.of(context)
-                                    .colorScheme
-                                    .onSurface,
+                                : Theme.of(context).colorScheme.onSurface,
                           ),
-                          backgroundColor: Theme.of(context)
-                              .colorScheme
-                              .onSurface
-                              .withValues(alpha: 0.08),
+                          backgroundColor: Theme.of(
+                            context,
+                          ).colorScheme.onSurface.withValues(alpha: 0.08),
                           onSelected: (selected) {
                             setState(() {
                               if (selected) {
@@ -923,7 +1260,9 @@ class _InviteMembersSheetState extends State<_InviteMembersSheet> {
                       child: ElevatedButton(
                         onPressed: _isSubmitting ? null : _sendInvites,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Theme.of(context).colorScheme.primary,
+                          backgroundColor: Theme.of(
+                            context,
+                          ).colorScheme.primary,
                           foregroundColor: Colors.black,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(14),

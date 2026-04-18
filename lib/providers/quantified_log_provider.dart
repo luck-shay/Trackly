@@ -1,5 +1,7 @@
 import 'package:flutter/foundation.dart';
 
+import '../utils/quantity_format.dart';
+
 class QuantifiedLogProvider extends ChangeNotifier {
   final double min;
   final double max;
@@ -16,7 +18,8 @@ class QuantifiedLogProvider extends ChangeNotifier {
 
   double get value => _value;
   int get decimalPlaces => step < 1 ? 1 : 0;
-  String get formattedValue => _value.toStringAsFixed(decimalPlaces);
+  String get formattedValue =>
+      formatQuantity(_value, maxDecimals: decimalPlaces);
 
   int get divisions {
     final range = (max - min).abs();
@@ -35,6 +38,15 @@ class QuantifiedLogProvider extends ChangeNotifier {
   void increment() => setValue(_value + step);
 
   void decrement() => setValue(_value - step);
+
+  bool trySetFromText(String raw) {
+    final parsed = double.tryParse(raw.trim());
+    if (parsed == null || !parsed.isFinite) {
+      return false;
+    }
+    setValue(parsed);
+    return true;
+  }
 
   double _snap(double raw) {
     final clamped = raw.clamp(min, max).toDouble();

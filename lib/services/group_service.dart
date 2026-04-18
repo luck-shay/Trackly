@@ -207,10 +207,11 @@ class GroupService {
         .collection('tasks')
         .snapshots()
         .map(
-          (snapshot) => snapshot.docs
-              .map((doc) => GroupTask.fromMap(doc.data(), id: doc.id))
-              .toList()
-            ..sort((a, b) => b.createdAt.compareTo(a.createdAt)),
+          (snapshot) =>
+              snapshot.docs
+                  .map((doc) => GroupTask.fromMap(doc.data(), id: doc.id))
+                  .toList()
+                ..sort((a, b) => b.createdAt.compareTo(a.createdAt)),
         );
   }
 
@@ -248,7 +249,10 @@ class GroupService {
       return null;
     }
 
-    return GroupTask.fromMap(snapshot.docs.first.data(), id: snapshot.docs.first.id);
+    return GroupTask.fromMap(
+      snapshot.docs.first.data(),
+      id: snapshot.docs.first.id,
+    );
   }
 
   Future<void> syncTaskMirrorsForGroup(String groupId) async {
@@ -331,6 +335,51 @@ class GroupService {
     }
   }
 
+  Future<GroupTask> updateGroupTaskAsAdmin({
+    required GroupTask existingTask,
+    required String title,
+    String description = '',
+    required bool isQuantified,
+    required String quantUnit,
+    required double quantMax,
+  }) async {
+    if (userId.isEmpty) {
+      throw StateError('You must be signed in to update group tasks.');
+    }
+
+    final group = await getGroupById(existingTask.groupId);
+    if (group == null) {
+      throw StateError('Group not found.');
+    }
+
+    if (group.ownerId != userId) {
+      throw StateError('Only the group admin can edit tasks.');
+    }
+
+    final normalizedTitle = title.trim();
+    if (normalizedTitle.isEmpty) {
+      throw StateError('Task title cannot be empty.');
+    }
+
+    final normalizedUnit = quantUnit.trim().isEmpty
+        ? 'units'
+        : quantUnit.trim();
+    final normalizedQuantMax = quantMax.isFinite
+        ? quantMax.clamp(0.1, 100000).toDouble()
+        : existingTask.quantMax;
+
+    final updatedTask = existingTask.copyWith(
+      title: normalizedTitle,
+      description: description.trim(),
+      isQuantified: isQuantified,
+      quantUnit: normalizedUnit,
+      quantMax: normalizedQuantMax,
+    );
+
+    await saveGroupTask(updatedTask);
+    return updatedTask;
+  }
+
   Future<void> deleteGroupTask(String groupId, String taskId) async {
     if (userId.isEmpty) {
       throw StateError('You must be signed in to delete group tasks.');
@@ -374,12 +423,16 @@ class GroupService {
     final userDates = List<DateTime>.from(updatedCompletions[uid] ?? const []);
     final hadToday = userDates.any(
       (date) =>
-          date.year == now.year && date.month == now.month && date.day == now.day,
+          date.year == now.year &&
+          date.month == now.month &&
+          date.day == now.day,
     );
 
     userDates.removeWhere(
       (date) =>
-          date.year == now.year && date.month == now.month && date.day == now.day,
+          date.year == now.year &&
+          date.month == now.month &&
+          date.day == now.day,
     );
 
     if (!hadToday) {

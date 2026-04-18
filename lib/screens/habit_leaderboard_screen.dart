@@ -8,6 +8,7 @@ import '../providers/group_interaction_provider.dart';
 import '../providers/habit_leaderboard_provider.dart';
 import '../providers/habits_provider.dart';
 import '../services/social_service.dart';
+import '../utils/quantity_format.dart';
 import 'create_habit_screen.dart';
 import '../widgets/calendar_activity_sheet.dart';
 
@@ -18,14 +19,18 @@ class HabitLeaderboardScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProxyProvider<HabitsProvider, HabitLeaderboardProvider>(
+    return ChangeNotifierProxyProvider<
+      HabitsProvider,
+      HabitLeaderboardProvider
+    >(
       create: (_) => HabitLeaderboardProvider(habit),
       update: (_, habitsProvider, provider) {
         final liveHabit = habitsProvider.habits.firstWhere(
           (candidate) => candidate.id == habit.id,
           orElse: () => habit,
         );
-        final leaderboardProvider = provider ?? HabitLeaderboardProvider(liveHabit);
+        final leaderboardProvider =
+            provider ?? HabitLeaderboardProvider(liveHabit);
         leaderboardProvider.syncWithHabit(liveHabit);
         return leaderboardProvider;
       },
@@ -72,8 +77,6 @@ class _HabitLeaderboardView extends StatelessWidget {
       ).showSnackBar(const SnackBar(content: Text('You left the group.')));
     }
   }
-
-
 
   Future<void> _showInviteMembersSheet(
     BuildContext context,
@@ -349,6 +352,15 @@ class _HabitLeaderboardView extends StatelessWidget {
                       ),
                     ),
                     if (taskProvider.isQuantified) ...[
+                      TextFormField(
+                        initialValue: taskProvider.quantUnit,
+                        onChanged: taskProvider.setQuantUnit,
+                        decoration: const InputDecoration(
+                          labelText: 'Unit',
+                          hintText: 'e.g. km, pages, units',
+                        ),
+                      ),
+                      const SizedBox(height: 10),
                       Wrap(
                         spacing: 8,
                         runSpacing: 8,
@@ -368,6 +380,30 @@ class _HabitLeaderboardView extends StatelessWidget {
                         }).toList(),
                       ),
                       const SizedBox(height: 10),
+                      TextFormField(
+                        initialValue: formatQuantity(
+                          taskProvider.quantMax,
+                          maxDecimals: taskProvider.quantDecimals,
+                        ),
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        decoration: InputDecoration(
+                          labelText: 'Daily target',
+                          hintText: 'Enter max value',
+                          suffixText: taskProvider.quantUnit,
+                        ),
+                        onChanged: (raw) {
+                          final parsed = double.tryParse(raw.trim());
+                          if (parsed == null ||
+                              !parsed.isFinite ||
+                              parsed <= 0) {
+                            return;
+                          }
+                          taskProvider.setQuantMax(parsed);
+                        },
+                      ),
+                      const SizedBox(height: 10),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
@@ -381,7 +417,7 @@ class _HabitLeaderboardView extends StatelessWidget {
                             ),
                           ),
                           Text(
-                            '${taskProvider.quantMax.toStringAsFixed(taskProvider.quantDecimals)} ${taskProvider.quantUnit}',
+                            '${formatQuantity(taskProvider.quantMax, maxDecimals: taskProvider.quantDecimals)} ${taskProvider.quantUnit}',
                             style: GoogleFonts.inter(
                               color: Theme.of(context).colorScheme.primary,
                               fontWeight: FontWeight.w700,
@@ -544,7 +580,9 @@ class _HabitLeaderboardView extends StatelessWidget {
                       ElevatedButton.icon(
                         onPressed: () async {
                           if (habit.spaceType == HabitSpaceType.individual) {
-                            await context.read<HabitsProvider>().convertToSharedSpace(habit);
+                            await context
+                                .read<HabitsProvider>()
+                                .convertToSharedSpace(habit);
                           }
                           if (context.mounted) {
                             _showInviteMembersSheet(context, habit);
@@ -703,9 +741,9 @@ class _HabitLeaderboardView extends StatelessWidget {
                         ),
                         subtitle: Text(
                           '${user.username != null ? '@${user.username}' : user.email}  •  ${habit.hasMemberDefinedGroupTasks
-                              ? '${habit.taskFor(user.uid).isEmpty ? 'No task set yet' : habit.taskFor(user.uid)}${userIsQuantified && todayValue != null ? ' • ${todayValue.toStringAsFixed(1)} / ${userQuantMax.toStringAsFixed(1)} $userQuantUnit ($todayProgress%)' : ''}'
+                              ? '${habit.taskFor(user.uid).isEmpty ? 'No task set yet' : habit.taskFor(user.uid)}${userIsQuantified && todayValue != null ? ' • ${formatQuantity(todayValue, maxDecimals: 1)} / ${formatQuantity(userQuantMax, maxDecimals: 1)} $userQuantUnit ($todayProgress%)' : ''}'
                               : userIsQuantified && todayValue != null
-                              ? '${todayValue.toStringAsFixed(1)} / ${userQuantMax.toStringAsFixed(1)} $userQuantUnit ($todayProgress%)'
+                              ? '${formatQuantity(todayValue, maxDecimals: 1)} / ${formatQuantity(userQuantMax, maxDecimals: 1)} $userQuantUnit ($todayProgress%)'
                               : 'Tap for activity'}',
                           style: GoogleFonts.inter(
                             fontSize: 12,

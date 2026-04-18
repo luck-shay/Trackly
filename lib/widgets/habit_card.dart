@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+
 import '../models/habit.dart';
+import '../utils/quantity_format.dart';
 
 class HabitCard extends StatefulWidget {
   final Habit habit;
@@ -43,13 +45,13 @@ class _HabitCardState extends State<HabitCard>
     final scheme = Theme.of(context).colorScheme;
     DateTime now = DateTime.now();
     final groupTaskTitle = widget.habit.hasMemberDefinedGroupTasks
-      ? (widget.habit.taskFor(widget.currentUserId).trim().isEmpty
-          ? 'No personal task set yet'
-          : widget.habit.taskFor(widget.currentUserId).trim())
-      : widget.habit.title;
+        ? (widget.habit.taskFor(widget.currentUserId).trim().isEmpty
+              ? 'No personal task set yet'
+              : widget.habit.taskFor(widget.currentUserId).trim())
+        : widget.habit.title;
     final primaryTitle = widget.habit.isGroup
-      ? groupTaskTitle
-      : widget.habit.displayTitle;
+        ? groupTaskTitle
+        : widget.habit.displayTitle;
     final groupLabel = (widget.habit.groupName ?? '').trim();
     final todayValue = widget.habit.completionValueFor(
       widget.currentUserId,
@@ -63,7 +65,6 @@ class _HabitCardState extends State<HabitCard>
     final userIsQuantified = widget.habit.isQuantifiedFor(widget.currentUserId);
     final userQuantUnit = widget.habit.quantUnitFor(widget.currentUserId);
     final userQuantMax = widget.habit.quantMaxFor(widget.currentUserId);
-    final hasQuantProgress = userIsQuantified && todayValue != null;
     final completedToday = widget.habit.isCompletedOnDate(
       widget.currentUserId,
       now,
@@ -86,8 +87,8 @@ class _HabitCardState extends State<HabitCard>
         borderRadius: BorderRadius.circular(24),
         border: Border.all(
           color: completedToday
-            ? scheme.primary.withValues(alpha: 0.35)
-            : scheme.onSurface.withValues(alpha: 0.08),
+              ? scheme.primary.withValues(alpha: 0.35)
+              : scheme.onSurface.withValues(alpha: 0.08),
         ),
         boxShadow: [
           BoxShadow(
@@ -125,7 +126,7 @@ class _HabitCardState extends State<HabitCard>
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           color: completedToday
-                                ? scheme.primary
+                              ? scheme.primary
                               : Colors.transparent,
                           border: Border.all(
                             color: completedToday
@@ -182,8 +183,10 @@ class _HabitCardState extends State<HabitCard>
                                     fontSize: 20,
                                     fontWeight: FontWeight.w600,
                                     color: completedToday
-                                      ? scheme.onSurface.withValues(alpha: 0.6)
-                                      : scheme.onSurface,
+                                        ? scheme.onSurface.withValues(
+                                            alpha: 0.6,
+                                          )
+                                        : scheme.onSurface,
                                     decoration: completedToday
                                         ? TextDecoration.lineThrough
                                         : null,
@@ -197,30 +200,27 @@ class _HabitCardState extends State<HabitCard>
                             ],
                           ),
                           const SizedBox(height: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 5,
-                            ),
-                            decoration: BoxDecoration(
-                              color: widget.habit.isGroup
-                                  ? Theme.of(
-                                      context,
-                                    ).colorScheme.secondary.withValues(alpha: 0.14)
-                                  : scheme.onSurface.withValues(alpha: 0.06),
-                              borderRadius: BorderRadius.circular(999),
-                            ),
-                            child: Text(
-                              widget.habit.spaceType.label,
-                              style: GoogleFonts.inter(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: widget.habit.isGroup
-                                    ? Theme.of(context).colorScheme.secondary
-                                    : scheme.onSurface.withValues(alpha: 0.65),
+                          if (!widget.habit.isGroup)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 5,
+                              ),
+                              decoration: BoxDecoration(
+                                color: scheme.onSurface.withValues(alpha: 0.06),
+                                borderRadius: BorderRadius.circular(999),
+                              ),
+                              child: Text(
+                                widget.habit.spaceType.label,
+                                style: GoogleFonts.inter(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: scheme.onSurface.withValues(
+                                    alpha: 0.65,
+                                  ),
+                                ),
                               ),
                             ),
-                          ),
                           if (widget.habit.isGroup &&
                               groupLabel.isNotEmpty) ...[
                             const SizedBox(height: 4),
@@ -232,28 +232,6 @@ class _HabitCardState extends State<HabitCard>
                               ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                            ),
-                          ],
-                          if (userIsQuantified && completedToday) ...[
-                            const SizedBox(height: 6),
-                            Text(
-                              '${(todayValue ?? 0).toStringAsFixed(1)} / ${userQuantMax.toStringAsFixed(1)} $userQuantUnit • $quantProgressPct% completed',
-                              style: GoogleFonts.inter(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w700,
-                                color: Theme.of(context).colorScheme.primary,
-                              ),
-                            ),
-                          ],
-                          if (hasQuantProgress && !completedToday) ...[
-                            const SizedBox(height: 6),
-                            Text(
-                              '${todayValue.toStringAsFixed(1)} / ${userQuantMax.toStringAsFixed(1)} $userQuantUnit • $quantProgressPct% completed',
-                              style: GoogleFonts.inter(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w700,
-                                color: Theme.of(context).colorScheme.secondary,
-                              ),
                             ),
                           ],
                           if (widget.habit.description.isNotEmpty) ...[
@@ -335,15 +313,53 @@ class _HabitCardState extends State<HabitCard>
                 ),
                 if (userIsQuantified) ...[
                   const SizedBox(height: 12),
+                  Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            '${formatQuantity(todayValue ?? 0, maxDecimals: 1)} $userQuantUnit',
+                            style: GoogleFonts.inter(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: completedToday
+                                  ? Theme.of(context).colorScheme.primary
+                                  : Theme.of(context).colorScheme.secondary,
+                            ),
+                          ),
+                          Text(
+                            '${formatQuantity(userQuantMax, maxDecimals: 1)} $userQuantUnit',
+                            style: GoogleFonts.inter(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onSurface.withValues(alpha: 0.72),
+                            ),
+                          ),
+                        ],
+                      ),
+                      Text(
+                        '$quantProgressPct%',
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.onSurface.withValues(alpha: 0.85),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
                   LinearProgressIndicator(
                     value: quantProgress.clamp(0.0, 1.0),
                     minHeight: 7,
                     borderRadius: BorderRadius.circular(999),
-                    backgroundColor:
-                        scheme.onSurface.withValues(alpha: 0.12),
-                    valueColor: AlwaysStoppedAnimation<Color>(
-                      scheme.primary,
-                    ),
+                    backgroundColor: scheme.onSurface.withValues(alpha: 0.12),
+                    valueColor: AlwaysStoppedAnimation<Color>(scheme.primary),
                   ),
                 ],
                 const SizedBox(height: 16),

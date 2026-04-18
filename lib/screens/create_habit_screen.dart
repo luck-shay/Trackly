@@ -7,6 +7,7 @@ import '../models/habit.dart';
 import '../services/social_service.dart';
 import '../providers/create_habit_provider.dart';
 import '../theme/app_layout.dart';
+import '../utils/quantity_format.dart';
 
 class CreateHabitScreen extends StatelessWidget {
   final HabitSpaceType initialSpaceType;
@@ -294,9 +295,7 @@ class _CreateHabitViewState extends State<_CreateHabitView> {
                             labelStyle: GoogleFonts.inter(
                               color: isSelected
                                   ? Colors.black
-                                  : Theme.of(context)
-                                      .colorScheme
-                                      .onSurface,
+                                  : Theme.of(context).colorScheme.onSurface,
                               fontWeight: FontWeight.w600,
                             ),
                           );
@@ -316,7 +315,7 @@ class _CreateHabitViewState extends State<_CreateHabitView> {
                             ),
                           ),
                           Text(
-                            '${provider.quantMax.toStringAsFixed(provider.quantValueDecimals)} ${provider.quantUnit}',
+                            '${formatQuantity(provider.quantMax, maxDecimals: provider.quantValueDecimals)} ${provider.quantUnit}',
                             style: GoogleFonts.inter(
                               color: Theme.of(context).colorScheme.primary,
                               fontWeight: FontWeight.w700,
@@ -462,9 +461,7 @@ class _CreateHabitViewState extends State<_CreateHabitView> {
                             labelStyle: GoogleFonts.inter(
                               color: isSelected
                                   ? Colors.black
-                                  : Theme.of(context)
-                                      .colorScheme
-                                      .onSurface,
+                                  : Theme.of(context).colorScheme.onSurface,
                               fontWeight: FontWeight.w600,
                             ),
                           );
@@ -548,7 +545,7 @@ class _CreateHabitViewState extends State<_CreateHabitView> {
                   );
                 },
               ).animate().fade(delay: 350.ms),
-              
+
               const VGap(AppLayout.xxl),
 
               Text(
@@ -556,7 +553,9 @@ class _CreateHabitViewState extends State<_CreateHabitView> {
                 style: GoogleFonts.inter(
                   fontSize: 12,
                   fontWeight: FontWeight.bold,
-                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.68),
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.onSurface.withValues(alpha: 0.68),
                   letterSpacing: 1.2,
                 ),
               ).animate().fade(delay: 375.ms),
@@ -569,8 +568,12 @@ class _CreateHabitViewState extends State<_CreateHabitView> {
                       final now = TimeOfDay.now();
                       final initialTime = provider.reminderTime != null
                           ? TimeOfDay(
-                              hour: int.parse(provider.reminderTime!.split(':')[0]),
-                              minute: int.parse(provider.reminderTime!.split(':')[1]),
+                              hour: int.parse(
+                                provider.reminderTime!.split(':')[0],
+                              ),
+                              minute: int.parse(
+                                provider.reminderTime!.split(':')[1],
+                              ),
                             )
                           : now;
 
@@ -608,10 +611,9 @@ class _CreateHabitViewState extends State<_CreateHabitView> {
                         Icons.notifications_active_rounded,
                         color: provider.reminderTime != null
                             ? Theme.of(context).colorScheme.primary
-                            : Theme.of(context)
-                                .colorScheme
-                                .onSurface
-                                .withValues(alpha: 0.58),
+                            : Theme.of(
+                                context,
+                              ).colorScheme.onSurface.withValues(alpha: 0.58),
                       ),
                     ),
                     title: Text(
@@ -621,10 +623,9 @@ class _CreateHabitViewState extends State<_CreateHabitView> {
                         fontWeight: FontWeight.w600,
                         color: provider.reminderTime != null
                             ? Theme.of(context).colorScheme.onSurface
-                            : Theme.of(context)
-                                .colorScheme
-                                .onSurface
-                                .withValues(alpha: 0.58),
+                            : Theme.of(
+                                context,
+                              ).colorScheme.onSurface.withValues(alpha: 0.58),
                       ),
                     ),
                     trailing: provider.reminderTime != null
@@ -636,7 +637,6 @@ class _CreateHabitViewState extends State<_CreateHabitView> {
                   );
                 },
               ).animate().fade(delay: 400.ms).slideX(begin: 0.05),
-
 
               const VGap(AppLayout.xxl),
 
@@ -730,19 +730,14 @@ class _CreateHabitViewState extends State<_CreateHabitView> {
                                 labelStyle: GoogleFonts.inter(
                                   color: isSelected
                                       ? Theme.of(context).colorScheme.onPrimary
-                                      : Theme.of(context)
-                                            .colorScheme
-                                            .onSurface
+                                      : Theme.of(context).colorScheme.onSurface
                                             .withValues(alpha: 0.9),
                                 ),
-                                backgroundColor: Theme.of(context)
-                                    .colorScheme
-                                    .onSurface
-                                    .withValues(alpha: 0.06),
+                                backgroundColor: Theme.of(
+                                  context,
+                                ).colorScheme.onSurface.withValues(alpha: 0.06),
                                 side: BorderSide(
-                                  color: Theme.of(context)
-                                      .colorScheme
-                                      .onSurface
+                                  color: Theme.of(context).colorScheme.onSurface
                                       .withValues(alpha: 0.2),
                                 ),
                                 checkmarkColor: Colors.black,
@@ -768,73 +763,77 @@ class _CreateHabitViewState extends State<_CreateHabitView> {
                   onPressed: _isSubmitting
                       ? null
                       : () async {
-                    if (_formKey.currentState!.validate()) {
-                      final provider = context.read<CreateHabitProvider>();
-                      final wasEditMode = provider.isEditMode;
-                      final title = _titleController.text.trim();
-                      final description = _descriptionController.text.trim();
-                      final groupName = _groupNameController.text.trim();
+                          if (_formKey.currentState!.validate()) {
+                            final provider = context
+                                .read<CreateHabitProvider>();
+                            final wasEditMode = provider.isEditMode;
+                            final title = _titleController.text.trim();
+                            final description = _descriptionController.text
+                                .trim();
+                            final groupName = _groupNameController.text.trim();
 
-                      if (provider.spaceType == HabitSpaceType.group &&
-                          groupName.isEmpty) {
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Please add a group name.'),
-                            ),
-                          );
-                        }
-                        return;
-                      }
+                            if (provider.spaceType == HabitSpaceType.group &&
+                                groupName.isEmpty) {
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Please add a group name.'),
+                                  ),
+                                );
+                              }
+                              return;
+                            }
 
-                      setState(() {
-                        _isSubmitting = true;
-                      });
-
-                      try {
-                        final newHabit = await context
-                            .read<CreateHabitProvider>()
-                            .saveHabit(
-                              title: title,
-                              description: description,
-                              groupName: groupName,
-                            );
-                        if (context.mounted) {
-                          if (!wasEditMode) {
-                            final createdLabel =
-                                provider.spaceType == HabitSpaceType.group
-                                ? 'Group created'
-                                : provider.spaceType == HabitSpaceType.individual
-                                ? 'Task created'
-                                : 'Shared task created';
-                            Navigator.pop(context, {
-                              'habit': newHabit,
-                              'snackbarMessage': '$createdLabel: ${newHabit.displayTitle}',
+                            setState(() {
+                              _isSubmitting = true;
                             });
-                            return;
-                          }
 
-                          Navigator.pop(context, {'habit': newHabit});
-                        }
-                      } catch (error) {
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                'Could not create habit. ${error.toString().split('\n').first}',
-                              ),
-                            ),
-                          );
-                        }
-                      } finally {
-                        if (mounted) {
-                          setState(() {
-                            _isSubmitting = false;
-                          });
-                        }
-                      }
-                    }
-                  },
+                            try {
+                              final newHabit = await context
+                                  .read<CreateHabitProvider>()
+                                  .saveHabit(
+                                    title: title,
+                                    description: description,
+                                    groupName: groupName,
+                                  );
+                              if (context.mounted) {
+                                if (!wasEditMode) {
+                                  final createdLabel =
+                                      provider.spaceType == HabitSpaceType.group
+                                      ? 'Group created'
+                                      : provider.spaceType ==
+                                            HabitSpaceType.individual
+                                      ? 'Task created'
+                                      : 'Shared task created';
+                                  Navigator.pop(context, {
+                                    'habit': newHabit,
+                                    'snackbarMessage':
+                                        '$createdLabel: ${newHabit.displayTitle}',
+                                  });
+                                  return;
+                                }
+
+                                Navigator.pop(context, {'habit': newHabit});
+                              }
+                            } catch (error) {
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      'Could not create habit. ${error.toString().split('\n').first}',
+                                    ),
+                                  ),
+                                );
+                              }
+                            } finally {
+                              if (mounted) {
+                                setState(() {
+                                  _isSubmitting = false;
+                                });
+                              }
+                            }
+                          }
+                        },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Theme.of(context).colorScheme.primary,
                     foregroundColor: Colors.black,
