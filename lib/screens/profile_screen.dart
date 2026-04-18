@@ -160,7 +160,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ] else ...[
                   _buildTextField(context, 'Display Name', _nameController, Icons.badge_rounded),
                   const SizedBox(height: 16),
-                  _buildTextField(context, 'Username', _usernameController, Icons.alternate_email_rounded,),
+                  _buildTextField(context, 'Username', _usernameController, Icons.alternate_email_rounded),
                   if (profileProvider.usernameError != null)
                     Padding(
                       padding: const EdgeInsets.only(top: 8.0),

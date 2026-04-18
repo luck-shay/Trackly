@@ -82,6 +82,10 @@ class LoginScreen extends StatelessWidget {
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(16),
                     ),
+                    side: BorderSide(
+                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.22),
+                      width: 1.2,
+                    ),
                     elevation: 0,
                   ),
                   child: Row(
