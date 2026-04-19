@@ -761,11 +761,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Future<bool> _confirmDeleteHabit(BuildContext context, Habit habit) async {
-    final isShared = habit.participants.length > 1;
+    final isGroupTask = habit.isGroup;
+    final isShared = !isGroupTask && habit.participants.length > 1;
     final title = isShared ? 'Leave shared habit?' : 'Delete habit?';
     final message = isShared
-        ? 'You will be removed from "${habit.title}". Others will keep it and be notified that you left.'
-        : 'Are you sure you want to delete "${habit.title}"? This cannot be undone.';
+      ? 'You will be removed from "${habit.title}". Others will keep it and be notified that you left.'
+      : isGroupTask
+      ? 'This will delete "${habit.title}" for the whole group. This cannot be undone.'
+      : 'Are you sure you want to delete "${habit.title}"? This cannot be undone.';
     final actionLabel = isShared ? 'Leave' : 'Delete';
 
     return await showDialog<bool>(
@@ -826,6 +829,57 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     try {
       await provider.deleteHabit(habit);
+
+      if (!context.mounted) {
+        return;
+      }
+
+      final canJoinBack = !habit.isGroup && habit.participants.length > 1;
+      if (canJoinBack) {
+        final messenger = ScaffoldMessenger.of(context);
+        messenger.hideCurrentSnackBar();
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text('You left "${habit.title}".'),
+            action: SnackBarAction(
+              label: 'Join back',
+              onPressed: () async {
+                try {
+                  final rejoined = await provider.rejoinSharedHabit(habit);
+                  if (!context.mounted) {
+                    return;
+                  }
+                  if (!rejoined) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                          'Could not join back. Ask a participant to invite you.',
+                        ),
+                      ),
+                    );
+                    return;
+                  }
+
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Rejoined "${habit.title}".')),
+                  );
+                } catch (error) {
+                  if (!context.mounted) {
+                    return;
+                  }
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        'Could not join back. ${error.toString().split('\n').first}',
+                      ),
+                    ),
+                  );
+                }
+              },
+            ),
+          ),
+        );
+      }
     } catch (error) {
       if (!context.mounted) {
         return;
@@ -871,7 +925,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final toggleIcon = completedToday
         ? Icons.undo_rounded
         : Icons.check_circle_rounded;
-    final isShared = habit.participants.length > 1;
+    final isShared = !habit.isGroup && habit.participants.length > 1;
     final deleteLabel = isShared ? 'Leave' : 'Delete';
 
     return Padding(

@@ -418,6 +418,20 @@ class HabitsProvider extends ChangeNotifier {
   Future<void> deleteHabit(Habit habit) async {
     final uid = _db.userId;
 
+    if (habit.isGroup && (habit.groupEntityId ?? '').trim().isNotEmpty) {
+      final groupId = habit.groupEntityId!.trim();
+      final group = await _groupService.getGroupById(groupId);
+      if (group == null) {
+        throw StateError('Group not found.');
+      }
+      if (group.ownerId != uid) {
+        throw StateError('Only the group admin can delete group tasks.');
+      }
+
+      await _groupService.deleteGroupTask(groupId, habit.id);
+      return;
+    }
+
     if (habit.participants.length <= 1) {
       // True delete only when this user is the last participant.
       final previousHabits = List<Habit>.from(_habits);
@@ -549,6 +563,12 @@ class HabitsProvider extends ChangeNotifier {
       return;
     }
 
+    final groupId = (habit.groupEntityId ?? '').trim();
+    if (groupId.isNotEmpty) {
+      await _groupService.leaveGroup(groupId);
+      return;
+    }
+
     final uid = _db.userId;
     if (!habit.participants.contains(uid)) {
       return;
@@ -614,6 +634,33 @@ class HabitsProvider extends ChangeNotifier {
       habit: habit,
       remainingParticipants: newParticipants,
     );
+  }
+
+  Future<bool> rejoinSharedHabit(Habit habit) async {
+    if (habit.isGroup) {
+      return false;
+    }
+
+    final uid = _db.userId;
+    if (uid.isEmpty) {
+      return false;
+    }
+
+    final latestHabit = await _db.getHabitById(habit.id);
+    if (latestHabit == null || latestHabit.isGroup) {
+      return false;
+    }
+
+    if (latestHabit.participants.contains(uid)) {
+      return true;
+    }
+
+    final updatedHabit = latestHabit.copyWith(
+      participants: [...latestHabit.participants, uid],
+    );
+
+    await _db.saveHabit(updatedHabit);
+    return true;
   }
 
   Future<void> _notifyParticipantDeparture({
