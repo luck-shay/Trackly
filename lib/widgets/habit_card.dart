@@ -11,6 +11,9 @@ class HabitCard extends StatefulWidget {
   final VoidCallback onCheck;
   final VoidCallback? onCardTap;
   final String currentUserId;
+  final EdgeInsetsGeometry margin;
+  final double borderRadius;
+  final bool showShadow;
 
   const HabitCard({
     super.key,
@@ -18,6 +21,9 @@ class HabitCard extends StatefulWidget {
     required this.onCheck,
     this.onCardTap,
     required this.currentUserId,
+    this.margin = const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+    this.borderRadius = 24,
+    this.showShadow = true,
   });
 
   @override
@@ -79,30 +85,40 @@ class _HabitCardState extends State<HabitCard>
     }
 
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+      margin: widget.margin,
       decoration: BoxDecoration(
         color: completedToday
             ? Theme.of(context).colorScheme.surface.withValues(alpha: 0.8)
             : Theme.of(context).colorScheme.surface,
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(widget.borderRadius),
         border: Border.all(
           color: completedToday
-              ? scheme.primary.withValues(alpha: 0.35)
+              ? scheme.primary.withValues(alpha: 0.6)
               : scheme.onSurface.withValues(alpha: 0.08),
+          width: completedToday ? 1.35 : 1,
         ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.3),
-            blurRadius: 15,
-            offset: const Offset(0, 8),
-          ),
-        ],
+        boxShadow: widget.showShadow
+            ? [
+                if (completedToday)
+                  BoxShadow(
+                    color: scheme.primary.withValues(alpha: 0.12),
+                    blurRadius: 10,
+                    spreadRadius: 0.8,
+                    offset: const Offset(0, 0),
+                  ),
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.3),
+                  blurRadius: 15,
+                  offset: const Offset(0, 8),
+                ),
+              ]
+            : null,
       ),
       child: Material(
         color: Colors.transparent,
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(widget.borderRadius),
         child: InkWell(
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(widget.borderRadius),
           onTap: widget.onCardTap,
           child: Padding(
             padding: const EdgeInsets.all(20.0),

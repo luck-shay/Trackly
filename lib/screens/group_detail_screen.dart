@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../models/group.dart';
@@ -176,23 +177,6 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
     );
   }
 
-  Future<void> _toggleCheckboxTask(BuildContext context, GroupTask task) async {
-    try {
-      await GroupService().toggleCheckboxTaskCompletion(task);
-    } catch (error) {
-      if (!context.mounted) {
-        return;
-      }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Could not update task. ${error.toString().split('\n').first}',
-          ),
-        ),
-      );
-    }
-  }
-
   Future<void> _deleteTask(
     BuildContext context,
     Group group,
@@ -218,6 +202,239 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
         ),
       );
     }
+  }
+
+  Future<bool> _confirmDeleteTask(
+    BuildContext context,
+    GroupTask task,
+  ) async {
+    return await showDialog<bool>(
+          context: context,
+          builder: (dialogContext) {
+            return AlertDialog(
+              title: const Text('Delete task?'),
+              content: Text(
+                '"${task.title}" will be removed for all group members and cannot be restored.',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext, false),
+                  child: const Text('Cancel'),
+                ),
+                FilledButton(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: Theme.of(context).colorScheme.error,
+                    foregroundColor: Theme.of(context).colorScheme.onError,
+                  ),
+                  onPressed: () => Navigator.pop(dialogContext, true),
+                  child: const Text('Delete'),
+                ),
+              ],
+            );
+          },
+        ) ??
+        false;
+  }
+
+  Future<void> _showTaskInfoSheet(
+    BuildContext context,
+    GroupTask task, {
+    required int completedTodayCount,
+  }) async {
+    final todayValue = GroupService().userId.isEmpty
+        ? null
+        : task.completionValueFor(GroupService().userId, DateTime.now());
+
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (sheetContext) {
+        return SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 44,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 12),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                ),
+                Text(
+                  task.title,
+                  style: GoogleFonts.outfit(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const VGap(AppLayout.sm),
+                if (task.description.trim().isNotEmpty)
+                  Text(
+                    task.description,
+                    style: GoogleFonts.inter(
+                      color: Theme.of(context)
+                          .colorScheme
+                          .onSurface
+                          .withValues(alpha: 0.75),
+                      height: 1.35,
+                    ),
+                  ),
+                if (task.description.trim().isNotEmpty)
+                  const VGap(AppLayout.md),
+                Text(
+                  'Completed today by group: $completedTodayCount',
+                  style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+                ),
+                const VGap(AppLayout.xs),
+                Text(
+                  task.isQuantified
+                      ? 'Your progress today: ${formatQuantity(todayValue ?? 0, maxDecimals: 1)}/${formatQuantity(task.quantMax, maxDecimals: 1)} ${task.quantUnit}'
+                      : 'Type: checkbox task',
+                  style: GoogleFonts.inter(
+                    color: Theme.of(context)
+                        .colorScheme
+                        .onSurface
+                        .withValues(alpha: 0.7),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  SlidableAction _buildGroupTaskSwipeAction({
+    required String label,
+    required IconData icon,
+    required Color color,
+    required VoidCallback onPressed,
+    BorderRadius borderRadius = BorderRadius.zero,
+  }) {
+    return SlidableAction(
+      onPressed: (_) => onPressed(),
+      backgroundColor: color,
+      foregroundColor: Colors.white,
+      icon: icon,
+      label: label,
+      borderRadius: borderRadius,
+      spacing: 0,
+      autoClose: true,
+    );
+  }
+
+  Widget _buildTaskSlidable(
+    BuildContext context,
+    Group group,
+    GroupTask task, {
+    required bool isGroupAdmin,
+    required int completedTodayCount,
+    required Widget child,
+  }) {
+    final secondaryColor = Theme.of(context).colorScheme.secondary;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppLayout.sm),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(18),
+        child: Slidable(
+          key: ValueKey('group_task_slide_${task.id}'),
+          closeOnScroll: true,
+          startActionPane: ActionPane(
+            motion: const DrawerMotion(),
+            extentRatio: isGroupAdmin ? 0.5 : 0.25,
+            dismissible: DismissiblePane(
+              onDismissed: () {},
+              closeOnCancel: true,
+              confirmDismiss: () async {
+                await _showTaskInfoSheet(
+                  context,
+                  task,
+                  completedTodayCount: completedTodayCount,
+                );
+                return false;
+              },
+            ),
+            children: [
+              _buildGroupTaskSwipeAction(
+                label: 'Info',
+                icon: Icons.info_outline_rounded,
+                color: secondaryColor.withValues(alpha: 0.9),
+                onPressed: () => _showTaskInfoSheet(
+                  context,
+                  task,
+                  completedTodayCount: completedTodayCount,
+                ),
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(18),
+                  bottomLeft: Radius.circular(18),
+                ),
+              ),
+              if (isGroupAdmin)
+                _buildGroupTaskSwipeAction(
+                  label: 'Edit',
+                  icon: Icons.edit_rounded,
+                  color: secondaryColor.withValues(alpha: 0.72),
+                  onPressed: () => _editTask(context, group, task),
+                ),
+            ],
+          ),
+          endActionPane: isGroupAdmin
+              ? ActionPane(
+                  motion: const DrawerMotion(),
+                  extentRatio: 0.28,
+                  dismissible: DismissiblePane(
+                    onDismissed: () {},
+                    closeOnCancel: true,
+                    confirmDismiss: () async {
+                      final shouldDelete = await _confirmDeleteTask(
+                        context,
+                        task,
+                      );
+                      if (!context.mounted || !shouldDelete) {
+                        return false;
+                      }
+                      await _deleteTask(context, group, task);
+                      return false;
+                    },
+                  ),
+                  children: [
+                    _buildGroupTaskSwipeAction(
+                      label: 'Delete',
+                      icon: Icons.delete_rounded,
+                      color: Theme.of(context).colorScheme.error,
+                      onPressed: () async {
+                        final shouldDelete = await _confirmDeleteTask(
+                          context,
+                          task,
+                        );
+                        if (!context.mounted || !shouldDelete) {
+                          return;
+                        }
+                        await _deleteTask(context, group, task);
+                      },
+                      borderRadius: const BorderRadius.only(
+                        topRight: Radius.circular(18),
+                        bottomRight: Radius.circular(18),
+                      ),
+                    ),
+                  ],
+                )
+              : null,
+          child: child,
+        ),
+      ),
+    );
   }
 
   @override
@@ -456,15 +673,12 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
 
                                 final taskCard = Container(
                                   width: double.infinity,
-                                  margin: const EdgeInsets.only(
-                                    bottom: AppLayout.sm,
-                                  ),
                                   padding: const EdgeInsets.all(AppLayout.md),
                                   decoration: BoxDecoration(
                                     color: Theme.of(
                                       context,
                                     ).colorScheme.surface,
-                                    borderRadius: BorderRadius.circular(18),
+                                    borderRadius: BorderRadius.zero,
                                     border: Border.all(
                                       color: Theme.of(context)
                                           .colorScheme
@@ -515,26 +729,6 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                                           Row(
                                             mainAxisSize: MainAxisSize.min,
                                             children: [
-                                              if (!task.isQuantified)
-                                                IconButton.filledTonal(
-                                                  tooltip: completedToday
-                                                      ? 'Undo today'
-                                                      : 'Mark done today',
-                                                  onPressed: uid.isEmpty
-                                                      ? null
-                                                      : () =>
-                                                            _toggleCheckboxTask(
-                                                              context,
-                                                              task,
-                                                            ),
-                                                  icon: Icon(
-                                                    completedToday
-                                                        ? Icons
-                                                              .check_circle_rounded
-                                                        : Icons
-                                                              .radio_button_unchecked_rounded,
-                                                  ),
-                                                ),
                                               if (isGroupAdmin)
                                                 IconButton(
                                                   tooltip: 'Edit task',
@@ -671,75 +865,12 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                                   ),
                                 );
 
-                                if (!isGroupAdmin) {
-                                  return taskCard;
-                                }
-
-                                return Dismissible(
-                                  key: Key('group_task_${task.id}'),
-                                  direction: DismissDirection.endToStart,
-                                  confirmDismiss: (direction) async {
-                                    return await showDialog<bool>(
-                                          context: context,
-                                          builder: (dialogContext) {
-                                            return AlertDialog(
-                                              title: const Text('Delete task?'),
-                                              content: Text(
-                                                '"${task.title}" will be removed for all group members and cannot be restored.',
-                                              ),
-                                              actions: [
-                                                TextButton(
-                                                  onPressed: () =>
-                                                      Navigator.pop(
-                                                        dialogContext,
-                                                        false,
-                                                      ),
-                                                  child: const Text('Cancel'),
-                                                ),
-                                                FilledButton(
-                                                  style: FilledButton.styleFrom(
-                                                    backgroundColor: Theme.of(
-                                                      context,
-                                                    ).colorScheme.error,
-                                                    foregroundColor: Theme.of(
-                                                      context,
-                                                    ).colorScheme.onError,
-                                                  ),
-                                                  onPressed: () =>
-                                                      Navigator.pop(
-                                                        dialogContext,
-                                                        true,
-                                                      ),
-                                                  child: const Text('Delete'),
-                                                ),
-                                              ],
-                                            );
-                                          },
-                                        ) ??
-                                        false;
-                                  },
-                                  onDismissed: (_) {
-                                    _deleteTask(context, liveGroup, task);
-                                  },
-                                  background: Container(
-                                    alignment: Alignment.centerRight,
-                                    padding: const EdgeInsets.only(right: 30),
-                                    margin: const EdgeInsets.only(
-                                      bottom: AppLayout.sm,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: Theme.of(context).colorScheme.error
-                                          .withValues(alpha: 0.85),
-                                      borderRadius: BorderRadius.circular(18),
-                                    ),
-                                    child: Icon(
-                                      Icons.delete_sweep_rounded,
-                                      color: Theme.of(
-                                        context,
-                                      ).colorScheme.onError,
-                                      size: 30,
-                                    ),
-                                  ),
+                                return _buildTaskSlidable(
+                                  context,
+                                  liveGroup,
+                                  task,
+                                  isGroupAdmin: isGroupAdmin,
+                                  completedTodayCount: completedTodayCount,
                                   child: taskCard,
                                 );
                               }).toList(),

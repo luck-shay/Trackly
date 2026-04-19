@@ -18,6 +18,7 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   final _nameController = TextEditingController();
   final _usernameController = TextEditingController();
+  ProfileProvider? _profileProvider;
 
   Future<void> _changeProfilePhoto(BuildContext context) async {
     final error = await context.read<ProfileProvider>().uploadProfilePicture();
@@ -90,9 +91,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _profileProvider ??= context.read<ProfileProvider>();
+  }
+
+  @override
   void dispose() {
     // Ensure profile always reopens in view mode.
-    context.read<ProfileProvider>().cancelEditing();
+    _profileProvider?.cancelEditing();
     _nameController.dispose();
     _usernameController.dispose();
     super.dispose();

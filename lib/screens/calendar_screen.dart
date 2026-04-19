@@ -7,7 +7,7 @@ import 'package:table_calendar/table_calendar.dart';
 
 import '../models/habit.dart';
 import '../providers/calendar_provider.dart';
-import '../services/database_service.dart';
+import '../providers/habits_provider.dart';
 
 class CalendarScreen extends StatelessWidget {
   const CalendarScreen({super.key});
@@ -33,32 +33,34 @@ class _CalendarView extends StatefulWidget {
 class _CalendarViewState extends State<_CalendarView> {
   _CalendarScope _scope = _CalendarScope.mine;
 
+  bool _isCompletedForDay(
+    Habit habit,
+    String userId,
+    DateTime day,
+  ) {
+    if (userId.isEmpty) {
+      return false;
+    }
+    return habit.completionProgressFor(userId, day) >= 1;
+  }
+
   List<Habit> _getEventsForDay(DateTime day, List<Habit> habits) {
     final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
     return habits.where((habit) {
       if (_scope == _CalendarScope.mine) {
-        final userCompletions = habit.completions[uid] ?? [];
-        return userCompletions.any(
-          (d) => d.year == day.year && d.month == day.month && d.day == day.day,
-        );
+        return _isCompletedForDay(habit, uid, day);
       }
 
       if (habit.participants.length <= 1) {
         return false;
       }
 
-      return habit.participants.any((participantId) {
-        final participantCompletions = habit.completions[participantId] ?? [];
-        return participantCompletions.any(
-          (d) => d.year == day.year && d.month == day.month && d.day == day.day,
-        );
-      });
+      return _isCompletedForDay(habit, uid, day);
     }).toList();
   }
 
   @override
   Widget build(BuildContext context) {
-    final db = DatabaseService();
     final scheme = Theme.of(context).colorScheme;
 
     return Scaffold(
@@ -86,14 +88,22 @@ class _CalendarViewState extends State<_CalendarView> {
           const SizedBox(width: 8),
         ],
       ),
-      body: StreamBuilder<List<Habit>>(
-        stream: db.streamHabits(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
+      body: Consumer<HabitsProvider>(
+        builder: (context, habitsProvider, _) {
+          if (habitsProvider.isLoading) {
             return const Center(child: CircularProgressIndicator());
           }
 
-          final habits = snapshot.data ?? [];
+          if (habitsProvider.error != null) {
+            return Center(
+              child: Text(
+                'Error: ${habitsProvider.error}',
+                style: GoogleFonts.inter(color: Theme.of(context).colorScheme.error),
+              ),
+            );
+          }
+
+          final habits = habitsProvider.habits;
 
           return Column(
             children: [
@@ -294,14 +304,7 @@ class _CalendarViewState extends State<_CalendarView> {
         final dayParticipantsCompleted = habit.participants.where((
           participantId,
         ) {
-          final completions =
-              habit.completions[participantId] ?? const <DateTime>[];
-          return completions.any(
-            (d) =>
-                d.year == selectedDay.year &&
-                d.month == selectedDay.month &&
-                d.day == selectedDay.day,
-          );
+          return _isCompletedForDay(habit, participantId, selectedDay);
         }).length;
         final participationSummary = _scope == _CalendarScope.mine
             ? '${habit.currentStreakFor(uid)} 🔥'
