@@ -10,10 +10,54 @@ import '../theme/app_layout.dart';
 import '../utils/quantity_format.dart';
 import 'create_group_task_screen.dart';
 
-class GroupDetailScreen extends StatelessWidget {
+class GroupDetailScreen extends StatefulWidget {
   final Group group;
 
   const GroupDetailScreen({super.key, required this.group});
+
+  @override
+  State<GroupDetailScreen> createState() => _GroupDetailScreenState();
+}
+
+class _GroupDetailScreenState extends State<GroupDetailScreen> {
+  bool _isTasksExpanded = false;
+
+  Widget _buildTasksHeader(BuildContext context, int taskCount) {
+    final onSurface = Theme.of(context).colorScheme.onSurface;
+    return InkWell(
+      onTap: () {
+        setState(() {
+          _isTasksExpanded = !_isTasksExpanded;
+        });
+      },
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                'TASKS ($taskCount)',
+                style: GoogleFonts.inter(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: onSurface.withValues(alpha: 0.62),
+                  letterSpacing: 1.2,
+                ),
+              ),
+            ),
+            Icon(
+              _isTasksExpanded
+                  ? Icons.keyboard_arrow_up_rounded
+                  : Icons.keyboard_arrow_down_rounded,
+              color: onSurface.withValues(alpha: 0.62),
+              size: 20,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   Future<void> _confirmLeaveGroup(BuildContext context, Group group) async {
     final shouldLeave = await showDialog<bool>(
@@ -181,14 +225,14 @@ class GroupDetailScreen extends StatelessWidget {
     return StreamBuilder<Group?>(
       stream: GroupService().streamGroupsForCurrentUser().map((groups) {
         for (final item in groups) {
-          if (item.id == group.id) {
+          if (item.id == widget.group.id) {
             return item;
           }
         }
         return null;
       }),
       builder: (context, snapshot) {
-        final liveGroup = snapshot.data ?? group;
+        final liveGroup = snapshot.data ?? widget.group;
 
         return Scaffold(
           appBar: AppBar(
@@ -321,383 +365,385 @@ class GroupDetailScreen extends StatelessWidget {
                         const VGap(AppLayout.md),
                         _GroupLeaderboardCard(group: liveGroup, tasks: tasks),
                         const VGap(AppLayout.lg),
-                        Text(
-                          'Tasks',
-                          style: GoogleFonts.outfit(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
+                        _buildTasksHeader(context, tasks.length),
                         const VGap(AppLayout.sm),
-                        if (tasks.isEmpty)
-                          Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.all(AppLayout.lg),
-                            decoration: BoxDecoration(
-                              color: Theme.of(context).colorScheme.surface,
-                              borderRadius: BorderRadius.circular(18),
-                              border: Border.all(
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.onSurface.withValues(alpha: 0.1),
+                        if (_isTasksExpanded)
+                          if (tasks.isEmpty)
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(AppLayout.lg),
+                              decoration: BoxDecoration(
+                                color: Theme.of(context).colorScheme.surface,
+                                borderRadius: BorderRadius.circular(18),
+                                border: Border.all(
+                                  color: Theme.of(context).colorScheme.onSurface
+                                      .withValues(alpha: 0.1),
+                                ),
                               ),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'No tasks in this group yet.',
-                                  style: GoogleFonts.outfit(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                                const VGap(AppLayout.xs),
-                                Text(
-                                  'Create your first task and start tracking progress with the group.',
-                                  style: GoogleFonts.inter(
-                                    color: Theme.of(context)
-                                        .colorScheme
-                                        .onSurface
-                                        .withValues(alpha: 0.7),
-                                    height: 1.4,
-                                  ),
-                                ),
-                                const VGap(AppLayout.md),
-                                SizedBox(
-                                  width: double.infinity,
-                                  child: ElevatedButton.icon(
-                                    onPressed: () =>
-                                        _createTask(context, liveGroup),
-                                    icon: const Icon(Icons.add_task_rounded),
-                                    label: const Text(
-                                      'Create First Group Task',
-                                    ),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Theme.of(
-                                        context,
-                                      ).colorScheme.primary,
-                                      foregroundColor: Colors.black,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'No tasks in this group yet.',
+                                    style: GoogleFonts.outfit(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w700,
                                     ),
                                   ),
-                                ),
-                              ],
-                            ),
-                          )
-                        else
-                          Column(
-                            children: tasks.map((task) {
-                              final completedToday =
-                                  uid.isNotEmpty &&
-                                  task.isCompletedOnDate(uid, now);
-                              final completedTodayCount = task
-                                  .completions
-                                  .values
-                                  .map(
-                                    (dates) => dates
-                                        .where(
-                                          (date) =>
-                                              date.year == now.year &&
-                                              date.month == now.month &&
-                                              date.day == now.day,
-                                        )
-                                        .length,
-                                  )
-                                  .fold<int>(0, (sum, value) => sum + value);
-                              final todayValue = uid.isEmpty
-                                  ? null
-                                  : task.completionValueFor(uid, now);
-                              final progress =
-                                  (task.isQuantified &&
-                                      task.quantMax > 0 &&
-                                      todayValue != null)
-                                  ? (todayValue / task.quantMax)
-                                        .clamp(0.0, 1.0)
-                                        .toDouble()
-                                  : 0.0;
+                                  const VGap(AppLayout.xs),
+                                  Text(
+                                    'Create your first task and start tracking progress with the group.',
+                                    style: GoogleFonts.inter(
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onSurface
+                                          .withValues(alpha: 0.7),
+                                      height: 1.4,
+                                    ),
+                                  ),
+                                  const VGap(AppLayout.md),
+                                  SizedBox(
+                                    width: double.infinity,
+                                    child: ElevatedButton.icon(
+                                      onPressed: () =>
+                                          _createTask(context, liveGroup),
+                                      icon: const Icon(Icons.add_task_rounded),
+                                      label: const Text(
+                                        'Create First Group Task',
+                                      ),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: Theme.of(
+                                          context,
+                                        ).colorScheme.primary,
+                                        foregroundColor: Colors.black,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            )
+                          else
+                            Column(
+                              children: tasks.map((task) {
+                                final completedToday =
+                                    uid.isNotEmpty &&
+                                    task.isCompletedOnDate(uid, now);
+                                final completedTodayCount = task
+                                    .completions
+                                    .values
+                                    .map(
+                                      (dates) => dates
+                                          .where(
+                                            (date) =>
+                                                date.year == now.year &&
+                                                date.month == now.month &&
+                                                date.day == now.day,
+                                          )
+                                          .length,
+                                    )
+                                    .fold<int>(0, (sum, value) => sum + value);
+                                final todayValue = uid.isEmpty
+                                    ? null
+                                    : task.completionValueFor(uid, now);
+                                final progress =
+                                    (task.isQuantified &&
+                                        task.quantMax > 0 &&
+                                        todayValue != null)
+                                    ? (todayValue / task.quantMax)
+                                          .clamp(0.0, 1.0)
+                                          .toDouble()
+                                    : 0.0;
 
-                              final taskCard = Container(
-                                width: double.infinity,
-                                margin: const EdgeInsets.only(
-                                  bottom: AppLayout.sm,
-                                ),
-                                padding: const EdgeInsets.all(AppLayout.md),
-                                decoration: BoxDecoration(
-                                  color: Theme.of(context).colorScheme.surface,
-                                  borderRadius: BorderRadius.circular(18),
-                                  border: Border.all(
-                                    color: Theme.of(context)
-                                        .colorScheme
-                                        .onSurface
-                                        .withValues(alpha: 0.1),
+                                final taskCard = Container(
+                                  width: double.infinity,
+                                  margin: const EdgeInsets.only(
+                                    bottom: AppLayout.sm,
                                   ),
-                                ),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Expanded(
-                                          child: Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              Text(
-                                                task.title,
-                                                style: GoogleFonts.outfit(
-                                                  fontSize: 18,
-                                                  fontWeight: FontWeight.w700,
-                                                ),
-                                              ),
-                                              if (task
-                                                  .description
-                                                  .isNotEmpty) ...[
-                                                const VGap(AppLayout.xs),
+                                  padding: const EdgeInsets.all(AppLayout.md),
+                                  decoration: BoxDecoration(
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.surface,
+                                    borderRadius: BorderRadius.circular(18),
+                                    border: Border.all(
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onSurface
+                                          .withValues(alpha: 0.1),
+                                    ),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
                                                 Text(
-                                                  task.description,
-                                                  style: GoogleFonts.inter(
-                                                    color: Theme.of(context)
-                                                        .colorScheme
-                                                        .onSurface
-                                                        .withValues(
-                                                          alpha: 0.72,
-                                                        ),
-                                                    height: 1.4,
+                                                  task.title,
+                                                  style: GoogleFonts.outfit(
+                                                    fontSize: 18,
+                                                    fontWeight: FontWeight.w700,
                                                   ),
                                                 ),
+                                                if (task
+                                                    .description
+                                                    .isNotEmpty) ...[
+                                                  const VGap(AppLayout.xs),
+                                                  Text(
+                                                    task.description,
+                                                    style: GoogleFonts.inter(
+                                                      color: Theme.of(context)
+                                                          .colorScheme
+                                                          .onSurface
+                                                          .withValues(
+                                                            alpha: 0.72,
+                                                          ),
+                                                      height: 1.4,
+                                                    ),
+                                                  ),
+                                                ],
                                               ],
-                                            ],
-                                          ),
-                                        ),
-                                        Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            if (!task.isQuantified)
-                                              IconButton.filledTonal(
-                                                tooltip: completedToday
-                                                    ? 'Undo today'
-                                                    : 'Mark done today',
-                                                onPressed: uid.isEmpty
-                                                    ? null
-                                                    : () => _toggleCheckboxTask(
-                                                        context,
-                                                        task,
-                                                      ),
-                                                icon: Icon(
-                                                  completedToday
-                                                      ? Icons
-                                                            .check_circle_rounded
-                                                      : Icons
-                                                            .radio_button_unchecked_rounded,
-                                                ),
-                                              ),
-                                            if (isGroupAdmin)
-                                              IconButton(
-                                                tooltip: 'Edit task',
-                                                onPressed: () => _editTask(
-                                                  context,
-                                                  liveGroup,
-                                                  task,
-                                                ),
-                                                icon: const Icon(
-                                                  Icons.edit_rounded,
-                                                ),
-                                              ),
-                                          ],
-                                        ),
-                                      ],
-                                    ),
-                                    const VGap(AppLayout.sm),
-                                    Wrap(
-                                      spacing: 8,
-                                      runSpacing: 8,
-                                      children: [
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 10,
-                                            vertical: 6,
-                                          ),
-                                          decoration: BoxDecoration(
-                                            color: Theme.of(context)
-                                                .colorScheme
-                                                .onSurface
-                                                .withValues(alpha: 0.08),
-                                            borderRadius: BorderRadius.circular(
-                                              999,
                                             ),
                                           ),
-                                          child: Text(
-                                            '$completedTodayCount completed today',
-                                            style: GoogleFonts.inter(
-                                              fontSize: 11,
-                                              fontWeight: FontWeight.w700,
+                                          Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              if (!task.isQuantified)
+                                                IconButton.filledTonal(
+                                                  tooltip: completedToday
+                                                      ? 'Undo today'
+                                                      : 'Mark done today',
+                                                  onPressed: uid.isEmpty
+                                                      ? null
+                                                      : () =>
+                                                            _toggleCheckboxTask(
+                                                              context,
+                                                              task,
+                                                            ),
+                                                  icon: Icon(
+                                                    completedToday
+                                                        ? Icons
+                                                              .check_circle_rounded
+                                                        : Icons
+                                                              .radio_button_unchecked_rounded,
+                                                  ),
+                                                ),
+                                              if (isGroupAdmin)
+                                                IconButton(
+                                                  tooltip: 'Edit task',
+                                                  onPressed: () => _editTask(
+                                                    context,
+                                                    liveGroup,
+                                                    task,
+                                                  ),
+                                                  icon: const Icon(
+                                                    Icons.edit_rounded,
+                                                  ),
+                                                ),
+                                            ],
+                                          ),
+                                        ],
+                                      ),
+                                      const VGap(AppLayout.sm),
+                                      Wrap(
+                                        spacing: 8,
+                                        runSpacing: 8,
+                                        children: [
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 10,
+                                              vertical: 6,
+                                            ),
+                                            decoration: BoxDecoration(
                                               color: Theme.of(context)
                                                   .colorScheme
                                                   .onSurface
-                                                  .withValues(alpha: 0.82),
-                                            ),
-                                          ),
-                                        ),
-                                        if (task.isQuantified)
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(
-                                              horizontal: 10,
-                                              vertical: 6,
-                                            ),
-                                            decoration: BoxDecoration(
-                                              color: Theme.of(context)
-                                                  .colorScheme
-                                                  .primary
-                                                  .withValues(alpha: 0.16),
+                                                  .withValues(alpha: 0.08),
                                               borderRadius:
                                                   BorderRadius.circular(999),
                                             ),
                                             child: Text(
-                                              'Today: ${formatQuantity(todayValue ?? 0, maxDecimals: 1)}/${formatQuantity(task.quantMax, maxDecimals: 1)} ${task.quantUnit}',
+                                              '$completedTodayCount completed today',
                                               style: GoogleFonts.inter(
                                                 fontSize: 11,
                                                 fontWeight: FontWeight.w700,
-                                                color: Theme.of(
-                                                  context,
-                                                ).colorScheme.primary,
+                                                color: Theme.of(context)
+                                                    .colorScheme
+                                                    .onSurface
+                                                    .withValues(alpha: 0.82),
                                               ),
                                             ),
-                                          )
-                                        else
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(
-                                              horizontal: 10,
-                                              vertical: 6,
-                                            ),
-                                            decoration: BoxDecoration(
-                                              color: completedToday
-                                                  ? Theme.of(context)
-                                                        .colorScheme
-                                                        .primary
-                                                        .withValues(alpha: 0.16)
-                                                  : Theme.of(context)
-                                                        .colorScheme
-                                                        .onSurface
-                                                        .withValues(
-                                                          alpha: 0.08,
-                                                        ),
-                                              borderRadius:
-                                                  BorderRadius.circular(999),
-                                            ),
-                                            child: Text(
-                                              completedToday
-                                                  ? 'You are done today'
-                                                  : 'Not done today',
-                                              style: GoogleFonts.inter(
-                                                fontSize: 11,
-                                                fontWeight: FontWeight.w700,
+                                          ),
+                                          if (task.isQuantified)
+                                            Container(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 10,
+                                                    vertical: 6,
+                                                  ),
+                                              decoration: BoxDecoration(
+                                                color: Theme.of(context)
+                                                    .colorScheme
+                                                    .primary
+                                                    .withValues(alpha: 0.16),
+                                                borderRadius:
+                                                    BorderRadius.circular(999),
+                                              ),
+                                              child: Text(
+                                                'Today: ${formatQuantity(todayValue ?? 0, maxDecimals: 1)}/${formatQuantity(task.quantMax, maxDecimals: 1)} ${task.quantUnit}',
+                                                style: GoogleFonts.inter(
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.w700,
+                                                  color: Theme.of(
+                                                    context,
+                                                  ).colorScheme.primary,
+                                                ),
+                                              ),
+                                            )
+                                          else
+                                            Container(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 10,
+                                                    vertical: 6,
+                                                  ),
+                                              decoration: BoxDecoration(
                                                 color: completedToday
-                                                    ? Theme.of(
-                                                        context,
-                                                      ).colorScheme.primary
+                                                    ? Theme.of(context)
+                                                          .colorScheme
+                                                          .primary
+                                                          .withValues(
+                                                            alpha: 0.16,
+                                                          )
                                                     : Theme.of(context)
                                                           .colorScheme
                                                           .onSurface
                                                           .withValues(
-                                                            alpha: 0.82,
+                                                            alpha: 0.08,
                                                           ),
+                                                borderRadius:
+                                                    BorderRadius.circular(999),
+                                              ),
+                                              child: Text(
+                                                completedToday
+                                                    ? 'You are done today'
+                                                    : 'Not done today',
+                                                style: GoogleFonts.inter(
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.w700,
+                                                  color: completedToday
+                                                      ? Theme.of(
+                                                          context,
+                                                        ).colorScheme.primary
+                                                      : Theme.of(context)
+                                                            .colorScheme
+                                                            .onSurface
+                                                            .withValues(
+                                                              alpha: 0.82,
+                                                            ),
+                                                ),
                                               ),
                                             ),
-                                          ),
-                                      ],
-                                    ),
-                                    if (task.isQuantified) ...[
-                                      const VGap(AppLayout.sm),
-                                      LinearProgressIndicator(
-                                        value: progress,
-                                        minHeight: 7,
-                                        borderRadius: BorderRadius.circular(
-                                          999,
-                                        ),
-                                        backgroundColor: Theme.of(context)
-                                            .colorScheme
-                                            .onSurface
-                                            .withValues(alpha: 0.12),
+                                        ],
                                       ),
+                                      if (task.isQuantified) ...[
+                                        const VGap(AppLayout.sm),
+                                        LinearProgressIndicator(
+                                          value: progress,
+                                          minHeight: 7,
+                                          borderRadius: BorderRadius.circular(
+                                            999,
+                                          ),
+                                          backgroundColor: Theme.of(context)
+                                              .colorScheme
+                                              .onSurface
+                                              .withValues(alpha: 0.12),
+                                        ),
+                                      ],
                                     ],
-                                  ],
-                                ),
-                              );
+                                  ),
+                                );
 
-                              if (!isGroupAdmin) {
-                                return taskCard;
-                              }
+                                if (!isGroupAdmin) {
+                                  return taskCard;
+                                }
 
-                              return Dismissible(
-                                key: Key('group_task_${task.id}'),
-                                direction: DismissDirection.endToStart,
-                                confirmDismiss: (direction) async {
-                                  return await showDialog<bool>(
-                                        context: context,
-                                        builder: (dialogContext) {
-                                          return AlertDialog(
-                                            title: const Text('Delete task?'),
-                                            content: Text(
-                                              '"${task.title}" will be removed for all group members and cannot be restored.',
-                                            ),
-                                            actions: [
-                                              TextButton(
-                                                onPressed: () => Navigator.pop(
-                                                  dialogContext,
-                                                  false,
-                                                ),
-                                                child: const Text('Cancel'),
+                                return Dismissible(
+                                  key: Key('group_task_${task.id}'),
+                                  direction: DismissDirection.endToStart,
+                                  confirmDismiss: (direction) async {
+                                    return await showDialog<bool>(
+                                          context: context,
+                                          builder: (dialogContext) {
+                                            return AlertDialog(
+                                              title: const Text('Delete task?'),
+                                              content: Text(
+                                                '"${task.title}" will be removed for all group members and cannot be restored.',
                                               ),
-                                              FilledButton(
-                                                style: FilledButton.styleFrom(
-                                                  backgroundColor: Theme.of(
-                                                    context,
-                                                  ).colorScheme.error,
-                                                  foregroundColor: Theme.of(
-                                                    context,
-                                                  ).colorScheme.onError,
+                                              actions: [
+                                                TextButton(
+                                                  onPressed: () =>
+                                                      Navigator.pop(
+                                                        dialogContext,
+                                                        false,
+                                                      ),
+                                                  child: const Text('Cancel'),
                                                 ),
-                                                onPressed: () => Navigator.pop(
-                                                  dialogContext,
-                                                  true,
+                                                FilledButton(
+                                                  style: FilledButton.styleFrom(
+                                                    backgroundColor: Theme.of(
+                                                      context,
+                                                    ).colorScheme.error,
+                                                    foregroundColor: Theme.of(
+                                                      context,
+                                                    ).colorScheme.onError,
+                                                  ),
+                                                  onPressed: () =>
+                                                      Navigator.pop(
+                                                        dialogContext,
+                                                        true,
+                                                      ),
+                                                  child: const Text('Delete'),
                                                 ),
-                                                child: const Text('Delete'),
-                                              ),
-                                            ],
-                                          );
-                                        },
-                                      ) ??
-                                      false;
-                                },
-                                onDismissed: (_) {
-                                  _deleteTask(context, liveGroup, task);
-                                },
-                                background: Container(
-                                  alignment: Alignment.centerRight,
-                                  padding: const EdgeInsets.only(right: 30),
-                                  margin: const EdgeInsets.only(
-                                    bottom: AppLayout.sm,
+                                              ],
+                                            );
+                                          },
+                                        ) ??
+                                        false;
+                                  },
+                                  onDismissed: (_) {
+                                    _deleteTask(context, liveGroup, task);
+                                  },
+                                  background: Container(
+                                    alignment: Alignment.centerRight,
+                                    padding: const EdgeInsets.only(right: 30),
+                                    margin: const EdgeInsets.only(
+                                      bottom: AppLayout.sm,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: Theme.of(context).colorScheme.error
+                                          .withValues(alpha: 0.85),
+                                      borderRadius: BorderRadius.circular(18),
+                                    ),
+                                    child: Icon(
+                                      Icons.delete_sweep_rounded,
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.onError,
+                                      size: 30,
+                                    ),
                                   ),
-                                  decoration: BoxDecoration(
-                                    color: Theme.of(
-                                      context,
-                                    ).colorScheme.error.withValues(alpha: 0.85),
-                                    borderRadius: BorderRadius.circular(18),
-                                  ),
-                                  child: Icon(
-                                    Icons.delete_sweep_rounded,
-                                    color: Theme.of(
-                                      context,
-                                    ).colorScheme.onError,
-                                    size: 30,
-                                  ),
-                                ),
-                                child: taskCard,
-                              );
-                            }).toList(),
-                          ),
+                                  child: taskCard,
+                                );
+                              }).toList(),
+                            ),
                       ],
                     );
                   },

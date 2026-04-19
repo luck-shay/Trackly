@@ -293,7 +293,7 @@ class _HabitLeaderboardView extends StatelessWidget {
                                     child: ListView.separated(
                                       shrinkWrap: true,
                                       itemCount: filtered.length,
-                                      separatorBuilder: (_, __) => Divider(
+                                      separatorBuilder: (_, _) => Divider(
                                         height: 1,
                                         color: Theme.of(context)
                                             .colorScheme
