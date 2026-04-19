@@ -199,6 +199,8 @@ class _CalendarViewState extends State<_CalendarView> {
                           color: scheme.secondary,
                           shape: BoxShape.circle,
                         ),
+                        markersMaxCount: 8,
+                        markerSize: 6,
                         todayDecoration: BoxDecoration(
                           color: Theme.of(
                             context,
@@ -263,7 +265,6 @@ class _CalendarViewState extends State<_CalendarView> {
                   },
                 ),
               ),
-              const SizedBox(height: 120),
             ],
           );
         },
@@ -297,7 +298,7 @@ class _CalendarViewState extends State<_CalendarView> {
 
     return ListView.builder(
       physics: const BouncingScrollPhysics(),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 120),
       itemCount: completedHabits.length,
       itemBuilder: (context, index) {
         final habit = completedHabits[index];
