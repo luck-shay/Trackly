@@ -9,11 +9,11 @@ import '../models/habit.dart';
 
 class GroupService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
-  static const String _hiddenGroupsKeyPrefix = 'hidden_groups_';
+  static const String _hiddenGrtaoupsKeyPrefix = 'hidden_groups_';
 
   String get userId => FirebaseAuth.instance.currentUser?.uid ?? '';
 
-  String get _hiddenGroupsPrefsKey => '$_hiddenGroupsKeyPrefix$userId';
+  String get _hiddenGroupsPrefsKey => '$_hiddenGrtaoupsKeyPrefix$userId';
 
   Future<Set<String>> _loadHiddenGroupIds() async {
     final uid = userId;

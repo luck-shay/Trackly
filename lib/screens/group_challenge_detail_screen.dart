@@ -8,7 +8,6 @@ import '../services/group_service.dart';
 import '../services/social_service.dart';
 import '../theme/app_layout.dart';
 import '../utils/quantity_format.dart';
-import '../widgets/challenge_activity_sheet.dart';
 
 class GroupChallengeDetailScreen extends StatelessWidget {
   final Group group;
@@ -457,81 +456,67 @@ class GroupChallengeDetailScreen extends StatelessWidget {
                       final isMe = uid == myUid;
                       final name = isMe ? 'You' : _displayName(uid, profiles);
 
-                      return InkWell(
-                        onTap: () {
-                          final userProfile = profiles[uid] ??
-                              UserProfile(uid: uid, displayName: name, email: '');
-                          ChallengeActivitySheet.show(context, challengeData, userProfile);
-                        },
-                        borderRadius: BorderRadius.circular(14),
-                        child: Container(
-                          margin: const EdgeInsets.only(bottom: 8),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 10,
-                          ),
-                          decoration: BoxDecoration(
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 10,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.onSurface.withValues(alpha: 0.05),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
                             color: Theme.of(
                               context,
-                            ).colorScheme.onSurface.withValues(alpha: 0.05),
-                            borderRadius: BorderRadius.circular(14),
-                            border: Border.all(
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.onSurface.withValues(alpha: 0.1),
+                            ).colorScheme.onSurface.withValues(alpha: 0.1),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Text(
+                              '#$rank',
+                              style: GoogleFonts.outfit(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w800,
+                              ),
                             ),
-                          ),
-                          child: Row(
-                            children: [
-                              Text(
-                                '#$rank',
-                                style: GoogleFonts.outfit(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w800,
-                                ),
-                              ),
-                              const HGap(12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      name,
-                                      style: GoogleFonts.inter(
-                                        fontWeight: FontWeight.w700,
-                                      ),
+                            const HGap(12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    name,
+                                    style: GoogleFonts.inter(
+                                      fontWeight: FontWeight.w700,
                                     ),
-                                    Text(
-                                      challengeData.hasTarget
-                                          ? 'Today: ${formatQuantity(today, maxDecimals: 1)} ${challengeData.unit}'
-                                          : 'Today: ${formatQuantity(today, maxDecimals: 1)} logs',
-                                      style: GoogleFonts.inter(
-                                        fontSize: 12,
-                                        color: Theme.of(context)
-                                            .colorScheme
-                                            .onSurface
-                                            .withValues(alpha: 0.66),
-                                      ),
+                                  ),
+                                  Text(
+                                    challengeData.hasTarget
+                                        ? 'Today: ${formatQuantity(today, maxDecimals: 1)} ${challengeData.unit}'
+                                        : 'Today: ${formatQuantity(today, maxDecimals: 1)} logs',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 12,
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onSurface
+                                          .withValues(alpha: 0.66),
                                     ),
-                                  ],
-                                ),
+                                  ),
+                                ],
                               ),
-                              Text(
-                                formatQuantity(total, maxDecimals: 1),
-                                style: GoogleFonts.outfit(
-                                  fontSize: 22,
-                                  fontWeight: FontWeight.w800,
-                                  color: Theme.of(context).colorScheme.primary,
-                                ),
+                            ),
+                            Text(
+                              formatQuantity(total, maxDecimals: 1),
+                              style: GoogleFonts.outfit(
+                                fontSize: 22,
+                                fontWeight: FontWeight.w800,
+                                color: Theme.of(context).colorScheme.primary,
                               ),
-                              const HGap(8),
-                              Icon(
-                                Icons.calendar_month_rounded,
-                                size: 20,
-                                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
-                              ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
                       );
                     }),

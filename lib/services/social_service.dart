@@ -71,11 +71,7 @@ class SocialService {
   }
 
   // Update Profile
-  Future<void> updateProfile({
-    String? displayName,
-    String? username,
-    String? photoUrl,
-  }) async {
+  Future<void> updateProfile({String? displayName, String? username, String? photoUrl}) async {
     if (userId.isEmpty) {
       throw StateError('You must be signed in to update your profile.');
     }

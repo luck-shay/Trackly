@@ -69,7 +69,6 @@ class Habit {
   final bool requiresPhotoValidation;
   final String? reminderTime; // HH:mm format
 
-
   Habit({
     required this.id,
     this.groupEntityId,
@@ -146,7 +145,8 @@ class Habit {
       memberIsQuantified: memberIsQuantified ?? this.memberIsQuantified,
       memberQuantUnits: memberQuantUnits ?? this.memberQuantUnits,
       memberQuantMax: memberQuantMax ?? this.memberQuantMax,
-      requiresPhotoValidation: requiresPhotoValidation ?? this.requiresPhotoValidation,
+      requiresPhotoValidation:
+          requiresPhotoValidation ?? this.requiresPhotoValidation,
       reminderTime: reminderTime ?? this.reminderTime,
     );
   }

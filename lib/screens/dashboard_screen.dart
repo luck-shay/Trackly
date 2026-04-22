@@ -860,43 +860,6 @@ class _DashboardScreenState extends State<DashboardScreen>
     }
   }
 
-  Future<void> _endChallenge(BuildContext context, GroupChallenge challenge) async {
-    final shouldEnd = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          title: const Text('End challenge now?'),
-          content: const Text(
-            'This will close the challenge immediately for everyone.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext, false),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(dialogContext, true),
-              child: const Text('End Challenge'),
-            ),
-          ],
-        );
-      },
-    ) ?? false;
-    if (!shouldEnd || !context.mounted) return;
-    try {
-      await GroupService().endGroupChallenge(challenge);
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Challenge ended.')),
-      );
-    } catch (error) {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to end challenge: $error')),
-      );
-    }
-  }
-
   Future<bool> _canDeleteHabit({
     required Habit habit,
     required String currentUserId,
@@ -1609,12 +1572,6 @@ class _DashboardScreenState extends State<DashboardScreen>
                                                 ],
                                               ),
                                             ),
-                                            if (!challenge.hasEnded)
-                                              IconButton(
-                                                icon: const Icon(Icons.stop_circle_outlined, color: Colors.redAccent),
-                                                tooltip: 'End Challenge',
-                                                onPressed: () => _endChallenge(context, challenge),
-                                              ),
                                             Container(
                                               padding:
                                                   const EdgeInsets.symmetric(
