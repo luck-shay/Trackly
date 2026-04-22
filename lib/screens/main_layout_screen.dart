@@ -59,7 +59,9 @@ class MainLayoutScreen extends StatelessWidget {
                 Text(
                   'Choose what you want to create.',
                   style: GoogleFonts.inter(
-                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.68),
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.onSurface.withValues(alpha: 0.68),
                   ),
                 ),
                 const SizedBox(height: 14),
@@ -87,10 +89,8 @@ class MainLayoutScreen extends StatelessWidget {
                   icon: Icons.groups_rounded,
                   title: 'Group',
                   subtitle: 'Create a group where members can add many tasks.',
-                  onTap: () => Navigator.pop(
-                    sheetContext,
-                    _CreateEntryAction.group,
-                  ),
+                  onTap: () =>
+                      Navigator.pop(sheetContext, _CreateEntryAction.group),
                 ),
               ],
             ),
@@ -124,9 +124,10 @@ class MainLayoutScreen extends StatelessWidget {
           const begin = Offset(0.0, 1.0);
           const end = Offset.zero;
           const curve = Curves.easeOutCubic;
-          final tween = Tween(begin: begin, end: end).chain(
-            CurveTween(curve: curve),
-          );
+          final tween = Tween(
+            begin: begin,
+            end: end,
+          ).chain(CurveTween(curve: curve));
           return SlideTransition(
             position: animation.drive(tween),
             child: child,
@@ -222,7 +223,8 @@ class MainLayoutScreen extends StatelessWidget {
                                   child: StreamBuilder<QuerySnapshot>(
                                     stream: social.streamGroupInvites(),
                                     builder: (context, snapshot) {
-                                      final count = snapshot.data?.docs.length ?? 0;
+                                      final count =
+                                          snapshot.data?.docs.length ?? 0;
                                       return _buildNavItem(
                                         context,
                                         Icons.groups_rounded,
@@ -236,7 +238,8 @@ class MainLayoutScreen extends StatelessWidget {
                                 ),
                                 Expanded(
                                   child: StreamBuilder<QuerySnapshot>(
-                                    stream: social.streamIncomingFriendRequests(),
+                                    stream: social
+                                        .streamIncomingFriendRequests(),
                                     builder: (context, friendSnapshot) {
                                       final friendCount =
                                           friendSnapshot.data?.docs.length ?? 0;
@@ -244,15 +247,32 @@ class MainLayoutScreen extends StatelessWidget {
                                         stream: social.streamHabitInvites(),
                                         builder: (context, habitSnapshot) {
                                           final habitCount =
-                                              habitSnapshot.data?.docs.length ?? 0;
-                                          final total = friendCount + habitCount;
-                                          return _buildNavItem(
-                                            context,
-                                            Icons.people_alt_rounded,
-                                            'Friends',
-                                            3,
-                                            badgeCount: total,
-                                            compact: compact,
+                                              habitSnapshot.data?.docs.length ??
+                                              0;
+                                          return StreamBuilder<QuerySnapshot>(
+                                            stream: social
+                                                .streamChallengeInvites(),
+                                            builder:
+                                                (context, challengeSnapshot) {
+                                                  final challengeCount =
+                                                      challengeSnapshot
+                                                          .data
+                                                          ?.docs
+                                                          .length ??
+                                                      0;
+                                                  final total =
+                                                      friendCount +
+                                                      habitCount +
+                                                      challengeCount;
+                                                  return _buildNavItem(
+                                                    context,
+                                                    Icons.people_alt_rounded,
+                                                    'Friends',
+                                                    3,
+                                                    badgeCount: total,
+                                                    compact: compact,
+                                                  );
+                                                },
                                           );
                                         },
                                       );
@@ -301,7 +321,9 @@ class MainLayoutScreen extends StatelessWidget {
 
                           final targetTab = result['targetTab'];
                           if (targetTab is int) {
-                            context.read<NavigationProvider>().setIndex(targetTab);
+                            context.read<NavigationProvider>().setIndex(
+                              targetTab,
+                            );
                           } else {
                             context.read<NavigationProvider>().setIndex(0);
                           }
@@ -309,9 +331,9 @@ class MainLayoutScreen extends StatelessWidget {
                           final snackbarMessage = result['snackbarMessage'];
                           if (snackbarMessage is String &&
                               snackbarMessage.isNotEmpty) {
-                            ScaffoldMessenger.of(
-                              context,
-                            ).showSnackBar(SnackBar(content: Text(snackbarMessage)));
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text(snackbarMessage)),
+                            );
                           }
                         },
                         child: const Icon(Icons.add, size: 38),
@@ -335,7 +357,8 @@ class MainLayoutScreen extends StatelessWidget {
     int badgeCount = 0,
     required bool compact,
   }) {
-    final isSelected = context.watch<NavigationProvider>().currentIndex == index;
+    final isSelected =
+        context.watch<NavigationProvider>().currentIndex == index;
     final scheme = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final iconColor = isSelected

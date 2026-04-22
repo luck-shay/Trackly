@@ -65,7 +65,8 @@ class FriendsScreen extends StatelessWidget {
                     color: scheme.onSurface.withValues(alpha: 0.7),
                   ),
                 ),
-                onFieldSubmitted: (val) => context.read<FriendsProvider>().searchUsers(val),
+                onFieldSubmitted: (val) =>
+                    context.read<FriendsProvider>().searchUsers(val),
               ),
             ),
             const SizedBox(height: 24),
@@ -82,56 +83,55 @@ class FriendsScreen extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               ...friendsProvider.searchResults.map(
-                    (user) => ListTile(
-                      leading: CircleAvatar(
-                        backgroundColor: Theme.of(
-                          context,
-                        ).colorScheme.primary.withValues(alpha: 0.2),
-                        backgroundImage: user.photoUrl != null
-                            ? NetworkImage(user.photoUrl!)
-                            : null,
-                        child: user.photoUrl == null
-                          ? Icon(Icons.person, color: scheme.onPrimary)
-                            : null,
-                      ),
-                      title: Text(
-                        user.displayName,
-                        style: GoogleFonts.inter(fontWeight: FontWeight.bold),
-                      ),
-                      subtitle: Text(
-                        user.username != null
-                            ? '@${user.username}'
-                            : user.email,
-                        style: GoogleFonts.inter(
-                          fontSize: 12,
-                          color: scheme.onSurface.withValues(alpha: 0.68),
-                        ),
-                      ),
-                      trailing: IconButton(
-                        icon: const Icon(
-                          Icons.person_add_rounded,
-                          color: Color(0xFF00E676),
-                        ),
-                        onPressed: () async {
-                          await social.sendFriendRequest(user.uid);
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  'Friend request sent to ${user.displayName}',
-                                ),
-                              ),
-                            );
-                          }
-                        },
-                      ),
+                (user) => ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: Theme.of(
+                      context,
+                    ).colorScheme.primary.withValues(alpha: 0.2),
+                    backgroundImage: user.photoUrl != null
+                        ? NetworkImage(user.photoUrl!)
+                        : null,
+                    child: user.photoUrl == null
+                        ? Icon(Icons.person, color: scheme.onPrimary)
+                        : null,
+                  ),
+                  title: Text(
+                    user.displayName,
+                    style: GoogleFonts.inter(fontWeight: FontWeight.bold),
+                  ),
+                  subtitle: Text(
+                    user.username != null ? '@${user.username}' : user.email,
+                    style: GoogleFonts.inter(
+                      fontSize: 12,
+                      color: scheme.onSurface.withValues(alpha: 0.68),
                     ),
                   ),
+                  trailing: IconButton(
+                    icon: const Icon(
+                      Icons.person_add_rounded,
+                      color: Color(0xFF00E676),
+                    ),
+                    onPressed: () async {
+                      await social.sendFriendRequest(user.uid);
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              'Friend request sent to ${user.displayName}',
+                            ),
+                          ),
+                        );
+                      }
+                    },
+                  ),
+                ),
+              ),
               Divider(
                 color: scheme.onSurface.withValues(alpha: 0.12),
                 height: 48,
               ),
-            ] else if (friendsProvider.hasSearched && friendsProvider.lastQuery.isNotEmpty) ...[
+            ] else if (friendsProvider.hasSearched &&
+                friendsProvider.lastQuery.isNotEmpty) ...[
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
@@ -185,142 +185,271 @@ class FriendsScreen extends StatelessWidget {
                           social.getUserProfile(fromUid),
                           db.getHabitById(habitId),
                         ]),
-                        builder:
-                            (
-                              ctx,
-                              AsyncSnapshot<List<dynamic>> combinedSnapshot,
-                            ) {
-                              if (!combinedSnapshot.hasData) {
-                                return const SizedBox.shrink();
-                              }
+                        builder: (ctx, AsyncSnapshot<List<dynamic>> combinedSnapshot) {
+                          if (!combinedSnapshot.hasData) {
+                            return const SizedBox.shrink();
+                          }
 
-                              final user =
-                                  combinedSnapshot.data![0] as UserProfile?;
-                              final habit = combinedSnapshot.data![1] as Habit?;
+                          final user =
+                              combinedSnapshot.data![0] as UserProfile?;
+                          final habit = combinedSnapshot.data![1] as Habit?;
 
-                              if (user == null || habit == null) {
-                                return ListTile(
-                                  leading: CircleAvatar(
-                                    backgroundColor: Colors.red.withValues(alpha: 0.15),
-                                    child: const Icon(
-                                      Icons.error_outline_rounded,
-                                      color: Colors.redAccent,
-                                    ),
+                          if (user == null || habit == null) {
+                            return ListTile(
+                              leading: CircleAvatar(
+                                backgroundColor: Colors.red.withValues(
+                                  alpha: 0.15,
+                                ),
+                                child: const Icon(
+                                  Icons.error_outline_rounded,
+                                  color: Colors.redAccent,
+                                ),
+                              ),
+                              title: Text(
+                                'Unavailable invite',
+                                style: GoogleFonts.inter(
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              subtitle: Text(
+                                'This invite is no longer valid. Remove it.',
+                                style: GoogleFonts.inter(
+                                  color: scheme.onSurface.withValues(
+                                    alpha: 0.68,
                                   ),
-                                  title: Text(
-                                    'Unavailable invite',
-                                    style: GoogleFonts.inter(
-                                      fontWeight: FontWeight.w700,
-                                    ),
+                                ),
+                              ),
+                              trailing: IconButton(
+                                icon: const Icon(
+                                  Icons.delete_outline_rounded,
+                                  color: Colors.redAccent,
+                                ),
+                                onPressed: () async {
+                                  try {
+                                    await social.declineHabitInvite(doc.id);
+                                  } catch (_) {
+                                    if (!context.mounted) return;
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                          'Could not remove invalid invite. Please try again.',
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                },
+                              ),
+                            );
+                          }
+
+                          return ListTile(
+                            leading: CircleAvatar(
+                              backgroundColor: Theme.of(
+                                context,
+                              ).colorScheme.secondary.withValues(alpha: 0.2),
+                              child: const Icon(
+                                Icons.track_changes_rounded,
+                                color: Colors.black,
+                              ),
+                            ),
+                            title: Text(
+                              habit.title,
+                              style: GoogleFonts.outfit(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 18,
+                              ),
+                            ),
+                            subtitle: Text(
+                              'Invited by ${user.displayName}',
+                              style: GoogleFonts.inter(
+                                color: scheme.onSurface.withValues(alpha: 0.68),
+                              ),
+                            ),
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  icon: const Icon(
+                                    Icons.check_circle,
+                                    color: Color(0xFF00E676),
                                   ),
-                                  subtitle: Text(
-                                    'This invite is no longer valid. Remove it.',
-                                    style: GoogleFonts.inter(
-                                      color: scheme.onSurface.withValues(alpha: 0.68),
-                                    ),
-                                  ),
-                                  trailing: IconButton(
-                                    icon: const Icon(
-                                      Icons.delete_outline_rounded,
-                                      color: Colors.redAccent,
-                                    ),
-                                    onPressed: () async {
-                                      try {
-                                        await social.declineHabitInvite(doc.id);
-                                      } catch (_) {
-                                        if (!context.mounted) return;
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          const SnackBar(
-                                            content: Text(
-                                              'Could not remove invalid invite. Please try again.',
-                                            ),
+                                  onPressed: () async {
+                                    try {
+                                      await social.acceptHabitInvite(
+                                        doc.id,
+                                        habitId,
+                                      );
+                                    } catch (_) {
+                                      if (!context.mounted) return;
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        const SnackBar(
+                                          content: Text(
+                                            'Could not accept invite. Please try again.',
                                           ),
-                                        );
-                                      }
-                                    },
+                                        ),
+                                      );
+                                    }
+                                  },
+                                ),
+                                IconButton(
+                                  icon: const Icon(
+                                    Icons.cancel,
+                                    color: Colors.redAccent,
                                   ),
-                                );
-                              }
+                                  onPressed: () async {
+                                    try {
+                                      await social.declineHabitInvite(doc.id);
+                                    } catch (_) {
+                                      if (!context.mounted) return;
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        const SnackBar(
+                                          content: Text(
+                                            'Could not decline invite. Please try again.',
+                                          ),
+                                        ),
+                                      );
+                                    }
+                                  },
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      );
+                    }),
+                    Divider(
+                      color: scheme.onSurface.withValues(alpha: 0.12),
+                      height: 48,
+                    ),
+                  ],
+                );
+              },
+            ),
 
-                              return ListTile(
-                                leading: CircleAvatar(
-                                  backgroundColor: Theme.of(
-                                    context,
-                                  ).colorScheme.secondary.withValues(alpha: 0.2),
-                                  child: const Icon(
-                                    Icons.track_changes_rounded,
-                                    color: Colors.black,
+            // Pending Friend Requests
+            StreamBuilder<QuerySnapshot>(
+              stream: social.streamChallengeInvites(),
+              builder: (context, snapshot) {
+                if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                  return const SizedBox.shrink();
+                }
+
+                final invites = snapshot.data!.docs;
+
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Challenge Invites',
+                      style: GoogleFonts.outfit(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    ...invites.map((doc) {
+                      final data = doc.data() as Map<String, dynamic>;
+                      final fromUid = (data['from'] as String? ?? '').trim();
+                      final groupId = (data['groupId'] as String? ?? '').trim();
+                      final challengeId = (data['challengeId'] as String? ?? '')
+                          .trim();
+                      final challengeTitle =
+                          (data['challengeTitle'] as String? ?? 'Challenge')
+                              .trim();
+
+                      return FutureBuilder<UserProfile?>(
+                        future: social.getUserProfile(fromUid),
+                        builder: (ctx, userSnapshot) {
+                          final inviter = userSnapshot.data;
+                          final inviterLabel =
+                              inviter?.displayName.trim().isNotEmpty == true
+                              ? inviter!.displayName
+                              : 'A group member';
+
+                          return ListTile(
+                            leading: CircleAvatar(
+                              backgroundColor: Theme.of(
+                                context,
+                              ).colorScheme.primary.withValues(alpha: 0.2),
+                              child: const Icon(
+                                Icons.flag_rounded,
+                                color: Colors.black,
+                              ),
+                            ),
+                            title: Text(
+                              challengeTitle,
+                              style: GoogleFonts.outfit(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 18,
+                              ),
+                            ),
+                            subtitle: Text(
+                              'Invited by $inviterLabel',
+                              style: GoogleFonts.inter(
+                                color: scheme.onSurface.withValues(alpha: 0.68),
+                              ),
+                            ),
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  icon: const Icon(
+                                    Icons.check_circle,
+                                    color: Color(0xFF00E676),
                                   ),
+                                  onPressed: () async {
+                                    try {
+                                      await social.acceptChallengeInvite(
+                                        inviteId: doc.id,
+                                        groupId: groupId,
+                                        challengeId: challengeId,
+                                      );
+                                    } catch (_) {
+                                      if (!context.mounted) return;
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        const SnackBar(
+                                          content: Text(
+                                            'Could not accept challenge invite. Please try again.',
+                                          ),
+                                        ),
+                                      );
+                                    }
+                                  },
                                 ),
-                                title: Text(
-                                  habit.title,
-                                  style: GoogleFonts.outfit(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 18,
+                                IconButton(
+                                  icon: const Icon(
+                                    Icons.cancel,
+                                    color: Colors.redAccent,
                                   ),
+                                  onPressed: () async {
+                                    try {
+                                      await social.declineChallengeInvite(
+                                        doc.id,
+                                      );
+                                    } catch (_) {
+                                      if (!context.mounted) return;
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        const SnackBar(
+                                          content: Text(
+                                            'Could not decline challenge invite. Please try again.',
+                                          ),
+                                        ),
+                                      );
+                                    }
+                                  },
                                 ),
-                                subtitle: Text(
-                                  'Invited by ${user.displayName}',
-                                  style: GoogleFonts.inter(
-                                    color: scheme.onSurface.withValues(alpha: 0.68),
-                                  ),
-                                ),
-                                trailing: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    IconButton(
-                                      icon: const Icon(
-                                        Icons.check_circle,
-                                        color: Color(0xFF00E676),
-                                      ),
-                                      onPressed: () async {
-                                        try {
-                                          await social.acceptHabitInvite(
-                                            doc.id,
-                                            habitId,
-                                          );
-                                        } catch (_) {
-                                          if (!context.mounted) return;
-                                          ScaffoldMessenger.of(
-                                            context,
-                                          ).showSnackBar(
-                                            const SnackBar(
-                                              content: Text(
-                                                'Could not accept invite. Please try again.',
-                                              ),
-                                            ),
-                                          );
-                                        }
-                                      },
-                                    ),
-                                    IconButton(
-                                      icon: const Icon(
-                                        Icons.cancel,
-                                        color: Colors.redAccent,
-                                      ),
-                                      onPressed: () async {
-                                        try {
-                                          await social.declineHabitInvite(
-                                            doc.id,
-                                          );
-                                        } catch (_) {
-                                          if (!context.mounted) return;
-                                          ScaffoldMessenger.of(
-                                            context,
-                                          ).showSnackBar(
-                                            const SnackBar(
-                                              content: Text(
-                                                'Could not decline invite. Please try again.',
-                                              ),
-                                            ),
-                                          );
-                                        }
-                                      },
-                                    ),
-                                  ],
-                                ),
-                              );
-                            },
+                              ],
+                            ),
+                          );
+                        },
                       );
                     }),
                     Divider(
@@ -360,14 +489,18 @@ class FriendsScreen extends StatelessWidget {
                       return FutureBuilder<UserProfile?>(
                         future: social.getUserProfile(fromUid),
                         builder: (ctx, userSnapshot) {
-                          if (userSnapshot.connectionState == ConnectionState.waiting) {
+                          if (userSnapshot.connectionState ==
+                              ConnectionState.waiting) {
                             return const SizedBox.shrink();
                           }
 
-                          if (!userSnapshot.hasData || userSnapshot.data == null) {
+                          if (!userSnapshot.hasData ||
+                              userSnapshot.data == null) {
                             return ListTile(
                               leading: CircleAvatar(
-                                backgroundColor: Colors.red.withValues(alpha: 0.15),
+                                backgroundColor: Colors.red.withValues(
+                                  alpha: 0.15,
+                                ),
                                 child: const Icon(
                                   Icons.error_outline_rounded,
                                   color: Colors.redAccent,
@@ -382,7 +515,9 @@ class FriendsScreen extends StatelessWidget {
                               subtitle: Text(
                                 'This friend request is no longer valid. Remove it.',
                                 style: GoogleFonts.inter(
-                                  color: scheme.onSurface.withValues(alpha: 0.68),
+                                  color: scheme.onSurface.withValues(
+                                    alpha: 0.68,
+                                  ),
                                 ),
                               ),
                               trailing: IconButton(
@@ -411,7 +546,9 @@ class FriendsScreen extends StatelessWidget {
                           final user = userSnapshot.data!;
                           return ListTile(
                             leading: CircleAvatar(
-                              backgroundColor: Colors.orange.withValues(alpha: 0.2),
+                              backgroundColor: Colors.orange.withValues(
+                                alpha: 0.2,
+                              ),
                               backgroundImage: user.photoUrl != null
                                   ? NetworkImage(user.photoUrl!)
                                   : null,
@@ -529,44 +666,42 @@ class FriendsScreen extends StatelessWidget {
                 return Column(
                   children: [
                     ...friends.map(
-                        (friend) => ListTile(
-                          leading: CircleAvatar(
-                            backgroundColor: Theme.of(
-                              context,
-                            ).colorScheme.primary.withValues(alpha: 0.2),
-                            backgroundImage: friend.photoUrl != null
-                                ? NetworkImage(friend.photoUrl!)
-                                : null,
-                            child: friend.photoUrl == null
+                      (friend) => ListTile(
+                        leading: CircleAvatar(
+                          backgroundColor: Theme.of(
+                            context,
+                          ).colorScheme.primary.withValues(alpha: 0.2),
+                          backgroundImage: friend.photoUrl != null
+                              ? NetworkImage(friend.photoUrl!)
+                              : null,
+                          child: friend.photoUrl == null
                               ? Icon(Icons.person, color: scheme.onPrimary)
-                                : null,
-                          ),
-                          title: Text(
-                            friend.displayName,
-                            style: GoogleFonts.inter(
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          subtitle: Text(
-                            friend.username != null
-                                ? '@${friend.username}'
-                                : friend.email,
-                            style: GoogleFonts.inter(
-                              fontSize: 12,
-                              color: scheme.onSurface.withValues(alpha: 0.68),
-                            ),
-                          ),
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) =>
-                                    FriendProfileScreen(friend: friend),
-                              ),
-                            );
-                          },
+                              : null,
                         ),
+                        title: Text(
+                          friend.displayName,
+                          style: GoogleFonts.inter(fontWeight: FontWeight.bold),
+                        ),
+                        subtitle: Text(
+                          friend.username != null
+                              ? '@${friend.username}'
+                              : friend.email,
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            color: scheme.onSurface.withValues(alpha: 0.68),
+                          ),
+                        ),
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) =>
+                                  FriendProfileScreen(friend: friend),
+                            ),
+                          );
+                        },
                       ),
+                    ),
                   ],
                 ).animate().fade().slideY(begin: 0.1);
               },

@@ -40,9 +40,11 @@ class NotificationService with WidgetsBindingObserver {
   StreamSubscription<QuerySnapshot>? _friendInviteSubscription;
   StreamSubscription<QuerySnapshot>? _habitInviteSubscription;
   StreamSubscription<QuerySnapshot>? _groupInviteSubscription;
+  StreamSubscription<QuerySnapshot>? _challengeInviteSubscription;
   StreamSubscription<QuerySnapshot>? _friendInviteResponseSubscription;
   StreamSubscription<QuerySnapshot>? _habitInviteResponseSubscription;
   StreamSubscription<QuerySnapshot>? _groupInviteResponseSubscription;
+  StreamSubscription<QuerySnapshot>? _challengeInviteResponseSubscription;
   StreamSubscription<QuerySnapshot>? _habitNoticeSubscription;
   
   Set<String> _notifiedInviteIds = {};
@@ -242,9 +244,11 @@ class NotificationService with WidgetsBindingObserver {
       _friendInviteSubscription?.cancel();
       _habitInviteSubscription?.cancel();
       _groupInviteSubscription?.cancel();
+      _challengeInviteSubscription?.cancel();
       _friendInviteResponseSubscription?.cancel();
       _habitInviteResponseSubscription?.cancel();
       _groupInviteResponseSubscription?.cancel();
+      _challengeInviteResponseSubscription?.cancel();
       _habitNoticeSubscription?.cancel();
 
       if (user == null) {
@@ -297,6 +301,16 @@ class NotificationService with WidgetsBindingObserver {
               onError: (e) => debugPrint('Group invite stream error: $e'),
             );
 
+        _challengeInviteSubscription = db
+            .collection('challengeInvites')
+            .where('to', isEqualTo: user.uid)
+            .where('status', isEqualTo: 'pending')
+            .snapshots()
+            .listen(
+              (s) => _processInviteSnapshot(s, 'challengeInvite'),
+              onError: (e) => debugPrint('Challenge invite stream error: $e'),
+            );
+
         // Notify sender when outgoing invites are accepted or declined.
         _friendInviteResponseSubscription = db
             .collection('friendRequests')
@@ -323,6 +337,15 @@ class NotificationService with WidgetsBindingObserver {
             .listen(
               (s) => _processInviteResponseSnapshot(s, 'groupInvite'),
               onError: (e) => debugPrint('Group invite response stream error: $e'),
+            );
+
+        _challengeInviteResponseSubscription = db
+            .collection('challengeInvites')
+            .where('from', isEqualTo: user.uid)
+            .snapshots()
+            .listen(
+              (s) => _processInviteResponseSnapshot(s, 'challengeInvite'),
+              onError: (e) => debugPrint('Challenge invite response stream error: $e'),
             );
 
         _habitNoticeSubscription = db
@@ -420,6 +443,10 @@ class NotificationService with WidgetsBindingObserver {
           final groupName = data['groupName'] as String?;
           title = 'Group Invite';
           body = '$senderName invited you to join "$groupName"';
+        } else if (type == 'challengeInvite') {
+          final challengeTitle = data['challengeTitle'] as String?;
+          title = 'Challenge Invite';
+          body = '$senderName challenged you to "$challengeTitle"';
         }
 
         await _localNotifications.show(
@@ -486,6 +513,15 @@ class NotificationService with WidgetsBindingObserver {
           body = isAccepted
               ? '$targetName accepted your invite to "$habitTitle".'
               : '$targetName declined your invite to "$habitTitle".';
+        } else if (type == 'challengeInvite') {
+          final challengeTitle = (data['challengeTitle'] as String?)?.trim();
+          final resolvedTitle = (challengeTitle == null || challengeTitle.isEmpty)
+              ? 'your challenge'
+              : challengeTitle;
+          title = isAccepted ? 'Challenge Accepted' : 'Challenge Declined';
+          body = isAccepted
+              ? '$targetName accepted your challenge "$resolvedTitle".'
+              : '$targetName declined your challenge "$resolvedTitle".';
         } else {
           final groupName = (data['groupName'] as String?)?.trim();
           final resolvedGroupName = (groupName == null || groupName.isEmpty)

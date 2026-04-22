@@ -1,14 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:table_calendar/table_calendar.dart';
 
 import '../models/group.dart';
+import '../models/group_challenge.dart';
 import '../models/group_task.dart';
 import '../models/user_profile.dart';
 import '../services/group_service.dart';
 import '../services/social_service.dart';
 import '../theme/app_layout.dart';
 import '../utils/quantity_format.dart';
+import 'create_group_challenge_screen.dart';
+import 'group_challenge_detail_screen.dart';
 import 'create_group_task_screen.dart';
 
 class GroupDetailScreen extends StatefulWidget {
@@ -21,7 +25,45 @@ class GroupDetailScreen extends StatefulWidget {
 }
 
 class _GroupDetailScreenState extends State<GroupDetailScreen> {
+  bool _isChallengesExpanded = true;
   bool _isTasksExpanded = false;
+
+  Widget _buildChallengesHeader(BuildContext context, int challengeCount) {
+    final onSurface = Theme.of(context).colorScheme.onSurface;
+    return InkWell(
+      onTap: () {
+        setState(() {
+          _isChallengesExpanded = !_isChallengesExpanded;
+        });
+      },
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                'LIVE CHALLENGES ($challengeCount)',
+                style: GoogleFonts.inter(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: onSurface.withValues(alpha: 0.62),
+                  letterSpacing: 1.2,
+                ),
+              ),
+            ),
+            Icon(
+              _isChallengesExpanded
+                  ? Icons.keyboard_arrow_up_rounded
+                  : Icons.keyboard_arrow_down_rounded,
+              color: onSurface.withValues(alpha: 0.62),
+              size: 20,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   Widget _buildTasksHeader(BuildContext context, int taskCount) {
     final onSurface = Theme.of(context).colorScheme.onSurface;
@@ -142,6 +184,37 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
     );
   }
 
+  Future<void> _createChallenge(BuildContext context, Group group) async {
+    final createdChallenge = await Navigator.push<GroupChallenge>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => CreateGroupChallengeScreen(group: group),
+      ),
+    );
+
+    if (!context.mounted || createdChallenge == null) {
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Challenge started: ${createdChallenge.title}')),
+    );
+  }
+
+  Future<void> _openChallenge(
+    BuildContext context,
+    Group group,
+    GroupChallenge challenge,
+  ) async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) =>
+            GroupChallengeDetailScreen(group: group, challenge: challenge),
+      ),
+    );
+  }
+
   Future<void> _editTask(
     BuildContext context,
     Group group,
@@ -204,10 +277,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
     }
   }
 
-  Future<bool> _confirmDeleteTask(
-    BuildContext context,
-    GroupTask task,
-  ) async {
+  Future<bool> _confirmDeleteTask(BuildContext context, GroupTask task) async {
     return await showDialog<bool>(
           context: context,
           builder: (dialogContext) {
@@ -265,7 +335,9 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                   height: 4,
                   margin: const EdgeInsets.only(bottom: 12),
                   decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.2),
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.onSurface.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(999),
                   ),
                 ),
@@ -281,10 +353,9 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                   Text(
                     task.description,
                     style: GoogleFonts.inter(
-                      color: Theme.of(context)
-                          .colorScheme
-                          .onSurface
-                          .withValues(alpha: 0.75),
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withValues(alpha: 0.75),
                       height: 1.35,
                     ),
                   ),
@@ -300,10 +371,9 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                       ? 'Your progress today: ${formatQuantity(todayValue ?? 0, maxDecimals: 1)}/${formatQuantity(task.quantMax, maxDecimals: 1)} ${task.quantUnit}'
                       : 'Type: checkbox task',
                   style: GoogleFonts.inter(
-                    color: Theme.of(context)
-                        .colorScheme
-                        .onSurface
-                        .withValues(alpha: 0.7),
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.onSurface.withValues(alpha: 0.7),
                   ),
                 ),
               ],
@@ -558,10 +628,226 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                           ),
                         ],
                       ),
+                      const VGap(AppLayout.xs),
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          onPressed: () => _createChallenge(context, liveGroup),
+                          icon: const Icon(Icons.flag_rounded),
+                          label: const Text('Start Challenge'),
+                        ),
+                      ),
                     ],
                   ),
                 ),
                 const VGap(AppLayout.lg),
+                StreamBuilder<List<GroupChallenge>>(
+                  stream: GroupService().streamGroupChallenges(liveGroup.id),
+                  builder: (context, challengeSnapshot) {
+                    final challenges =
+                        challengeSnapshot.data ?? const <GroupChallenge>[];
+                    final activeCount = challenges
+                        .where((challenge) => challenge.isActive)
+                        .length;
+
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildChallengesHeader(context, challenges.length),
+                        const VGap(AppLayout.sm),
+                        if (_isChallengesExpanded)
+                          if (challenges.isEmpty)
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(AppLayout.md),
+                              decoration: BoxDecoration(
+                                color: Theme.of(context).colorScheme.surface,
+                                borderRadius: BorderRadius.circular(18),
+                                border: Border.all(
+                                  color: Theme.of(context).colorScheme.onSurface
+                                      .withValues(alpha: 0.1),
+                                ),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'No challenges yet.',
+                                    style: GoogleFonts.outfit(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                  const VGap(AppLayout.xs),
+                                  Text(
+                                    'Start a time-boxed head-to-head challenge for this group.',
+                                    style: GoogleFonts.inter(
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onSurface
+                                          .withValues(alpha: 0.7),
+                                      height: 1.4,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            )
+                          else
+                            Column(
+                              children: [
+                                Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: Padding(
+                                    padding: const EdgeInsets.only(
+                                      left: AppLayout.xs,
+                                      bottom: AppLayout.xs,
+                                    ),
+                                    child: Text(
+                                      '$activeCount active right now',
+                                      style: GoogleFonts.inter(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w700,
+                                        color: Theme.of(
+                                          context,
+                                        ).colorScheme.primary,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                ...challenges.map((challenge) {
+                                  final now = DateTime.now();
+                                  final hasStarted = !now.isBefore(
+                                    challenge.startAt,
+                                  );
+                                  final hasEnded = now.isAfter(challenge.endAt);
+                                  final daysLeft = hasEnded
+                                      ? 0
+                                      : challenge.endAt
+                                                .difference(
+                                                  DateTime(
+                                                    now.year,
+                                                    now.month,
+                                                    now.day,
+                                                  ),
+                                                )
+                                                .inDays +
+                                            1;
+
+                                  String statusLabel;
+                                  Color statusColor;
+                                  if (!challenge.isReadyToStart) {
+                                    statusLabel = 'Waiting';
+                                    statusColor = Theme.of(
+                                      context,
+                                    ).colorScheme.secondary;
+                                  } else if (!hasStarted) {
+                                    statusLabel = 'Upcoming';
+                                    statusColor = Theme.of(
+                                      context,
+                                    ).colorScheme.secondary;
+                                  } else if (hasEnded) {
+                                    statusLabel = 'Ended';
+                                    statusColor = Theme.of(
+                                      context,
+                                    ).colorScheme.onSurface;
+                                  } else {
+                                    statusLabel =
+                                        '$daysLeft day${daysLeft == 1 ? '' : 's'} left';
+                                    statusColor = Theme.of(
+                                      context,
+                                    ).colorScheme.primary;
+                                  }
+
+                                  return Container(
+                                    width: double.infinity,
+                                    margin: const EdgeInsets.only(
+                                      bottom: AppLayout.sm,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.surface,
+                                      borderRadius: BorderRadius.circular(16),
+                                      border: Border.all(
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .onSurface
+                                            .withValues(alpha: 0.1),
+                                      ),
+                                    ),
+                                    child: ListTile(
+                                      onTap: () => _openChallenge(
+                                        context,
+                                        liveGroup,
+                                        challenge,
+                                      ),
+                                      title: Text(
+                                        challenge.title,
+                                        style: GoogleFonts.outfit(
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                      subtitle: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          const SizedBox(height: 6),
+                                          Text(
+                                            challenge.hasTarget
+                                                ? 'Target: ${formatQuantity(challenge.targetValue, maxDecimals: 1)} ${challenge.unit}'
+                                                : 'No target set',
+                                            style: GoogleFonts.inter(
+                                              fontSize: 12,
+                                              color: Theme.of(context)
+                                                  .colorScheme
+                                                  .onSurface
+                                                  .withValues(alpha: 0.72),
+                                            ),
+                                          ),
+                                          Text(
+                                            '${challenge.participantIds.length} participants',
+                                            style: GoogleFonts.inter(
+                                              fontSize: 12,
+                                              color: Theme.of(context)
+                                                  .colorScheme
+                                                  .onSurface
+                                                  .withValues(alpha: 0.62),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      trailing: Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 10,
+                                          vertical: 6,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: statusColor.withValues(
+                                            alpha: 0.15,
+                                          ),
+                                          borderRadius: BorderRadius.circular(
+                                            999,
+                                          ),
+                                        ),
+                                        child: Text(
+                                          statusLabel,
+                                          style: GoogleFonts.inter(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w700,
+                                            color: statusColor,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                }),
+                              ],
+                            ),
+                      ],
+                    );
+                  },
+                ),
+                const VGap(AppLayout.md),
                 StreamBuilder<List<GroupTask>>(
                   stream: GroupService().streamGroupTasks(liveGroup.id),
                   builder: (context, taskSnapshot) {
@@ -573,7 +859,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                     final now = DateTime.now();
                     final uid = GroupService().userId;
                     final isGroupAdmin =
-                        uid.isNotEmpty && uid == liveGroup.ownerId;
+                        uid.isNotEmpty && liveGroup.memberIds.contains(uid);
 
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1090,6 +1376,10 @@ class _GroupLeaderboardCard extends StatefulWidget {
 
 class _GroupLeaderboardCardState extends State<_GroupLeaderboardCard> {
   _LeaderboardWindow _window = _LeaderboardWindow.week;
+  bool _showCalendar = false;
+  DateTime _calendarFocusedDay = DateTime.now();
+  DateTime? _calendarSelectedDay;
+  String? _calendarSelectedUid;
 
   Widget _buildWindowChip(
     BuildContext context, {
@@ -1206,6 +1496,27 @@ class _GroupLeaderboardCardState extends State<_GroupLeaderboardCard> {
     return total;
   }
 
+  int _completionsOnDateForUser({required String uid, required DateTime day}) {
+    var total = 0;
+    for (final task in widget.tasks) {
+      final dates = task.completions[uid] ?? const <DateTime>[];
+      total += dates.where((date) => _isSameDay(date, day)).length;
+    }
+    return total;
+  }
+
+  Map<DateTime, int> _calendarCountsForUser(String uid) {
+    final counts = <DateTime, int>{};
+    for (final task in widget.tasks) {
+      final dates = task.completions[uid] ?? const <DateTime>[];
+      for (final date in dates) {
+        final day = _dayOnly(date);
+        counts[day] = (counts[day] ?? 0) + 1;
+      }
+    }
+    return counts;
+  }
+
   @override
   Widget build(BuildContext context) {
     final now = DateTime.now();
@@ -1301,6 +1612,18 @@ class _GroupLeaderboardCardState extends State<_GroupLeaderboardCard> {
           _LeaderboardWindow.allTime => 'all time',
         };
 
+        if (rankRows.isNotEmpty && _calendarSelectedUid == null) {
+          _calendarSelectedUid = rankRows.first.uid;
+        }
+        final selectedUid = _calendarSelectedUid;
+        final dayCounts = selectedUid == null
+            ? const <DateTime, int>{}
+            : _calendarCountsForUser(selectedUid);
+        final selectedDay = _calendarSelectedDay ?? _dayOnly(now);
+        final selectedDayCount = selectedUid == null
+            ? 0
+            : _completionsOnDateForUser(uid: selectedUid, day: selectedDay);
+
         return Container(
           width: double.infinity,
           padding: const EdgeInsets.all(AppLayout.md),
@@ -1340,6 +1663,22 @@ class _GroupLeaderboardCardState extends State<_GroupLeaderboardCard> {
                 children: [
                   _buildWindowChip(
                     context,
+                    label: 'Leaderboard',
+                    selected: !_showCalendar,
+                    onTap: () {
+                      setState(() => _showCalendar = false);
+                    },
+                  ),
+                  _buildWindowChip(
+                    context,
+                    label: 'Calendar',
+                    selected: _showCalendar,
+                    onTap: () {
+                      setState(() => _showCalendar = true);
+                    },
+                  ),
+                  _buildWindowChip(
+                    context,
                     label: 'Today',
                     selected: _window == _LeaderboardWindow.today,
                     onTap: () {
@@ -1365,25 +1704,112 @@ class _GroupLeaderboardCardState extends State<_GroupLeaderboardCard> {
                 ],
               ),
               const VGap(AppLayout.sm),
-              if (rankRows.isEmpty)
-                Text(
-                  'No members yet.',
-                  style: GoogleFonts.inter(
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.onSurface.withValues(alpha: 0.68),
+              if (_showCalendar) ...[
+                if (rankRows.isEmpty)
+                  Text(
+                    'No members yet.',
+                    style: GoogleFonts.inter(
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withValues(alpha: 0.68),
+                    ),
+                  )
+                else ...[
+                  DropdownButtonFormField<String>(
+                    initialValue: selectedUid,
+                    decoration: const InputDecoration(
+                      labelText: 'Member',
+                      border: OutlineInputBorder(),
+                    ),
+                    items: rankRows
+                        .map(
+                          (row) => DropdownMenuItem<String>(
+                            value: row.uid,
+                            child: Text(row.name),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (value) {
+                      if (value == null) return;
+                      setState(() {
+                        _calendarSelectedUid = value;
+                      });
+                    },
                   ),
-                )
-              else
-                ...rankRows.asMap().entries.map((entry) {
-                  final index = entry.key;
-                  final row = entry.value;
-                  return _LeaderboardTile(
-                    rank: index + 1,
-                    row: row,
-                    metricLabel: scoreLabel,
-                  );
-                }),
+                  const VGap(AppLayout.sm),
+                  TableCalendar<void>(
+                    firstDay: DateTime.utc(2020, 1, 1),
+                    lastDay: DateTime.utc(2035, 12, 31),
+                    focusedDay: _calendarFocusedDay,
+                    selectedDayPredicate: (day) =>
+                        _isSameDay(day, _calendarSelectedDay ?? _dayOnly(now)),
+                    onDaySelected: (selected, focused) {
+                      setState(() {
+                        _calendarSelectedDay = selected;
+                        _calendarFocusedDay = focused;
+                      });
+                    },
+                    calendarBuilders: CalendarBuilders(
+                      defaultBuilder: (context, day, focusedDay) {
+                        final count = dayCounts[_dayOnly(day)] ?? 0;
+                        if (count <= 0) {
+                          return null;
+                        }
+                        final intensity = count >= 5
+                            ? 0.45
+                            : count >= 3
+                            ? 0.32
+                            : 0.2;
+                        return Container(
+                          margin: const EdgeInsets.all(5),
+                          decoration: BoxDecoration(
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.primary.withValues(alpha: intensity),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          alignment: Alignment.center,
+                          child: Text(
+                            '${day.day}',
+                            style: GoogleFonts.inter(
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  const VGap(AppLayout.xs),
+                  Text(
+                    'Selected day: ${selectedDay.year}-${selectedDay.month.toString().padLeft(2, '0')}-${selectedDay.day.toString().padLeft(2, '0')} • $selectedDayCount completions',
+                    style: GoogleFonts.inter(
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withValues(alpha: 0.72),
+                    ),
+                  ),
+                ],
+              ] else ...[
+                if (rankRows.isEmpty)
+                  Text(
+                    'No members yet.',
+                    style: GoogleFonts.inter(
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withValues(alpha: 0.68),
+                    ),
+                  )
+                else
+                  ...rankRows.asMap().entries.map((entry) {
+                    final index = entry.key;
+                    final row = entry.value;
+                    return _LeaderboardTile(
+                      rank: index + 1,
+                      row: row,
+                      metricLabel: scoreLabel,
+                    );
+                  }),
+              ],
               const VGap(AppLayout.sm),
               Wrap(
                 spacing: 8,

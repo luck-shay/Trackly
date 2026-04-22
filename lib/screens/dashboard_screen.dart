@@ -9,6 +9,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../models/group_challenge.dart';
 import '../models/habit.dart';
 import '../models/user_profile.dart';
 import '../widgets/habit_card.dart';
@@ -17,11 +18,12 @@ import '../providers/navigation_provider.dart';
 import '../providers/quantified_log_provider.dart';
 import '../services/group_service.dart';
 import '../utils/quantity_format.dart';
+import 'group_challenge_detail_screen.dart';
 import 'group_detail_screen.dart';
 import 'habit_leaderboard_screen.dart';
 import 'profile_screen.dart';
 
-enum DashboardFilter { all, group, shared, incomplete, completed }
+enum DashboardFilter { all, challenges, group, shared, incomplete, completed }
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -32,16 +34,22 @@ class DashboardScreen extends StatefulWidget {
   State<DashboardScreen> createState() => _DashboardScreenState();
 }
 
-class _DashboardScreenState extends State<DashboardScreen> {
+class _DashboardScreenState extends State<DashboardScreen>
+    with WidgetsBindingObserver {
   bool _isLoadingSectionPrefs = true;
   DashboardFilter _selectedFilter = DashboardFilter.all;
   List<String> _groupOrderIds = <String>[];
   List<String> _personalOrderIds = <String>[];
+  final Set<String> _completedHabitIdsForOrdering = <String>{};
   final Set<String> _movingToBottomHabitIds = <String>{};
+  bool _hasCapturedInitialCompletionOrder = false;
+  NavigationProvider? _navigationProvider;
+  int _lastNavIndex = 0;
 
   String _filterLabel(DashboardFilter filter) {
     return switch (filter) {
       DashboardFilter.all => 'All',
+      DashboardFilter.challenges => 'Challenges',
       DashboardFilter.group => 'Group',
       DashboardFilter.shared => 'Shared',
       DashboardFilter.incomplete => 'Incomplete',
@@ -52,18 +60,28 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget _buildFilterPills(
     BuildContext context, {
     required int allCount,
+    required int challengeCount,
     required int groupCount,
     required int sharedCount,
     required int incompleteCount,
     required int completedCount,
   }) {
-    final items = <(DashboardFilter, int)>[
-      (DashboardFilter.all, allCount),
-      (DashboardFilter.group, groupCount),
-      (DashboardFilter.shared, sharedCount),
-      (DashboardFilter.incomplete, incompleteCount),
-      (DashboardFilter.completed, completedCount),
-    ];
+    final items = <(DashboardFilter, int)>[(DashboardFilter.all, allCount)];
+    if (challengeCount > 0) {
+      items.add((DashboardFilter.challenges, challengeCount));
+    }
+    if (groupCount > 0) {
+      items.add((DashboardFilter.group, groupCount));
+    }
+    if (sharedCount > 0) {
+      items.add((DashboardFilter.shared, sharedCount));
+    }
+    if (incompleteCount > 0) {
+      items.add((DashboardFilter.incomplete, incompleteCount));
+    }
+    if (completedCount > 0) {
+      items.add((DashboardFilter.completed, completedCount));
+    }
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(24, 4, 24, 12),
@@ -71,94 +89,94 @@ class _DashboardScreenState extends State<DashboardScreen> {
         scrollDirection: Axis.horizontal,
         child: Row(
           children: [
-          ...items.map((item) {
-            final filter = item.$1;
-            final count = item.$2;
-            final selected = _selectedFilter == filter;
-          final useSecondary =
-            filter == DashboardFilter.incomplete ||
-            filter == DashboardFilter.completed;
-          final accent = useSecondary
-            ? Theme.of(context).colorScheme.secondary
-            : Theme.of(context).colorScheme.primary;
-          final bg = selected
-            ? accent.withValues(alpha: 0.2)
-            : Theme.of(context).colorScheme.surface;
-          final fg = selected
-            ? accent
-            : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.78);
+            ...items.map((item) {
+              final filter = item.$1;
+              final count = item.$2;
+              final selected = _selectedFilter == filter;
+              final useSecondary =
+                  filter == DashboardFilter.incomplete ||
+                  filter == DashboardFilter.completed;
+              final accent = useSecondary
+                  ? Theme.of(context).colorScheme.secondary
+                  : Theme.of(context).colorScheme.primary;
+              final bg = selected
+                  ? accent.withValues(alpha: 0.2)
+                  : Theme.of(context).colorScheme.surface;
+              final fg = selected
+                  ? accent
+                  : Theme.of(
+                      context,
+                    ).colorScheme.onSurface.withValues(alpha: 0.78);
 
-            return Padding(
-              padding: const EdgeInsets.only(right: 10),
-              child: InkWell(
-                onTap: () {
-                  if (_selectedFilter == filter) {
-                    return;
-                  }
-                  setState(() {
-                    _selectedFilter = filter;
-                  });
-                },
-                borderRadius: BorderRadius.circular(999),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 180),
-                  curve: Curves.easeOut,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 10,
-                  ),
-                  decoration: BoxDecoration(
-                    color: bg,
-                    borderRadius: BorderRadius.circular(999),
-                    border: Border.all(
-                      color: selected
-                        ? accent.withValues(alpha: 0.45)
-                          : Theme.of(context)
-                                .colorScheme
-                                .onSurface
-                                .withValues(alpha: 0.1),
+              return Padding(
+                padding: const EdgeInsets.only(right: 10),
+                child: InkWell(
+                  onTap: () {
+                    if (_selectedFilter == filter) {
+                      return;
+                    }
+                    setState(() {
+                      _selectedFilter = filter;
+                    });
+                  },
+                  borderRadius: BorderRadius.circular(999),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 180),
+                    curve: Curves.easeOut,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 10,
                     ),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        _filterLabel(filter),
-                        style: GoogleFonts.inter(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color: fg,
-                        ),
+                    decoration: BoxDecoration(
+                      color: bg,
+                      borderRadius: BorderRadius.circular(999),
+                      border: Border.all(
+                        color: selected
+                            ? accent.withValues(alpha: 0.45)
+                            : Theme.of(
+                                context,
+                              ).colorScheme.onSurface.withValues(alpha: 0.1),
                       ),
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: selected
-                              ? accent.withValues(alpha: 0.2)
-                              : Theme.of(
-                                  context,
-                                ).colorScheme.onSurface.withValues(alpha: 0.08),
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                        child: Text(
-                          '$count',
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          _filterLabel(filter),
                           style: GoogleFonts.inter(
-                            fontSize: 11,
+                            fontSize: 13,
                             fontWeight: FontWeight.w700,
                             color: fg,
                           ),
                         ),
-                      ),
-                    ],
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: selected
+                                ? accent.withValues(alpha: 0.2)
+                                : Theme.of(context).colorScheme.onSurface
+                                      .withValues(alpha: 0.08),
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: Text(
+                            '$count',
+                            style: GoogleFonts.inter(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: fg,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-            );
-          }).toList(),
+              );
+            }),
           ],
         ),
       ),
@@ -172,7 +190,92 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadSectionPrefs();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _attachNavigationListener();
+      _refreshCompletedOrderSnapshot();
+    });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _navigationProvider?.removeListener(_handleNavigationIndexChanged);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _refreshCompletedOrderSnapshot();
+    }
+  }
+
+  void _attachNavigationListener() {
+    if (!mounted) return;
+    final nextProvider = context.read<NavigationProvider>();
+    if (identical(_navigationProvider, nextProvider)) {
+      return;
+    }
+    _navigationProvider?.removeListener(_handleNavigationIndexChanged);
+    _navigationProvider = nextProvider;
+    _lastNavIndex = nextProvider.currentIndex;
+    nextProvider.addListener(_handleNavigationIndexChanged);
+  }
+
+  void _handleNavigationIndexChanged() {
+    final nav = _navigationProvider;
+    if (nav == null) {
+      return;
+    }
+
+    final nextIndex = nav.currentIndex;
+    final returningToDashboard = _lastNavIndex != 0 && nextIndex == 0;
+    _lastNavIndex = nextIndex;
+
+    if (returningToDashboard) {
+      _refreshCompletedOrderSnapshot();
+    }
+  }
+
+  void _refreshCompletedOrderSnapshot() {
+    if (!mounted) return;
+
+    final provider = context.read<HabitsProvider>();
+    if (provider.isLoading) {
+      return;
+    }
+
+    final now = DateTime.now();
+    final nextCompletedIds = provider.habits
+        .where((habit) => habit.isCompletedOnDate(provider.userId, now))
+        .map((habit) => habit.id)
+        .toSet();
+
+    if (_hasCapturedInitialCompletionOrder &&
+        _sameHabitIdSet(_completedHabitIdsForOrdering, nextCompletedIds)) {
+      return;
+    }
+
+    setState(() {
+      _completedHabitIdsForOrdering
+        ..clear()
+        ..addAll(nextCompletedIds);
+      _hasCapturedInitialCompletionOrder = true;
+    });
+  }
+
+  bool _sameHabitIdSet(Set<String> a, Set<String> b) {
+    if (a.length != b.length) {
+      return false;
+    }
+    for (final value in a) {
+      if (!b.contains(value)) {
+        return false;
+      }
+    }
+    return true;
   }
 
   Future<void> _loadSectionPrefs() async {
@@ -228,13 +331,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return indexed.map((entry) => entry.$2).toList();
   }
 
-  List<Habit> _orderWithCompletedLast(List<Habit> source, String userId) {
-    final now = DateTime.now();
+  List<Habit> _orderWithCompletedLast(List<Habit> source) {
     final pending = <Habit>[];
     final completed = <Habit>[];
 
     for (final habit in source) {
-      if (habit.isCompletedOnDate(userId, now)) {
+      if (_completedHabitIdsForOrdering.contains(habit.id)) {
         completed.add(habit);
       } else {
         pending.add(habit);
@@ -286,30 +388,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final moved = next.removeAt(oldIndex);
     next.insert(newIndex, moved);
     await _setPersonalOrderFromItems(next);
-  }
-
-  Future<void> _startMoveToBottomAnimation(String habitId) async {
-    if (_movingToBottomHabitIds.contains(habitId)) {
-      return;
-    }
-
-    if (mounted) {
-      setState(() {
-        _movingToBottomHabitIds.add(habitId);
-      });
-    }
-
-    await Future<void>.delayed(const Duration(milliseconds: 280));
-  }
-
-  Future<void> _finishMoveToBottomAnimation(String habitId) async {
-    await Future<void>.delayed(const Duration(milliseconds: 120));
-    if (!mounted) {
-      return;
-    }
-    setState(() {
-      _movingToBottomHabitIds.remove(habitId);
-    });
   }
 
   Widget _wrapCompletionMoveAnimation({
@@ -745,6 +823,80 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
+  Future<void> _openChallengeFromDashboard(
+    BuildContext context,
+    GroupChallenge challenge,
+  ) async {
+    try {
+      final group = await GroupService().getGroupById(challenge.groupId);
+      if (!mounted || !context.mounted) {
+        return;
+      }
+      if (group == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not find that group.')),
+        );
+        return;
+      }
+
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) =>
+              GroupChallengeDetailScreen(group: group, challenge: challenge),
+        ),
+      );
+    } catch (error) {
+      if (!mounted || !context.mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Could not open challenge. ${error.toString().split('\n').first}',
+          ),
+        ),
+      );
+    }
+  }
+
+  Future<void> _endChallenge(BuildContext context, GroupChallenge challenge) async {
+    final shouldEnd = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('End challenge now?'),
+          content: const Text(
+            'This will close the challenge immediately for everyone.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('End Challenge'),
+            ),
+          ],
+        );
+      },
+    ) ?? false;
+    if (!shouldEnd || !context.mounted) return;
+    try {
+      await GroupService().endGroupChallenge(challenge);
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Challenge ended.')),
+      );
+    } catch (error) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to end challenge: $error')),
+      );
+    }
+  }
+
   Future<bool> _canDeleteHabit({
     required Habit habit,
     required String currentUserId,
@@ -753,11 +905,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
       return true;
     }
 
-    final group = await GroupService().getGroupById(habit.groupEntityId!.trim());
+    final group = await GroupService().getGroupById(
+      habit.groupEntityId!.trim(),
+    );
     if (group == null) {
       return false;
     }
-    return group.ownerId == currentUserId;
+    return group.memberIds.contains(currentUserId);
   }
 
   Future<bool> _confirmDeleteHabit(BuildContext context, Habit habit) async {
@@ -765,10 +919,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final isShared = !isGroupTask && habit.participants.length > 1;
     final title = isShared ? 'Leave shared habit?' : 'Delete habit?';
     final message = isShared
-      ? 'You will be removed from "${habit.title}". Others will keep it and be notified that you left.'
-      : isGroupTask
-      ? 'This will delete "${habit.title}" for the whole group. This cannot be undone.'
-      : 'Are you sure you want to delete "${habit.title}"? This cannot be undone.';
+        ? 'You will be removed from "${habit.title}". Others will keep it and be notified that you left.'
+        : isGroupTask
+        ? 'This will delete "${habit.title}" for the whole group. This cannot be undone.'
+        : 'Are you sure you want to delete "${habit.title}"? This cannot be undone.';
     final actionLabel = isShared ? 'Leave' : 'Delete';
 
     return await showDialog<bool>(
@@ -789,7 +943,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   onPressed: () => Navigator.pop(dialogContext, true),
                   child: Text(
                     actionLabel,
-                    style: const TextStyle(color: Color.fromARGB(255, 255, 255, 255)),
+                    style: const TextStyle(
+                      color: Color.fromARGB(255, 255, 255, 255),
+                    ),
                   ),
                 ),
               ],
@@ -816,7 +972,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     if (!canDelete) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Only the group admin can delete group tasks.'),
+          content: Text('Only group members can delete group tasks.'),
         ),
       );
       return;
@@ -920,7 +1076,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
     required Future<void> Function() onToggleCompletion,
     required Widget child,
   }) {
-    final completedToday = habit.isCompletedOnDate(provider.userId, DateTime.now());
+    final completedToday = habit.isCompletedOnDate(
+      provider.userId,
+      DateTime.now(),
+    );
     final toggleLabel = completedToday ? 'Undo' : 'Done';
     final toggleIcon = completedToday
         ? Icons.undo_rounded
@@ -943,56 +1102,56 @@ class _DashboardScreenState extends State<DashboardScreen> {
             key: ValueKey('habit_slidable_${habit.id}'),
             closeOnScroll: true,
             startActionPane: ActionPane(
-            motion: const DrawerMotion(),
-            extentRatio: 0.28,
-            dismissible: DismissiblePane(
-              onDismissed: () {},
-              closeOnCancel: true,
-              confirmDismiss: () async {
-                await onToggleCompletion();
-                return false;
-              },
-            ),
-            children: [
-              _buildHabitSwipeAction(
-                label: toggleLabel,
-                icon: toggleIcon,
-                color: Theme.of(context).colorScheme.primary.withValues(
-                  alpha: 0.9,
-                ),
-                onPressed: onToggleCompletion,
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(24),
-                  bottomLeft: Radius.circular(24),
-                ),
+              motion: const DrawerMotion(),
+              extentRatio: 0.28,
+              dismissible: DismissiblePane(
+                onDismissed: () {},
+                closeOnCancel: true,
+                confirmDismiss: () async {
+                  await onToggleCompletion();
+                  return false;
+                },
               ),
-            ],
-          ),
+              children: [
+                _buildHabitSwipeAction(
+                  label: toggleLabel,
+                  icon: toggleIcon,
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.primary.withValues(alpha: 0.9),
+                  onPressed: onToggleCompletion,
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(24),
+                    bottomLeft: Radius.circular(24),
+                  ),
+                ),
+              ],
+            ),
             endActionPane: ActionPane(
-            motion: const DrawerMotion(),
-            extentRatio: 0.28,
-            dismissible: DismissiblePane(
-              onDismissed: () {},
-              closeOnCancel: true,
-              confirmDismiss: () async {
-                await _deleteHabitWithPermissions(context, provider, habit);
-                return false;
-              },
-            ),
-            children: [
-              _buildHabitSwipeAction(
-                label: deleteLabel,
-                icon: Icons.delete_rounded,
-                color: Theme.of(context).colorScheme.error,
-                onPressed: () =>
-                    _deleteHabitWithPermissions(context, provider, habit),
-                borderRadius: const BorderRadius.only(
-                  topRight: Radius.circular(24),
-                  bottomRight: Radius.circular(24),
-                ),
+              motion: const DrawerMotion(),
+              extentRatio: 0.28,
+              dismissible: DismissiblePane(
+                onDismissed: () {},
+                closeOnCancel: true,
+                confirmDismiss: () async {
+                  await _deleteHabitWithPermissions(context, provider, habit);
+                  return false;
+                },
               ),
-            ],
-          ),
+              children: [
+                _buildHabitSwipeAction(
+                  label: deleteLabel,
+                  icon: Icons.delete_rounded,
+                  color: Theme.of(context).colorScheme.error,
+                  onPressed: () =>
+                      _deleteHabitWithPermissions(context, provider, habit),
+                  borderRadius: const BorderRadius.only(
+                    topRight: Radius.circular(24),
+                    bottomRight: Radius.circular(24),
+                  ),
+                ),
+              ],
+            ),
             child: child,
           ),
         ),
@@ -1154,13 +1313,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     personalHabits,
                     _personalOrderIds,
                   );
+                  if (!_hasCapturedInitialCompletionOrder &&
+                      !_isLoadingSectionPrefs) {
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      _refreshCompletedOrderSnapshot();
+                    });
+                  }
                   final displayGroupHabits = _orderWithCompletedLast(
                     orderedGroupHabits,
-                    provider.userId,
                   );
                   final displayPersonalHabits = _orderWithCompletedLast(
                     orderedPersonalHabits,
-                    provider.userId,
                   );
                   final allCount = groupHabits.length + personalHabits.length;
                   final sharedCount = personalHabits.length;
@@ -1178,44 +1341,52 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   final incompleteCount = scopeHabits.length - completedCount;
                   final filteredGroupHabits = switch (_selectedFilter) {
                     DashboardFilter.all => displayGroupHabits,
+                    DashboardFilter.challenges => const <Habit>[],
                     DashboardFilter.group => displayGroupHabits,
                     DashboardFilter.shared => const <Habit>[],
-                    DashboardFilter.incomplete => displayGroupHabits
-                        .where(
-                          (habit) =>
-                              !habit.isCompletedOnDate(provider.userId, now),
-                        )
-                        .toList(),
-                    DashboardFilter.completed => displayGroupHabits
-                        .where(
-                          (habit) =>
-                              habit.isCompletedOnDate(provider.userId, now),
-                        )
-                        .toList(),
+                    DashboardFilter.incomplete =>
+                      displayGroupHabits
+                          .where(
+                            (habit) =>
+                                !habit.isCompletedOnDate(provider.userId, now),
+                          )
+                          .toList(),
+                    DashboardFilter.completed =>
+                      displayGroupHabits
+                          .where(
+                            (habit) =>
+                                habit.isCompletedOnDate(provider.userId, now),
+                          )
+                          .toList(),
                   };
                   final filteredPersonalHabits = switch (_selectedFilter) {
                     DashboardFilter.all => displayPersonalHabits,
+                    DashboardFilter.challenges => const <Habit>[],
                     DashboardFilter.group => const <Habit>[],
                     DashboardFilter.shared => displayPersonalHabits,
-                    DashboardFilter.incomplete => displayPersonalHabits
-                        .where(
-                          (habit) =>
-                              !habit.isCompletedOnDate(provider.userId, now),
-                        )
-                        .toList(),
-                    DashboardFilter.completed => displayPersonalHabits
-                        .where(
-                          (habit) =>
-                              habit.isCompletedOnDate(provider.userId, now),
-                        )
-                        .toList(),
+                    DashboardFilter.incomplete =>
+                      displayPersonalHabits
+                          .where(
+                            (habit) =>
+                                !habit.isCompletedOnDate(provider.userId, now),
+                          )
+                          .toList(),
+                    DashboardFilter.completed =>
+                      displayPersonalHabits
+                          .where(
+                            (habit) =>
+                                habit.isCompletedOnDate(provider.userId, now),
+                          )
+                          .toList(),
                   };
-                  final showGroups = filteredGroupHabits.isNotEmpty ||
+                  final showGroups =
+                      filteredGroupHabits.isNotEmpty ||
                       _selectedFilter == DashboardFilter.all ||
                       _selectedFilter == DashboardFilter.group ||
                       _selectedFilter == DashboardFilter.incomplete ||
                       _selectedFilter == DashboardFilter.completed;
-                  final showPersonal = filteredPersonalHabits.isNotEmpty ||
+                  final showPersonal =
+                      filteredPersonalHabits.isNotEmpty ||
                       _selectedFilter == DashboardFilter.all ||
                       _selectedFilter == DashboardFilter.shared ||
                       _selectedFilter == DashboardFilter.incomplete ||
@@ -1225,509 +1396,636 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     return const Center(child: CircularProgressIndicator());
                   }
 
-                  if (personalHabits.isEmpty && groupHabits.isEmpty) {
-                    return Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Container(
-                                padding: const EdgeInsets.all(24),
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: Theme.of(
-                                    context,
-                                  ).colorScheme.primary.withValues(alpha: 0.05),
-                                ),
-                                child: Icon(
-                                  Icons.spa_rounded,
-                                  size: 80,
-                                  color: Theme.of(
-                                    context,
-                                  ).colorScheme.primary.withValues(alpha: 0.6),
-                                ),
-                              )
-                              .animate(
-                                onPlay: (controller) =>
-                                    controller.repeat(reverse: true),
-                              )
-                              .scaleXY(
-                                end: 1.05,
-                                duration: 2.seconds,
-                                curve: Curves.easeInOut,
-                              ),
-                          const SizedBox(height: 32),
-                          Text(
-                            'It\'s mighty quiet here.',
-                            style: GoogleFonts.outfit(
-                              fontSize: 24,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ).animate().fade(delay: 300.ms).slideY(begin: 0.1),
-                          const SizedBox(height: 12),
-                          Text(
-                            'Tap the + icon to build better routines.',
-                            style: GoogleFonts.inter(
-                              color: Colors.grey[500],
-                              fontSize: 16,
-                            ),
-                          ).animate().fade(delay: 400.ms),
-                        ],
-                      ),
-                    );
-                  }
+                  return StreamBuilder<List<GroupChallenge>>(
+                    stream: GroupService().streamMyChallenges(),
+                    builder: (context, challengeSnapshot) {
+                      final myChallenges =
+                          challengeSnapshot.data ?? const <GroupChallenge>[];
+                      final challengeCount = myChallenges.length;
+                      final allCount =
+                          groupHabits.length +
+                          personalHabits.length +
+                          challengeCount;
 
-                  return RefreshIndicator(
-                    onRefresh: () async {
-                      try {
-                        await context
-                            .read<HabitsProvider>()
-                            .syncHealthDataForStepsHabits();
-                      } catch (error) {
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                'Refresh failed. ${error.toString().split('\n').first}',
-                              ),
-                            ),
-                          );
-                        }
+                      final filteredChallenges = switch (_selectedFilter) {
+                        DashboardFilter.all => myChallenges,
+                        DashboardFilter.challenges => myChallenges,
+                        DashboardFilter.group => const <GroupChallenge>[],
+                        DashboardFilter.shared => const <GroupChallenge>[],
+                        DashboardFilter.incomplete => const <GroupChallenge>[],
+                        DashboardFilter.completed => const <GroupChallenge>[],
+                      };
+
+                      final availableFilters = <DashboardFilter>{
+                        DashboardFilter.all,
+                        if (challengeCount > 0) DashboardFilter.challenges,
+                        if (groupHabits.isNotEmpty) DashboardFilter.group,
+                        if (sharedCount > 0) DashboardFilter.shared,
+                        if (incompleteCount > 0) DashboardFilter.incomplete,
+                        if (completedCount > 0) DashboardFilter.completed,
+                      };
+
+                      if (!availableFilters.contains(_selectedFilter)) {
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          if (!mounted) return;
+                          setState(() {
+                            _selectedFilter = DashboardFilter.all;
+                          });
+                        });
                       }
-                    },
-                    color: Theme.of(context).colorScheme.primary,
-                    backgroundColor: Theme.of(context).colorScheme.surface,
-                    child: SlidableAutoCloseBehavior(
-                      closeWhenTapped: true,
-                      child: ListView(
-                        physics: const AlwaysScrollableScrollPhysics(
-                          parent: BouncingScrollPhysics(),
-                        ),
-                        padding: EdgeInsets.zero,
-                        children: [
-                        const SizedBox(height: 8),
-                        _buildFilterPills(
-                          context,
-                          allCount: allCount,
-                          groupCount: groupHabits.length,
-                          sharedCount: sharedCount,
-                          incompleteCount: incompleteCount,
-                          completedCount: completedCount,
-                        ),
-                        if (showGroups && filteredGroupHabits.isNotEmpty) ...[
-                          _buildSectionLabel(
-                            context,
-                            title: 'GROUP TASKS',
-                            count: filteredGroupHabits.length,
-                          ),
-                          Column(
+
+                      final showChallenges =
+                          filteredChallenges.isNotEmpty ||
+                          _selectedFilter == DashboardFilter.all ||
+                          _selectedFilter == DashboardFilter.challenges;
+
+                      if (personalHabits.isEmpty &&
+                          groupHabits.isEmpty &&
+                          challengeCount == 0) {
+                        return Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                                        ReorderableListView.builder(
-                                          shrinkWrap: true,
-                                          physics:
-                                              const NeverScrollableScrollPhysics(),
-                                          buildDefaultDragHandles: false,
-                                          proxyDecorator:
-                                              (child, index, animation) {
-                                                return Material(
-                                                  color: Colors.transparent,
-                                                  shadowColor:
-                                                      Colors.transparent,
-                                                  elevation: 0,
-                                                  child: child,
-                                                );
-                                              },
-                                          itemCount: filteredGroupHabits.length,
-                                          onReorder: (oldIndex, newIndex) {
-                                            _onGroupReorder(
-                                              filteredGroupHabits,
-                                              oldIndex,
-                                              newIndex,
-                                            );
-                                          },
-                                          itemBuilder: (context, index) {
-                                            final habit =
-                                                filteredGroupHabits[index];
-                                            Future<void> handleToggleCompletion() async {
-                                              final now = DateTime.now();
-                                              final uid = provider.userId;
-                                              final isQuantified = habit
-                                                  .isQuantifiedFor(uid);
-                                              final quantMin = habit
-                                                  .quantMinFor(uid);
-                                              final quantMax = habit
-                                                  .quantMaxFor(uid);
-                                              final quantUnit = habit
-                                                  .quantUnitFor(uid);
-
-                                              if (!isQuantified) {
-                                                final wasCompleted = habit
-                                                    .isCompletedOnDate(
-                                                      provider.userId,
-                                                      now,
-                                                    );
-                                                if (!wasCompleted) {
-                                                  await _startMoveToBottomAnimation(
-                                                    habit.id,
-                                                  );
-                                                }
-                                                await provider
-                                                    .toggleHabitCompletion(
-                                                      habit,
-                                                    );
-                                                if (!wasCompleted) {
-                                                  await _finishMoveToBottomAnimation(
-                                                    habit.id,
-                                                  );
-                                                }
-                                                if (!wasCompleted &&
-                                                    context.mounted) {
-                                                  await _showCompletionCelebration(
-                                                    context,
-                                                    provider,
-                                                    habit,
-                                                  );
-                                                }
-                                                return;
-                                              }
-
-                                              if (habit.isCompletedOnDate(
-                                                provider.userId,
-                                                now,
-                                              )) {
-                                                await provider
-                                                    .clearTodayProgress(
-                                                      habit,
-                                                    );
-                                                return;
-                                              }
-
-                                              final existingValue = habit
-                                                  .completionValueFor(
-                                                    provider.userId,
-                                                    now,
-                                                  );
-
-                                              final value =
-                                                  await _askQuantifiedValue(
-                                                    context,
-                                                    habit,
-                                                    quantUnit,
-                                                    quantMin,
-                                                    quantMax,
-                                                    initialValue:
-                                                        existingValue,
-                                                  );
-
-                                              if (value == null) {
-                                                return;
-                                              }
-
-                                              if (!context.mounted) {
-                                                return;
-                                              }
-
-                                              if (value >= quantMax &&
-                                                  context.mounted) {
-                                                await _startMoveToBottomAnimation(
-                                                  habit.id,
-                                                );
-                                              }
-
-                                              await provider
-                                                  .saveQuantifiedProgress(
-                                                    habit,
-                                                    value,
-                                                  );
-
-                                              if (value >= quantMax &&
-                                                  context.mounted) {
-                                                await _finishMoveToBottomAnimation(
-                                                  habit.id,
-                                                );
-                                                if (!context.mounted) {
-                                                  return;
-                                                }
-                                                ScaffoldMessenger.of(
-                                                  context,
-                                                ).showSnackBar(
-                                                  SnackBar(
-                                                    content: Text(
-                                                      'Awesome! You hit today\'s ${habit.quantUnitFor(provider.userId)} goal.',
-                                                    ),
-                                                  ),
-                                                );
-                                              }
-                                            }
-                                            return ReorderableDelayedDragStartListener(
-                                              key: ValueKey(
-                                                'group_reorder_${habit.id}',
-                                              ),
-                                              index: index,
-                                              child: _buildHabitSlidable(
-                                                context,
-                                                provider,
-                                                habit,
-                                                onToggleCompletion:
-                                                    handleToggleCompletion,
-                                                child: _wrapCompletionMoveAnimation(
-                                                  habitId: habit.id,
-                                                  child: HabitCard(
-                                                    habit: habit,
-                                                    currentUserId:
-                                                        provider.userId,
-                                                    margin: EdgeInsets.zero,
-                                                    showShadow: false,
-                                                    onCheck:
-                                                        handleToggleCompletion,
-                                                    onCardTap: () {
-                                                      _openGroupForHabit(
-                                                        context,
-                                                        habit,
-                                                      );
-                                                    },
-                                                  ),
-                                                ),
-                                              ),
-                                            );
-                                          },
-                                        ),
-                                        const SizedBox(height: 8),
+                              Container(
+                                    padding: const EdgeInsets.all(24),
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .primary
+                                          .withValues(alpha: 0.05),
+                                    ),
+                                    child: Icon(
+                                      Icons.spa_rounded,
+                                      size: 80,
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .primary
+                                          .withValues(alpha: 0.6),
+                                    ),
+                                  )
+                                  .animate(
+                                    onPlay: (controller) =>
+                                        controller.repeat(reverse: true),
+                                  )
+                                  .scaleXY(
+                                    end: 1.05,
+                                    duration: 2.seconds,
+                                    curve: Curves.easeInOut,
+                                  ),
+                              const SizedBox(height: 32),
+                              Text(
+                                    'It\'s mighty quiet here.',
+                                    style: GoogleFonts.outfit(
+                                      fontSize: 24,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  )
+                                  .animate()
+                                  .fade(delay: 300.ms)
+                                  .slideY(begin: 0.1),
+                              const SizedBox(height: 12),
+                              Text(
+                                'Tap the + icon to build better routines.',
+                                style: GoogleFonts.inter(
+                                  color: Colors.grey[500],
+                                  fontSize: 16,
+                                ),
+                              ).animate().fade(delay: 400.ms),
                             ],
                           ),
-                        ],
-                        if (showPersonal && filteredPersonalHabits.isNotEmpty)
-                          _buildSectionLabel(
-                            context,
-                            title: 'PERSONAL/SHARED TASKS',
-                            count: filteredPersonalHabits.length,
-                          ),
-                        if (showPersonal)
-                          Column(
+                        );
+                      }
+
+                      return RefreshIndicator(
+                        onRefresh: () async {
+                          try {
+                            await context
+                                .read<HabitsProvider>()
+                                .syncHealthDataForStepsHabits();
+                          } catch (error) {
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    'Refresh failed. ${error.toString().split('\n').first}',
+                                  ),
+                                ),
+                              );
+                            }
+                          }
+                        },
+                        color: Theme.of(context).colorScheme.primary,
+                        backgroundColor: Theme.of(context).colorScheme.surface,
+                        child: SlidableAutoCloseBehavior(
+                          closeWhenTapped: true,
+                          child: ListView(
+                            physics: const AlwaysScrollableScrollPhysics(
+                              parent: BouncingScrollPhysics(),
+                            ),
+                            padding: EdgeInsets.zero,
                             children: [
-                                      ReorderableListView.builder(
-                                        shrinkWrap: true,
-                                        physics:
-                                            const NeverScrollableScrollPhysics(),
-                                        buildDefaultDragHandles: false,
-                                        proxyDecorator:
-                                            (child, index, animation) {
-                                              return Material(
-                                                color: Colors.transparent,
-                                                shadowColor: Colors.transparent,
-                                                elevation: 0,
-                                                child: child,
-                                              );
-                                            },
-                                        itemCount: filteredPersonalHabits.length,
-                                        onReorder: (oldIndex, newIndex) {
-                                          _onPersonalReorder(
-                                            filteredPersonalHabits,
-                                            oldIndex,
-                                            newIndex,
+                              const SizedBox(height: 8),
+                              _buildFilterPills(
+                                context,
+                                allCount: allCount,
+                                challengeCount: challengeCount,
+                                groupCount: groupHabits.length,
+                                sharedCount: sharedCount,
+                                incompleteCount: incompleteCount,
+                                completedCount: completedCount,
+                              ),
+                              if (showChallenges &&
+                                  filteredChallenges.isNotEmpty)
+                                _buildSectionLabel(
+                                  context,
+                                  title: 'LIVE CHALLENGES',
+                                  count: filteredChallenges.length,
+                                ),
+                              if (showChallenges &&
+                                  filteredChallenges.isNotEmpty)
+                                ...filteredChallenges.map((challenge) {
+                                  final status = !challenge.isReadyToStart
+                                      ? 'Waiting for accepts'
+                                      : challenge.hasEnded
+                                      ? 'Ended'
+                                      : 'Live';
+                                  return Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 24,
+                                      vertical: 8,
+                                    ),
+                                    child: InkWell(
+                                      borderRadius: BorderRadius.circular(20),
+                                      onTap: () => _openChallengeFromDashboard(
+                                        context,
+                                        challenge,
+                                      ),
+                                      child: Container(
+                                        padding: const EdgeInsets.all(16),
+                                        decoration: BoxDecoration(
+                                          color: Theme.of(
+                                            context,
+                                          ).colorScheme.surface,
+                                          borderRadius: BorderRadius.circular(
+                                            20,
+                                          ),
+                                          border: Border.all(
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .onSurface
+                                                .withValues(alpha: 0.1),
+                                          ),
+                                        ),
+                                        child: Row(
+                                          children: [
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
+                                                children: [
+                                                  Text(
+                                                    challenge.title,
+                                                    style: GoogleFonts.outfit(
+                                                      fontSize: 18,
+                                                      fontWeight:
+                                                          FontWeight.w700,
+                                                    ),
+                                                  ),
+                                                  const SizedBox(height: 4),
+                                                  Text(
+                                                    challenge.hasTarget
+                                                        ? 'Target: ${formatQuantity(challenge.targetValue, maxDecimals: 1)} ${challenge.unit}'
+                                                        : 'No target set',
+                                                    style: GoogleFonts.inter(
+                                                      color: Theme.of(context)
+                                                          .colorScheme
+                                                          .onSurface
+                                                          .withValues(
+                                                            alpha: 0.68,
+                                                          ),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                            if (!challenge.hasEnded)
+                                              IconButton(
+                                                icon: const Icon(Icons.stop_circle_outlined, color: Colors.redAccent),
+                                                tooltip: 'End Challenge',
+                                                onPressed: () => _endChallenge(context, challenge),
+                                              ),
+                                            Container(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 10,
+                                                    vertical: 6,
+                                                  ),
+                                              decoration: BoxDecoration(
+                                                color: Theme.of(context)
+                                                    .colorScheme
+                                                    .primary
+                                                    .withValues(alpha: 0.14),
+                                                borderRadius:
+                                                    BorderRadius.circular(999),
+                                              ),
+                                              child: Text(
+                                                status,
+                                                style: GoogleFonts.inter(
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.w700,
+                                                  color: Theme.of(
+                                                    context,
+                                                  ).colorScheme.primary,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                }),
+                              if (showGroups &&
+                                  filteredGroupHabits.isNotEmpty) ...[
+                                _buildSectionLabel(
+                                  context,
+                                  title: 'GROUP TASKS',
+                                  count: filteredGroupHabits.length,
+                                ),
+                                Column(
+                                  children: [
+                                    ReorderableListView.builder(
+                                      shrinkWrap: true,
+                                      physics:
+                                          const NeverScrollableScrollPhysics(),
+                                      buildDefaultDragHandles: false,
+                                      proxyDecorator:
+                                          (child, index, animation) {
+                                            return Material(
+                                              color: Colors.transparent,
+                                              shadowColor: Colors.transparent,
+                                              elevation: 0,
+                                              child: child,
+                                            );
+                                          },
+                                      itemCount: filteredGroupHabits.length,
+                                      onReorder: (oldIndex, newIndex) {
+                                        _onGroupReorder(
+                                          filteredGroupHabits,
+                                          oldIndex,
+                                          newIndex,
+                                        );
+                                      },
+                                      itemBuilder: (context, index) {
+                                        final habit =
+                                            filteredGroupHabits[index];
+                                        Future<void>
+                                        handleToggleCompletion() async {
+                                          final now = DateTime.now();
+                                          final uid = provider.userId;
+                                          final isQuantified = habit
+                                              .isQuantifiedFor(uid);
+                                          final quantMin = habit.quantMinFor(
+                                            uid,
                                           );
-                                        },
-                                        itemBuilder: (context, index) {
-                                          final habit =
-                                              filteredPersonalHabits[index];
-                                          Future<void> handleToggleCompletion() async {
-                                            final now = DateTime.now();
-                                            final uid = provider.userId;
-                                            final isQuantified = habit
-                                                .isQuantifiedFor(uid);
-                                            final quantMin = habit
-                                                .quantMinFor(uid);
-                                            final quantMax = habit
-                                                .quantMaxFor(uid);
-                                            final quantUnit = habit
-                                                .quantUnitFor(uid);
+                                          final quantMax = habit.quantMaxFor(
+                                            uid,
+                                          );
+                                          final quantUnit = habit.quantUnitFor(
+                                            uid,
+                                          );
 
-                                            if (!isQuantified) {
-                                              final wasCompleted =
-                                                  habit.isCompletedOnDate(
-                                                    provider.userId,
-                                                    now,
-                                                  );
-                                              if (!wasCompleted) {
-                                                await _startMoveToBottomAnimation(
-                                                  habit.id,
-                                                );
-                                              }
-                                              await provider
-                                                  .toggleHabitCompletion(
-                                                    habit,
-                                                  );
-                                              if (!wasCompleted) {
-                                                await _finishMoveToBottomAnimation(
-                                                  habit.id,
-                                                );
-                                              }
-                                              if (!wasCompleted &&
-                                                  context.mounted) {
-                                                await _showCompletionCelebration(
-                                                  context,
-                                                  provider,
-                                                  habit,
-                                                );
-                                              }
-                                              return;
-                                            }
-
-                                            if (habit.isCompletedOnDate(
-                                              provider.userId,
-                                              now,
-                                            )) {
-                                              await provider.clearTodayProgress(
-                                                habit,
-                                              );
-                                              return;
-                                            }
-
-                                            final existingValue = habit
-                                                .completionValueFor(
+                                          if (!isQuantified) {
+                                            final wasCompleted = habit
+                                                .isCompletedOnDate(
                                                   provider.userId,
                                                   now,
                                                 );
-
-                                            final value =
-                                                await _askQuantifiedValue(
-                                                  context,
-                                                  habit,
-                                                  quantUnit,
-                                                  quantMin,
-                                                  quantMax,
-                                                  initialValue:
-                                                      existingValue,
-                                                );
-
-                                            if (value == null) {
-                                              return;
+                                            await provider
+                                                .toggleHabitCompletion(habit);
+                                            if (!wasCompleted &&
+                                                context.mounted) {
+                                              await _showCompletionCelebration(
+                                                context,
+                                                provider,
+                                                habit,
+                                              );
                                             }
+                                            return;
+                                          }
 
+                                          if (habit.isCompletedOnDate(
+                                            provider.userId,
+                                            now,
+                                          )) {
+                                            await provider.clearTodayProgress(
+                                              habit,
+                                            );
+                                            return;
+                                          }
+
+                                          final existingValue = habit
+                                              .completionValueFor(
+                                                provider.userId,
+                                                now,
+                                              );
+
+                                          final value =
+                                              await _askQuantifiedValue(
+                                                context,
+                                                habit,
+                                                quantUnit,
+                                                quantMin,
+                                                quantMax,
+                                                initialValue: existingValue,
+                                              );
+
+                                          if (value == null) {
+                                            return;
+                                          }
+
+                                          if (!context.mounted) {
+                                            return;
+                                          }
+
+                                          await provider.saveQuantifiedProgress(
+                                            habit,
+                                            value,
+                                          );
+
+                                          if (value >= quantMax &&
+                                              context.mounted) {
                                             if (!context.mounted) {
                                               return;
                                             }
-
-                                            if (value >= quantMax &&
-                                                context.mounted) {
-                                              await _startMoveToBottomAnimation(
-                                                habit.id,
-                                              );
-                                            }
-
-                                            await provider
-                                                .saveQuantifiedProgress(
-                                                  habit,
-                                                  value,
-                                                );
-
-                                            if (value >= quantMax &&
-                                                context.mounted) {
-                                              await _finishMoveToBottomAnimation(
-                                                habit.id,
-                                              );
-                                              if (!context.mounted) {
-                                                return;
-                                              }
-                                              ScaffoldMessenger.of(
-                                                context,
-                                              ).showSnackBar(
-                                                SnackBar(
-                                                  content: Text(
-                                                    'Awesome! You hit today\'s ${habit.quantUnitFor(provider.userId)} goal.',
-                                                  ),
-                                                ),
-                                              );
-                                            }
-                                          }
-                                          return ReorderableDelayedDragStartListener(
-                                            key: ValueKey(
-                                              'personal_reorder_${habit.id}',
-                                            ),
-                                            index: index,
-                                            child: _buildHabitSlidable(
+                                            ScaffoldMessenger.of(
                                               context,
-                                              provider,
-                                              habit,
-                                              onToggleCompletion:
-                                                  handleToggleCompletion,
-                                              child: _wrapCompletionMoveAnimation(
-                                                habitId: habit.id,
-                                                child:
-                                                    HabitCard(
-                                                          habit: habit,
-                                                          currentUserId:
-                                                              provider.userId,
-                                                          margin:
-                                                              EdgeInsets.zero,
-                                                        showShadow: false,
-                                                          onCheck:
-                                                              handleToggleCompletion,
-                                                          onCardTap: () {
-                                                            Navigator.push(
-                                                              context,
-                                                              MaterialPageRoute(
-                                                                builder: (context) =>
-                                                                    HabitLeaderboardScreen(
-                                                                      habit:
-                                                                          habit,
-                                                                    ),
-                                                              ),
-                                                            );
-                                                          },
-                                                        )
-                                                        .animate(
-                                                          key: ValueKey(
-                                                            'anim_${habit.id}',
-                                                          ),
-                                                        )
-                                                        .fade()
-                                                        .slideY(begin: 0.2),
+                                            ).showSnackBar(
+                                              SnackBar(
+                                                content: Text(
+                                                  'Awesome! You hit today\'s ${habit.quantUnitFor(provider.userId)} goal.',
+                                                ),
+                                              ),
+                                            );
+                                          }
+                                        }
+
+                                        return ReorderableDelayedDragStartListener(
+                                          key: ValueKey(
+                                            'group_reorder_${habit.id}',
+                                          ),
+                                          index: index,
+                                          child: _buildHabitSlidable(
+                                            context,
+                                            provider,
+                                            habit,
+                                            onToggleCompletion:
+                                                handleToggleCompletion,
+                                            child: _wrapCompletionMoveAnimation(
+                                              habitId: habit.id,
+                                              child: HabitCard(
+                                                habit: habit,
+                                                currentUserId: provider.userId,
+                                                margin: EdgeInsets.zero,
+                                                showShadow: false,
+                                                onCheck: handleToggleCompletion,
+                                                onCardTap: () {
+                                                  _openGroupForHabit(
+                                                    context,
+                                                    habit,
+                                                  );
+                                                },
                                               ),
                                             ),
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                    const SizedBox(height: 8),
+                                  ],
+                                ),
+                              ],
+                              if (showPersonal &&
+                                  filteredPersonalHabits.isNotEmpty)
+                                _buildSectionLabel(
+                                  context,
+                                  title: 'PERSONAL/SHARED TASKS',
+                                  count: filteredPersonalHabits.length,
+                                ),
+                              if (showPersonal)
+                                Column(
+                                  children: [
+                                    ReorderableListView.builder(
+                                      shrinkWrap: true,
+                                      physics:
+                                          const NeverScrollableScrollPhysics(),
+                                      buildDefaultDragHandles: false,
+                                      proxyDecorator:
+                                          (child, index, animation) {
+                                            return Material(
+                                              color: Colors.transparent,
+                                              shadowColor: Colors.transparent,
+                                              elevation: 0,
+                                              child: child,
+                                            );
+                                          },
+                                      itemCount: filteredPersonalHabits.length,
+                                      onReorder: (oldIndex, newIndex) {
+                                        _onPersonalReorder(
+                                          filteredPersonalHabits,
+                                          oldIndex,
+                                          newIndex,
+                                        );
+                                      },
+                                      itemBuilder: (context, index) {
+                                        final habit =
+                                            filteredPersonalHabits[index];
+                                        Future<void>
+                                        handleToggleCompletion() async {
+                                          final now = DateTime.now();
+                                          final uid = provider.userId;
+                                          final isQuantified = habit
+                                              .isQuantifiedFor(uid);
+                                          final quantMin = habit.quantMinFor(
+                                            uid,
                                           );
-                                        },
-                                        ),
-                                      ],
-                          ),
-                        if ((showGroups && filteredGroupHabits.isEmpty) ||
-                            (showPersonal && filteredPersonalHabits.isEmpty))
-                          const SizedBox(height: 4),
-                        if (showGroups && filteredGroupHabits.isEmpty)
-                          Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 24,
-                              vertical: 12,
-                            ),
-                            child: Text(
-                              'No matching group tasks for this status.',
-                              style: GoogleFonts.inter(
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.onSurface.withValues(alpha: 0.62),
+                                          final quantMax = habit.quantMaxFor(
+                                            uid,
+                                          );
+                                          final quantUnit = habit.quantUnitFor(
+                                            uid,
+                                          );
+
+                                          if (!isQuantified) {
+                                            final wasCompleted = habit
+                                                .isCompletedOnDate(
+                                                  provider.userId,
+                                                  now,
+                                                );
+                                            await provider
+                                                .toggleHabitCompletion(habit);
+                                            if (!wasCompleted &&
+                                                context.mounted) {
+                                              await _showCompletionCelebration(
+                                                context,
+                                                provider,
+                                                habit,
+                                              );
+                                            }
+                                            return;
+                                          }
+
+                                          if (habit.isCompletedOnDate(
+                                            provider.userId,
+                                            now,
+                                          )) {
+                                            await provider.clearTodayProgress(
+                                              habit,
+                                            );
+                                            return;
+                                          }
+
+                                          final existingValue = habit
+                                              .completionValueFor(
+                                                provider.userId,
+                                                now,
+                                              );
+
+                                          final value =
+                                              await _askQuantifiedValue(
+                                                context,
+                                                habit,
+                                                quantUnit,
+                                                quantMin,
+                                                quantMax,
+                                                initialValue: existingValue,
+                                              );
+
+                                          if (value == null) {
+                                            return;
+                                          }
+
+                                          if (!context.mounted) {
+                                            return;
+                                          }
+
+                                          await provider.saveQuantifiedProgress(
+                                            habit,
+                                            value,
+                                          );
+
+                                          if (value >= quantMax &&
+                                              context.mounted) {
+                                            if (!context.mounted) {
+                                              return;
+                                            }
+                                            ScaffoldMessenger.of(
+                                              context,
+                                            ).showSnackBar(
+                                              SnackBar(
+                                                content: Text(
+                                                  'Awesome! You hit today\'s ${habit.quantUnitFor(provider.userId)} goal.',
+                                                ),
+                                              ),
+                                            );
+                                          }
+                                        }
+
+                                        return ReorderableDelayedDragStartListener(
+                                          key: ValueKey(
+                                            'personal_reorder_${habit.id}',
+                                          ),
+                                          index: index,
+                                          child: _buildHabitSlidable(
+                                            context,
+                                            provider,
+                                            habit,
+                                            onToggleCompletion:
+                                                handleToggleCompletion,
+                                            child: _wrapCompletionMoveAnimation(
+                                              habitId: habit.id,
+                                              child:
+                                                  HabitCard(
+                                                        habit: habit,
+                                                        currentUserId:
+                                                            provider.userId,
+                                                        margin: EdgeInsets.zero,
+                                                        showShadow: false,
+                                                        onCheck:
+                                                            handleToggleCompletion,
+                                                        onCardTap: () {
+                                                          Navigator.push(
+                                                            context,
+                                                            MaterialPageRoute(
+                                                              builder: (context) =>
+                                                                  HabitLeaderboardScreen(
+                                                                    habit:
+                                                                        habit,
+                                                                  ),
+                                                            ),
+                                                          );
+                                                        },
+                                                      )
+                                                      .animate(
+                                                        key: ValueKey(
+                                                          'anim_${habit.id}',
+                                                        ),
+                                                      )
+                                                      .fade()
+                                                      .slideY(begin: 0.2),
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  ],
+                                ),
+                              if ((showGroups && filteredGroupHabits.isEmpty) ||
+                                  (showPersonal &&
+                                      filteredPersonalHabits.isEmpty))
+                                const SizedBox(height: 4),
+                              if (showGroups && filteredGroupHabits.isEmpty)
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 24,
+                                    vertical: 12,
+                                  ),
+                                  child: Text(
+                                    'No matching group tasks for this status.',
+                                    style: GoogleFonts.inter(
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onSurface
+                                          .withValues(alpha: 0.62),
+                                    ),
+                                  ),
+                                ),
+                              if (showPersonal &&
+                                  filteredPersonalHabits.isEmpty)
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 24,
+                                    vertical: 12,
+                                  ),
+                                  child: Text(
+                                    'No matching personal/shared tasks for this status.',
+                                    style: GoogleFonts.inter(
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onSurface
+                                          .withValues(alpha: 0.62),
+                                    ),
+                                  ),
+                                ),
+                              const SizedBox(
+                                height: DashboardScreen._bottomNavClearance,
                               ),
-                            ),
+                            ],
                           ),
-                        if (showPersonal && filteredPersonalHabits.isEmpty)
-                          Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 24,
-                              vertical: 12,
-                            ),
-                            child: Text(
-                              'No matching personal/shared tasks for this status.',
-                              style: GoogleFonts.inter(
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.onSurface.withValues(alpha: 0.62),
-                              ),
-                            ),
-                          ),
-                        const SizedBox(
-                          height: DashboardScreen._bottomNavClearance,
                         ),
-                        ],
-                      ),
-                    ),
+                      );
+                    },
                   );
                 },
               ),

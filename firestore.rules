@@ -148,6 +148,25 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    match /challengeInvites/{inviteId} {
+      allow read: if isRecipientOrSender('from', 'to');
+
+      allow create: if isSignedIn() &&
+        request.resource.data.from == request.auth.uid &&
+        request.resource.data.to is string &&
+        request.resource.data.to != request.auth.uid &&
+        request.resource.data.groupId is string &&
+        request.resource.data.challengeId is string &&
+        request.resource.data.status == 'pending';
+
+      allow update: if isSignedIn() &&
+        resource.data.to == request.auth.uid &&
+        canOnlyChangeStatus() &&
+        request.resource.data.status in ['accepted', 'declined'];
+
+      allow delete: if false;
+    }
+
     match /habitNotices/{noticeId} {
       allow read: if isSignedIn() && resource.data.to == request.auth.uid;
 
@@ -183,6 +202,12 @@ service cloud.firestore {
       allow delete: if isSignedIn() && resource.data.ownerId == request.auth.uid;
 
       match /tasks/{taskId} {
+        allow read: if isSignedIn();
+
+        allow create, update, delete: if parentGroupAllowsAccess(groupId);
+      }
+
+      match /challenges/{challengeId} {
         allow read: if isSignedIn();
 
         allow create, update, delete: if parentGroupAllowsAccess(groupId);

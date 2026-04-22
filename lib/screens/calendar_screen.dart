@@ -152,6 +152,8 @@ class _CalendarViewState extends State<_CalendarView> {
                       firstDay: DateTime.utc(2020, 10, 16),
                       lastDay: DateTime.utc(2030, 3, 14),
                       focusedDay: calendarProvider.focusedDay,
+                      rowHeight: 44,
+                      daysOfWeekHeight: 20,
                       selectedDayPredicate: (day) {
                         return isSameDay(calendarProvider.selectedDay, day);
                       },

@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/group.dart';
+import '../models/group_challenge.dart';
 import '../models/group_task.dart';
 import '../models/habit.dart';
 
@@ -62,6 +63,38 @@ class GroupService {
 
   String createGroupTaskId(String groupId) {
     return _db.collection('groups').doc(groupId).collection('tasks').doc().id;
+  }
+
+  String createGroupChallengeId(String groupId) {
+    return _db
+        .collection('groups')
+        .doc(groupId)
+        .collection('challenges')
+        .doc()
+        .id;
+  }
+
+  Stream<List<GroupChallenge>> streamMyChallenges() {
+    if (userId.isEmpty) {
+      return Stream.value(const <GroupChallenge>[]);
+    }
+
+    return _db
+        .collectionGroup('challenges')
+        .where('participantIds', arrayContains: userId)
+        .snapshots()
+        .map(
+          (snapshot) =>
+              snapshot.docs
+                  .map((doc) => GroupChallenge.fromMap(doc.data(), id: doc.id))
+                  .toList()
+                ..sort((a, b) {
+                  if (a.isActive != b.isActive) {
+                    return a.isActive ? -1 : 1;
+                  }
+                  return b.createdAt.compareTo(a.createdAt);
+                }),
+        );
   }
 
   Stream<List<Group>> streamGroupsForCurrentUser() {
@@ -215,6 +248,274 @@ class GroupService {
         );
   }
 
+  Stream<List<GroupChallenge>> streamGroupChallenges(String groupId) {
+    if (groupId.trim().isEmpty) {
+      return Stream.value(const <GroupChallenge>[]);
+    }
+
+    return _db
+        .collection('groups')
+        .doc(groupId)
+        .collection('challenges')
+        .snapshots()
+        .map(
+          (snapshot) =>
+              snapshot.docs
+                  .map((doc) => GroupChallenge.fromMap(doc.data(), id: doc.id))
+                  .toList()
+                ..sort((a, b) {
+                  final aEnded = a.hasEnded;
+                  final bEnded = b.hasEnded;
+                  if (aEnded != bEnded) {
+                    return aEnded ? 1 : -1;
+                  }
+                  return b.createdAt.compareTo(a.createdAt);
+                }),
+        );
+  }
+
+  Future<GroupChallenge?> getGroupChallengeById(
+    String groupId,
+    String challengeId,
+  ) async {
+    if (groupId.trim().isEmpty || challengeId.trim().isEmpty) {
+      return null;
+    }
+
+    final doc = await _db
+        .collection('groups')
+        .doc(groupId)
+        .collection('challenges')
+        .doc(challengeId)
+        .get();
+
+    if (!doc.exists || doc.data() == null) {
+      return null;
+    }
+
+    return GroupChallenge.fromMap(doc.data()!, id: doc.id);
+  }
+
+  Future<GroupChallenge> createGroupChallenge({
+    required String groupId,
+    required String title,
+    String description = '',
+    required List<String> participantIds,
+    required String unit,
+    required double targetValue,
+    required DateTime startAt,
+    required DateTime endAt,
+  }) async {
+    if (userId.isEmpty) {
+      throw StateError('You must be signed in to create challenges.');
+    }
+
+    if (title.trim().isEmpty) {
+      throw StateError('Challenge title cannot be empty.');
+    }
+
+    if (endAt.isBefore(startAt) || endAt.isAtSameMomentAs(startAt)) {
+      throw StateError('Challenge end time must be after start time.');
+    }
+
+    final selectedMembers = <String>{
+      for (final uid in participantIds)
+        if (uid.trim().isNotEmpty) uid.trim(),
+      userId,
+    }.toList();
+
+    final group = await getGroupById(groupId);
+    if (group == null) {
+      throw StateError('Group not found.');
+    }
+
+    for (final uid in selectedMembers) {
+      if (!group.memberIds.contains(uid)) {
+        throw StateError('All challenge participants must be group members.');
+      }
+    }
+
+    final inviteeIds = selectedMembers.where((uid) => uid != userId).toList();
+    if (inviteeIds.isEmpty) {
+      throw StateError('Select at least one member to challenge.');
+    }
+
+    final challengeId = createGroupChallengeId(groupId);
+    final challenge = GroupChallenge(
+      id: challengeId,
+      groupId: groupId,
+      title: title.trim(),
+      description: description.trim(),
+      createdBy: userId,
+      createdAt: DateTime.now(),
+      startAt: startAt,
+      endAt: endAt,
+      participantIds: <String>[userId],
+      unit: unit.trim(),
+      targetValue: targetValue < 0 ? 0 : targetValue,
+      progressLogs: const <String, Map<String, double>>{},
+    );
+
+    final batch = _db.batch();
+
+    final challengeRef = _db
+        .collection('groups')
+        .doc(groupId)
+        .collection('challenges')
+        .doc(challenge.id);
+    batch.set(challengeRef, challenge.toMap());
+
+    for (final inviteeId in inviteeIds) {
+      final inviteRef = _db.collection('challengeInvites').doc();
+      batch.set(inviteRef, {
+        'from': userId,
+        'to': inviteeId,
+        'groupId': groupId,
+        'challengeId': challenge.id,
+        'challengeTitle': challenge.title,
+        'status': 'pending',
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+    }
+
+    await batch.commit();
+
+    return challenge;
+  }
+
+  Future<void> endGroupChallenge(GroupChallenge challenge) async {
+    if (userId.isEmpty) {
+      throw StateError('You must be signed in to end challenges.');
+    }
+
+    final group = await getGroupById(challenge.groupId);
+    if (group == null) {
+      throw StateError('Group not found.');
+    }
+    if (!group.memberIds.contains(userId)) {
+      throw StateError('Only group members can end challenges.');
+    }
+
+    await _db
+        .collection('groups')
+        .doc(challenge.groupId)
+        .collection('challenges')
+        .doc(challenge.id)
+        .update({'endAt': DateTime.now().toIso8601String()});
+  }
+
+  Future<void> acceptChallengeInvite({
+    required String inviteId,
+    required String groupId,
+    required String challengeId,
+  }) async {
+    if (userId.isEmpty) {
+      throw StateError('You must be signed in to accept challenge invites.');
+    }
+
+    final challengeRef = _db
+        .collection('groups')
+        .doc(groupId)
+        .collection('challenges')
+        .doc(challengeId);
+    final inviteRef = _db.collection('challengeInvites').doc(inviteId);
+
+    await _db.runTransaction((txn) async {
+      final challengeSnap = await txn.get(challengeRef);
+      final inviteSnap = await txn.get(inviteRef);
+
+      if (!inviteSnap.exists || inviteSnap.data() == null) {
+        throw StateError('Invite no longer exists.');
+      }
+      final invite = inviteSnap.data()!;
+      if ((invite['to'] as String? ?? '') != userId) {
+        throw StateError('This invite is not for you.');
+      }
+      if ((invite['status'] as String? ?? 'pending') != 'pending') {
+        return;
+      }
+
+      if (!challengeSnap.exists || challengeSnap.data() == null) {
+        txn.update(inviteRef, {'status': 'declined'});
+        return;
+      }
+
+      final challenge = GroupChallenge.fromMap(
+        challengeSnap.data()!,
+        id: challengeSnap.id,
+      );
+
+      final nextParticipants = <String>{...challenge.participantIds, userId}
+          .toList();
+
+      txn.update(challengeRef, {'participantIds': nextParticipants});
+      txn.update(inviteRef, {'status': 'accepted'});
+    });
+  }
+
+  Future<void> declineChallengeInvite(String inviteId) async {
+    if (userId.isEmpty) {
+      throw StateError('You must be signed in to decline challenge invites.');
+    }
+
+    await _db.collection('challengeInvites').doc(inviteId).update({
+      'status': 'declined',
+    });
+  }
+
+  Future<void> saveGroupChallenge(GroupChallenge challenge) async {
+    if (userId.isEmpty) {
+      throw StateError('You must be signed in to update challenges.');
+    }
+
+    await _db
+        .collection('groups')
+        .doc(challenge.groupId)
+        .collection('challenges')
+        .doc(challenge.id)
+        .set(challenge.toMap());
+  }
+
+  Future<GroupChallenge> addChallengeProgress({
+    required GroupChallenge challenge,
+    required double delta,
+    DateTime? day,
+  }) async {
+    final uid = userId;
+    if (uid.isEmpty) {
+      throw StateError('You must be signed in to log challenge progress.');
+    }
+
+    if (!challenge.participantIds.contains(uid)) {
+      throw StateError('Only challenge participants can log progress.');
+    }
+
+    final now = day ?? DateTime.now();
+    if (now.isBefore(challenge.startAt) || now.isAfter(challenge.endAt)) {
+      throw StateError('This challenge is not active right now.');
+    }
+
+    if (!delta.isFinite || delta <= 0) {
+      throw StateError('Progress value must be greater than 0.');
+    }
+
+    final logs = <String, Map<String, double>>{};
+    challenge.progressLogs.forEach((memberId, valuesByDay) {
+      logs[memberId] = Map<String, double>.from(valuesByDay);
+    });
+
+    final dateKey = challenge.dateKeyFor(now);
+    final memberLogs = Map<String, double>.from(
+      logs[uid] ?? const <String, double>{},
+    );
+    memberLogs[dateKey] = (memberLogs[dateKey] ?? 0) + delta;
+    logs[uid] = memberLogs;
+
+    final updated = challenge.copyWith(progressLogs: logs);
+    await saveGroupChallenge(updated);
+    return updated;
+  }
+
   Future<GroupTask?> getGroupTaskById(String groupId, String taskId) async {
     if (groupId.trim().isEmpty || taskId.trim().isEmpty) {
       return null;
@@ -352,8 +653,8 @@ class GroupService {
       throw StateError('Group not found.');
     }
 
-    if (group.ownerId != userId) {
-      throw StateError('Only the group admin can edit tasks.');
+    if (!group.memberIds.contains(userId)) {
+      throw StateError('Only group members can edit tasks.');
     }
 
     final normalizedTitle = title.trim();
@@ -390,8 +691,8 @@ class GroupService {
       throw StateError('Group not found.');
     }
 
-    if (group.ownerId != userId) {
-      throw StateError('Only the group admin can delete tasks.');
+    if (!group.memberIds.contains(userId)) {
+      throw StateError('Only group members can delete tasks.');
     }
 
     await _db

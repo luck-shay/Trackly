@@ -1017,40 +1017,51 @@ class _HabitLeaderboardView extends StatelessWidget {
                             color: scheme.onSurface.withValues(alpha: 0.72),
                           ),
                         ),
-                        trailing: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 8,
-                          ),
-                          decoration: BoxDecoration(
-                            color: streak > 0
-                                ? Colors.orange.withValues(alpha: 0.1)
-                                : scheme.onSurface.withValues(alpha: 0.14),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                Icons.local_fire_department_rounded,
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.calendar_month_rounded,
+                              size: 20,
+                              color: scheme.onSurface.withValues(alpha: 0.3),
+                            ),
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 8,
+                              ),
+                              decoration: BoxDecoration(
                                 color: streak > 0
-                                    ? Colors.orange
-                                    : scheme.onSurface.withValues(alpha: 0.62),
-                                size: 20,
+                                    ? Colors.orange.withValues(alpha: 0.1)
+                                    : scheme.onSurface.withValues(alpha: 0.14),
+                                borderRadius: BorderRadius.circular(12),
                               ),
-                              const SizedBox(width: 4),
-                              Text(
-                                '$streak',
-                                style: GoogleFonts.outfit(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 18,
-                                  color: streak > 0
-                                      ? Colors.orange
-                                      : scheme.onSurface.withValues(alpha: 0.62),
-                                ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.local_fire_department_rounded,
+                                    color: streak > 0
+                                        ? Colors.orange
+                                        : scheme.onSurface.withValues(alpha: 0.62),
+                                    size: 20,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    '$streak',
+                                    style: GoogleFonts.outfit(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 18,
+                                      color: streak > 0
+                                          ? Colors.orange
+                                          : scheme.onSurface.withValues(alpha: 0.62),
+                                    ),
+                                  ),
+                                ],
                               ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
                       ),
                     ).animate().fade(delay: (100 * index).ms).slideX(begin: 0.1);

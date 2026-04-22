@@ -12,15 +12,14 @@ import '../services/health_service.dart';
 import '../services/notification_service.dart';
 import '../services/social_service.dart';
 
-
 class HabitsProvider extends ChangeNotifier {
   final DatabaseService _db = DatabaseService();
   final GroupService _groupService = GroupService();
   StreamSubscription<List<Habit>>? _habitSubscription;
   StreamSubscription<List<Group>>? _groupsSubscription;
   StreamSubscription<User?>? _authSubscription;
-  final Map<String, StreamSubscription<List<GroupTask>>> _groupTaskSubscriptions =
-      <String, StreamSubscription<List<GroupTask>>>{};
+  final Map<String, StreamSubscription<List<GroupTask>>>
+  _groupTaskSubscriptions = <String, StreamSubscription<List<GroupTask>>>{};
   final Map<String, List<Habit>> _groupHabitsByGroupId =
       <String, List<Habit>>{};
   bool _permissionRetryScheduled = false;
@@ -128,19 +127,20 @@ class HabitsProvider extends ChangeNotifier {
         continue;
       }
 
-      _groupTaskSubscriptions[group.id] =
-          _groupService.streamGroupTasks(group.id).listen(
-                (tasks) {
-                  _permissionRetryScheduled = false;
-                  _groupHabitsByGroupId[group.id] = tasks
-                      .map((task) => _habitFromGroupTask(group, task))
-                      .toList();
-                  _publishMergedHabits();
-                },
-                onError: (err) {
-                  _handleStreamError(err);
-                },
-              );
+      _groupTaskSubscriptions[group.id] = _groupService
+          .streamGroupTasks(group.id)
+          .listen(
+            (tasks) {
+              _permissionRetryScheduled = false;
+              _groupHabitsByGroupId[group.id] = tasks
+                  .map((task) => _habitFromGroupTask(group, task))
+                  .toList();
+              _publishMergedHabits();
+            },
+            onError: (err) {
+              _handleStreamError(err);
+            },
+          );
     }
 
     _publishMergedHabits();
@@ -341,7 +341,10 @@ class HabitsProvider extends ChangeNotifier {
   Future<void> _persistHabit(Habit habit) async {
     if (habit.isGroup && (habit.groupEntityId ?? '').trim().isNotEmpty) {
       final groupId = habit.groupEntityId!.trim();
-      final existingTask = await _groupService.getGroupTaskById(groupId, habit.id);
+      final existingTask = await _groupService.getGroupTaskById(
+        groupId,
+        habit.id,
+      );
       if (existingTask != null) {
         await _groupService.saveGroupTask(
           existingTask.copyWith(
@@ -392,7 +395,6 @@ class HabitsProvider extends ChangeNotifier {
     }
   }
 
-
   void _applyOptimisticUpdate(Habit updatedHabit) {
     final index = _habits.indexWhere((h) => h.id == updatedHabit.id);
     if (index != -1) {
@@ -424,8 +426,8 @@ class HabitsProvider extends ChangeNotifier {
       if (group == null) {
         throw StateError('Group not found.');
       }
-      if (group.ownerId != uid) {
-        throw StateError('Only the group admin can delete group tasks.');
+      if (!group.memberIds.contains(uid)) {
+        throw StateError('Only group members can delete group tasks.');
       }
 
       await _groupService.deleteGroupTask(groupId, habit.id);
@@ -452,8 +454,8 @@ class HabitsProvider extends ChangeNotifier {
       return;
     }
 
-    final remainingParticipants =
-        List<String>.from(habit.participants)..remove(uid);
+    final remainingParticipants = List<String>.from(habit.participants)
+      ..remove(uid);
     final updatedHabit = habit.copyWith(
       participants: remainingParticipants,
       completions: Map<String, List<DateTime>>.from(habit.completions)
@@ -477,10 +479,7 @@ class HabitsProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      await _db.saveHabit(
-        updatedHabit,
-        ensureCurrentUserParticipant: false,
-      );
+      await _db.saveHabit(updatedHabit, ensureCurrentUserParticipant: false);
     } catch (_) {
       _habits = previousHabits;
       notifyListeners();
@@ -495,11 +494,9 @@ class HabitsProvider extends ChangeNotifier {
 
   Future<void> convertToSharedSpace(Habit habit) async {
     if (habit.spaceType != HabitSpaceType.individual) return;
-    
-    final updatedHabit = habit.copyWith(
-      spaceType: HabitSpaceType.sharedTask,
-    );
-    
+
+    final updatedHabit = habit.copyWith(spaceType: HabitSpaceType.sharedTask);
+
     await _runWithRollback(
       previousHabit: habit,
       updatedHabit: updatedHabit,
@@ -620,10 +617,7 @@ class HabitsProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      await _db.saveHabit(
-        updatedHabit,
-        ensureCurrentUserParticipant: false,
-      );
+      await _db.saveHabit(updatedHabit, ensureCurrentUserParticipant: false);
     } catch (_) {
       _habits = previousHabits;
       notifyListeners();

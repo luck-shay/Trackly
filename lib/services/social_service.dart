@@ -71,7 +71,11 @@ class SocialService {
   }
 
   // Update Profile
-  Future<void> updateProfile({String? displayName, String? username, String? photoUrl}) async {
+  Future<void> updateProfile({
+    String? displayName,
+    String? username,
+    String? photoUrl,
+  }) async {
     if (userId.isEmpty) {
       throw StateError('You must be signed in to update your profile.');
     }
@@ -300,6 +304,30 @@ class SocialService {
         .where('to', isEqualTo: userId)
         .where('status', isEqualTo: 'pending')
         .snapshots();
+  }
+
+  Stream<QuerySnapshot> streamChallengeInvites() {
+    return _db
+        .collection('challengeInvites')
+        .where('to', isEqualTo: userId)
+        .where('status', isEqualTo: 'pending')
+        .snapshots();
+  }
+
+  Future<void> acceptChallengeInvite({
+    required String inviteId,
+    required String groupId,
+    required String challengeId,
+  }) async {
+    await GroupService().acceptChallengeInvite(
+      inviteId: inviteId,
+      groupId: groupId,
+      challengeId: challengeId,
+    );
+  }
+
+  Future<void> declineChallengeInvite(String inviteId) async {
+    await GroupService().declineChallengeInvite(inviteId);
   }
 
   Future<void> sendGroupInvite({
