@@ -276,10 +276,11 @@ class SocialService {
     final reqRef = _db.collection('habitInvites').doc(inviteId);
     batch.update(reqRef, {'status': 'accepted'});
 
-    // 2. Add current user to habit participants
+    // 2. Add current user to habit participants and upgrade to shared task
     final habitRef = _db.collection('habits').doc(habitId);
     batch.update(habitRef, {
       'participants': FieldValue.arrayUnion([userId]),
+      'spaceType': 'sharedTask',
     });
 
     await batch.commit();

@@ -702,6 +702,8 @@ class _CreateHabitViewState extends State<_CreateHabitView> {
                       final shareTitle =
                           provider.spaceType == HabitSpaceType.group
                           ? 'INVITE MEMBERS (OPTIONAL)'
+                          : provider.spaceType == HabitSpaceType.sharedTask
+                          ? 'SHARE WITH FRIENDS (REQUIRED)'
                           : 'SHARE WITH FRIENDS (OPTIONAL)';
 
                       final friends = List<UserProfile>.from(snapshot.data!)
@@ -850,6 +852,18 @@ class _CreateHabitViewState extends State<_CreateHabitView> {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   const SnackBar(
                                     content: Text('Please add a group name.'),
+                                  ),
+                                );
+                              }
+                              return;
+                            }
+
+                            if (provider.spaceType == HabitSpaceType.sharedTask &&
+                                provider.selectedFriends.isEmpty) {
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Please select at least one friend to share with.'),
                                   ),
                                 );
                               }

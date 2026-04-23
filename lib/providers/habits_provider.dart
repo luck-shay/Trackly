@@ -456,7 +456,9 @@ class HabitsProvider extends ChangeNotifier {
 
     final remainingParticipants = List<String>.from(habit.participants)
       ..remove(uid);
+    final newSpaceType = (remainingParticipants.length <= 1 && habit.spaceType == HabitSpaceType.sharedTask) ? HabitSpaceType.individual : habit.spaceType;
     final updatedHabit = habit.copyWith(
+      spaceType: newSpaceType,
       participants: remainingParticipants,
       completions: Map<String, List<DateTime>>.from(habit.completions)
         ..remove(uid),

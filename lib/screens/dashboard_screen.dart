@@ -23,7 +23,15 @@ import 'group_detail_screen.dart';
 import 'habit_leaderboard_screen.dart';
 import 'profile_screen.dart';
 
-enum DashboardFilter { all, challenges, group, shared, incomplete, completed }
+enum DashboardFilter {
+  all,
+  challenges,
+  group,
+  individual,
+  shared,
+  incomplete,
+  completed,
+}
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -40,6 +48,8 @@ class _DashboardScreenState extends State<DashboardScreen>
   DashboardFilter _selectedFilter = DashboardFilter.all;
   List<String> _groupOrderIds = <String>[];
   List<String> _personalOrderIds = <String>[];
+  // ignore: unused_field
+  List<String> _sectionOrder = ['group', 'challenges', 'individual', 'shared'];
   final Set<String> _completedHabitIdsForOrdering = <String>{};
   final Set<String> _movingToBottomHabitIds = <String>{};
   bool _hasCapturedInitialCompletionOrder = false;
@@ -51,6 +61,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       DashboardFilter.all => 'All',
       DashboardFilter.challenges => 'Challenges',
       DashboardFilter.group => 'Group',
+      DashboardFilter.individual => 'Individual',
       DashboardFilter.shared => 'Shared',
       DashboardFilter.incomplete => 'Incomplete',
       DashboardFilter.completed => 'Completed',
@@ -62,6 +73,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     required int allCount,
     required int challengeCount,
     required int groupCount,
+    required int individualCount,
     required int sharedCount,
     required int incompleteCount,
     required int completedCount,
@@ -72,6 +84,9 @@ class _DashboardScreenState extends State<DashboardScreen>
     }
     if (groupCount > 0) {
       items.add((DashboardFilter.group, groupCount));
+    }
+    if (individualCount > 0) {
+      items.add((DashboardFilter.individual, individualCount));
     }
     if (sharedCount > 0) {
       items.add((DashboardFilter.shared, sharedCount));
@@ -293,6 +308,9 @@ class _DashboardScreenState extends State<DashboardScreen>
     setState(() {
       _groupOrderIds = prefs.getStringList(_groupsOrderKey) ?? <String>[];
       _personalOrderIds = prefs.getStringList(_personalOrderKey) ?? <String>[];
+      _sectionOrder =
+          prefs.getStringList('dashboard_section_order') ??
+          ['group', 'challenges', 'individual', 'shared'];
       _isLoadingSectionPrefs = false;
     });
   }
@@ -1262,8 +1280,19 @@ class _DashboardScreenState extends State<DashboardScreen>
                     );
                   }
 
-                  final personalHabits = provider.habits
-                      .where((habit) => !habit.isGroup)
+                  final individualHabits = provider.habits
+                      .where(
+                        (habit) =>
+                            !habit.isGroup &&
+                            habit.spaceType == HabitSpaceType.individual,
+                      )
+                      .toList();
+                  final sharedHabits = provider.habits
+                      .where(
+                        (habit) =>
+                            !habit.isGroup &&
+                            habit.spaceType == HabitSpaceType.sharedTask,
+                      )
                       .toList();
                   final groupHabits = provider.habits
                       .where((habit) => habit.isGroup)
@@ -1272,6 +1301,8 @@ class _DashboardScreenState extends State<DashboardScreen>
                     groupHabits,
                     _groupOrderIds,
                   );
+                  // For now, keep using _personalOrderIds for both, or separate them. Let's separate them later or just combine them for ordering:
+                  final personalHabits = [...individualHabits, ...sharedHabits];
                   final orderedPersonalHabits = _applySavedOrder(
                     personalHabits,
                     _personalOrderIds,
@@ -1288,8 +1319,16 @@ class _DashboardScreenState extends State<DashboardScreen>
                   final displayPersonalHabits = _orderWithCompletedLast(
                     orderedPersonalHabits,
                   );
-                  final allCount = groupHabits.length + personalHabits.length;
-                  final sharedCount = personalHabits.length;
+                  final displayIndividualHabits = displayPersonalHabits
+                      .where((h) => h.spaceType == HabitSpaceType.individual)
+                      .toList();
+                  final displaySharedHabits = displayPersonalHabits
+                      .where((h) => h.spaceType == HabitSpaceType.sharedTask)
+                      .toList();
+
+                  final individualCount = individualHabits.length;
+                  final sharedCount = sharedHabits.length;
+
                   final scopeHabits = <Habit>[
                     ...displayGroupHabits,
                     ...displayPersonalHabits,
@@ -1306,6 +1345,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                     DashboardFilter.all => displayGroupHabits,
                     DashboardFilter.challenges => const <Habit>[],
                     DashboardFilter.group => displayGroupHabits,
+                    DashboardFilter.individual => const <Habit>[],
                     DashboardFilter.shared => const <Habit>[],
                     DashboardFilter.incomplete =>
                       displayGroupHabits
@@ -1322,38 +1362,73 @@ class _DashboardScreenState extends State<DashboardScreen>
                           )
                           .toList(),
                   };
-                  final filteredPersonalHabits = switch (_selectedFilter) {
-                    DashboardFilter.all => displayPersonalHabits,
+                  final filteredIndividualHabits = switch (_selectedFilter) {
+                    DashboardFilter.all => displayIndividualHabits,
                     DashboardFilter.challenges => const <Habit>[],
                     DashboardFilter.group => const <Habit>[],
-                    DashboardFilter.shared => displayPersonalHabits,
+                    DashboardFilter.individual => displayIndividualHabits,
+                    DashboardFilter.shared => const <Habit>[],
                     DashboardFilter.incomplete =>
-                      displayPersonalHabits
+                      displayIndividualHabits
                           .where(
                             (habit) =>
                                 !habit.isCompletedOnDate(provider.userId, now),
                           )
                           .toList(),
                     DashboardFilter.completed =>
-                      displayPersonalHabits
+                      displayIndividualHabits
                           .where(
                             (habit) =>
                                 habit.isCompletedOnDate(provider.userId, now),
                           )
                           .toList(),
                   };
+                  final filteredSharedHabits = switch (_selectedFilter) {
+                    DashboardFilter.all => displaySharedHabits,
+                    DashboardFilter.challenges => const <Habit>[],
+                    DashboardFilter.group => const <Habit>[],
+                    DashboardFilter.individual => const <Habit>[],
+                    DashboardFilter.shared => displaySharedHabits,
+                    DashboardFilter.incomplete =>
+                      displaySharedHabits
+                          .where(
+                            (habit) =>
+                                !habit.isCompletedOnDate(provider.userId, now),
+                          )
+                          .toList(),
+                    DashboardFilter.completed =>
+                      displaySharedHabits
+                          .where(
+                            (habit) =>
+                                habit.isCompletedOnDate(provider.userId, now),
+                          )
+                          .toList(),
+                  };
+
                   final showGroups =
                       filteredGroupHabits.isNotEmpty ||
                       _selectedFilter == DashboardFilter.all ||
                       _selectedFilter == DashboardFilter.group ||
                       _selectedFilter == DashboardFilter.incomplete ||
                       _selectedFilter == DashboardFilter.completed;
-                  final showPersonal =
-                      filteredPersonalHabits.isNotEmpty ||
+                  final showIndividual =
+                      filteredIndividualHabits.isNotEmpty ||
+                      _selectedFilter == DashboardFilter.all ||
+                      _selectedFilter == DashboardFilter.individual ||
+                      _selectedFilter == DashboardFilter.incomplete ||
+                      _selectedFilter == DashboardFilter.completed;
+                  final showShared =
+                      filteredSharedHabits.isNotEmpty ||
                       _selectedFilter == DashboardFilter.all ||
                       _selectedFilter == DashboardFilter.shared ||
                       _selectedFilter == DashboardFilter.incomplete ||
                       _selectedFilter == DashboardFilter.completed;
+
+                  final showPersonal = showIndividual || showShared;
+                  final filteredPersonalHabits = [
+                    ...filteredIndividualHabits,
+                    ...filteredSharedHabits,
+                  ];
 
                   if (_isLoadingSectionPrefs) {
                     return const Center(child: CircularProgressIndicator());
@@ -1374,6 +1449,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                         DashboardFilter.all => myChallenges,
                         DashboardFilter.challenges => myChallenges,
                         DashboardFilter.group => const <GroupChallenge>[],
+                        DashboardFilter.individual => const <GroupChallenge>[],
                         DashboardFilter.shared => const <GroupChallenge>[],
                         DashboardFilter.incomplete => const <GroupChallenge>[],
                         DashboardFilter.completed => const <GroupChallenge>[],
@@ -1383,6 +1459,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                         DashboardFilter.all,
                         if (challengeCount > 0) DashboardFilter.challenges,
                         if (groupHabits.isNotEmpty) DashboardFilter.group,
+                        if (individualCount > 0) DashboardFilter.individual,
                         if (sharedCount > 0) DashboardFilter.shared,
                         if (incompleteCount > 0) DashboardFilter.incomplete,
                         if (completedCount > 0) DashboardFilter.completed,
@@ -1494,6 +1571,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                                 allCount: allCount,
                                 challengeCount: challengeCount,
                                 groupCount: groupHabits.length,
+                                individualCount: individualCount,
                                 sharedCount: sharedCount,
                                 incompleteCount: incompleteCount,
                                 completedCount: completedCount,

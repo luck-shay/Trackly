@@ -84,7 +84,7 @@ class GroupChallenge {
     if (userLogs == null) {
       return 0;
     }
-    return userLogs.values.fold<double>(0, (sum, value) => sum + value);
+    return userLogs.values.fold<double>(0, (acc, value) => acc + value);
   }
 
   Map<String, dynamic> toMap() {

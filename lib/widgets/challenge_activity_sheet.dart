@@ -48,7 +48,6 @@ class ChallengeActivitySheet {
                 } catch (_) {}
               });
               
-              final totalTrackableDays = challenge.endAt.difference(challenge.startAt).inDays + 1;
 
               return SafeArea(
                 child: Padding(
