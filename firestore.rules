@@ -36,8 +36,8 @@ service cloud.firestore {
     }
 
     function parentGroupAllowsAccess(groupId) {
-      let groupDoc = get(/databases/$(database)/documents/groups/$(groupId));
-      let group = groupDoc != null ? groupDoc.data : null;
+      let groupPath = /databases/$(database)/documents/groups/$(groupId);
+      let group = exists(groupPath) ? get(groupPath).data : null;
       return isSignedIn() && group != null &&
         (
           ('memberIds' in group && group.memberIds is list && request.auth.uid in group.memberIds) ||
