@@ -56,6 +56,8 @@ dependencies:
   flutter_timezone: ^4.1.1
   timezone: ^0.11.0
   shared_preferences: ^2.5.5
+  purchases_flutter: ^10.0.1
+  purchases_ui_flutter: ^10.0.1
 
 dev_dependencies:
   flutter_test:

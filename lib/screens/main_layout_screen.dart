@@ -214,7 +214,7 @@ class MainLayoutScreen extends StatelessWidget {
                                   child: _buildNavItem(
                                     context,
                                     Icons.calendar_month_rounded,
-                                    'History',
+                                    'Activity',
                                     1,
                                     compact: compact,
                                   ),
