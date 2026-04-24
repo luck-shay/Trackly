@@ -4,9 +4,13 @@ import '../models/user_profile.dart';
 import '../models/group_invite.dart';
 import '../models/habit.dart';
 import '../services/group_service.dart';
+import 'subscription_constants.dart';
+import 'subscription_exceptions.dart';
+import 'subscription_service.dart';
 
 class SocialService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
+  final SubscriptionService _subscriptionService = SubscriptionService();
 
   String get userId => FirebaseAuth.instance.currentUser?.uid ?? '';
 
@@ -247,6 +251,18 @@ class SocialService {
   }) async {
     if (userId.isEmpty || toUserId.isEmpty) return;
 
+    final habitDoc = await _db.collection('habits').doc(habitId).get();
+    if (habitDoc.exists) {
+      final participants = List<String>.from(
+        (habitDoc.data()?['participants'] as List?) ?? const <String>[],
+      );
+      if (participants.length >= kSharedTaskMaxMembers) {
+        throw StateError(
+          'Shared task already has the maximum of 3 members.',
+        );
+      }
+    }
+
     final existing = await _db
         .collection('habitInvites')
         .where('from', isEqualTo: userId)
@@ -269,6 +285,33 @@ class SocialService {
   // Accept Habit Invite
   Future<void> acceptHabitInvite(String inviteId, String habitId) async {
     if (userId.isEmpty) return;
+
+    final info = await _subscriptionService.getCustomerInfo();
+    final hasAccess = await _subscriptionService.canAccessPremiumFeatures(
+      userId: userId,
+      customerInfo: info,
+    );
+    if (!hasAccess) {
+      final sharedCount = await _subscriptionService.sharedTaskParticipationCount(
+        userId,
+      );
+      if (sharedCount >= kFreeSharedTaskLimit) {
+        throw const UpgradeRequiredException(
+          'Free tier allows up to 3 shared tasks. Upgrade to Trackly Pro.',
+        );
+      }
+    }
+
+    final habitDoc = await _db.collection('habits').doc(habitId).get();
+    if (habitDoc.exists) {
+      final participants = List<String>.from(
+        (habitDoc.data()?['participants'] as List?) ?? const <String>[],
+      );
+      if (!participants.contains(userId) &&
+          participants.length >= kSharedTaskMaxMembers) {
+        throw StateError('Shared task is full (max 3 members).');
+      }
+    }
 
     final batch = _db.batch();
 
@@ -369,9 +412,19 @@ class SocialService {
   Future<void> acceptGroupInvite(String inviteId, String groupId) async {
     if (userId.isEmpty) return;
 
+    final info = await _subscriptionService.getCustomerInfo();
+    final hasAccess = await _subscriptionService.canAccessPremiumFeatures(
+      userId: userId,
+      customerInfo: info,
+    );
+    if (!hasAccess) {
+      throw const UpgradeRequiredException(
+        'Trackly Pro is required to join groups.',
+      );
+    }
+
     final groupRef = _db.collection('groups').doc(groupId);
     final groupDoc = await groupRef.get();
-
     final batch = _db.batch();
 
     final inviteRef = _db.collection('groupInvites').doc(inviteId);

@@ -6,9 +6,12 @@ import '../models/group.dart';
 import '../models/group_challenge.dart';
 import '../models/group_task.dart';
 import '../models/habit.dart';
+import 'subscription_exceptions.dart';
+import 'subscription_service.dart';
 
 class GroupService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
+  final SubscriptionService _subscriptionService = SubscriptionService();
   static const String _hiddenGroupsKeyPrefix = 'hidden_groups_';
 
   String get userId => FirebaseAuth.instance.currentUser?.uid ?? '';
@@ -131,6 +134,17 @@ class GroupService {
   }) async {
     if (userId.isEmpty) {
       throw StateError('You must be signed in to create groups.');
+    }
+
+    final info = await _subscriptionService.getCustomerInfo();
+    final hasAccess = await _subscriptionService.canAccessPremiumFeatures(
+      userId: userId,
+      customerInfo: info,
+    );
+    if (!hasAccess) {
+      throw const UpgradeRequiredException(
+        'Trackly Pro is required to create groups.',
+      );
     }
 
     final groupId = createGroupId();

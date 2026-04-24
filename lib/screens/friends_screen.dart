@@ -5,9 +5,11 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
 import '../services/social_service.dart';
 import '../services/database_service.dart';
+import '../services/subscription_exceptions.dart';
 import '../models/user_profile.dart';
 import '../models/habit.dart';
 import '../providers/friends_provider.dart';
+import '../providers/subscription_provider.dart';
 import 'friend_profile_screen.dart';
 
 class FriendsScreen extends StatelessWidget {
@@ -278,6 +280,16 @@ class FriendsScreen extends StatelessWidget {
                                       await social.acceptHabitInvite(
                                         doc.id,
                                         habitId,
+                                      );
+                                    } on UpgradeRequiredException catch (error) {
+                                      if (!context.mounted) return;
+                                      try {
+                                        await context
+                                            .read<SubscriptionProvider>()
+                                            .presentPaywall();
+                                      } catch (_) {}
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(content: Text(error.message)),
                                       );
                                     } catch (_) {
                                       if (!context.mounted) return;

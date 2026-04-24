@@ -6,6 +6,8 @@ import '../models/user_profile.dart';
 import '../models/habit.dart';
 import '../services/social_service.dart';
 import '../providers/create_habit_provider.dart';
+import '../providers/subscription_provider.dart';
+import '../services/subscription_exceptions.dart';
 import '../theme/app_layout.dart';
 import '../utils/quantity_format.dart';
 
@@ -869,6 +871,19 @@ class _CreateHabitViewState extends State<_CreateHabitView> {
                               }
                               return;
                             }
+                            if (provider.spaceType == HabitSpaceType.sharedTask &&
+                                provider.selectedFriends.length > 2) {
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      'Shared tasks support up to 3 members total (you + 2 friends).',
+                                    ),
+                                  ),
+                                );
+                              }
+                              return;
+                            }
 
                             setState(() {
                               _isSubmitting = true;
@@ -900,6 +915,17 @@ class _CreateHabitViewState extends State<_CreateHabitView> {
                                 }
 
                                 Navigator.pop(context, {'habit': newHabit});
+                              }
+                            } on UpgradeRequiredException catch (error) {
+                              if (context.mounted) {
+                                try {
+                                  await context
+                                      .read<SubscriptionProvider>()
+                                      .presentPaywall();
+                                } catch (_) {}
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text(error.message)),
+                                );
                               }
                             } catch (error) {
                               if (context.mounted) {

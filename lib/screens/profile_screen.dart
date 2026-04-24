@@ -3,9 +3,12 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
+import 'package:purchases_flutter/models/package_wrapper.dart';
 import '../services/auth_service.dart';
 import '../models/user_profile.dart';
+import '../models/subscription_state.dart';
 import '../providers/profile_provider.dart';
+import '../providers/subscription_provider.dart';
 import '../providers/theme_mode_provider.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -109,6 +112,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget build(BuildContext context) {
     final profileProvider = context.watch<ProfileProvider>();
     final themeModeProvider = context.watch<ThemeModeProvider>();
+    final subscriptionProvider = context.watch<SubscriptionProvider>();
+    final subscriptionState = subscriptionProvider.state;
     final userId = FirebaseAuth.instance.currentUser?.uid ?? '';
 
     return PopScope(
@@ -379,6 +384,80 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ],
 
                     if (!profileProvider.isEditing) ...[
+                      const SizedBox(height: 24),
+                      _SubscriptionSection(
+                        state: subscriptionState,
+                        onUpgrade: () async {
+                          try {
+                            await subscriptionProvider.presentPaywall();
+                          } catch (error) {
+                            if (!context.mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  'Could not open upgrade screen. ${error.toString().split('\n').first}',
+                                ),
+                              ),
+                            );
+                          }
+                        },
+                        onRestore: () async {
+                          try {
+                            await subscriptionProvider.restore();
+                            if (!context.mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Purchases restored.'),
+                              ),
+                            );
+                          } catch (error) {
+                            if (!context.mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  'Could not restore purchases. ${error.toString().split('\n').first}',
+                                ),
+                              ),
+                            );
+                          }
+                        },
+                        onManageSubscription: () async {
+                          try {
+                            await subscriptionProvider.openCustomerCenter();
+                          } catch (error) {
+                            if (!context.mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  'Could not open subscription management. ${error.toString().split('\n').first}',
+                                ),
+                              ),
+                            );
+                          }
+                        },
+                        onBuyPackage: (package) async {
+                          try {
+                            await subscriptionProvider.purchase(package);
+                            if (!context.mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Subscription activated.'),
+                              ),
+                            );
+                          } catch (error) {
+                            if (!context.mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  'Purchase failed. ${error.toString().split('\n').first}',
+                                ),
+                              ),
+                            );
+                          }
+                        },
+                      ),
+                    ],
+                    if (!profileProvider.isEditing) ...[
                       const SizedBox(height: 48),
                       Container(
                         width: double.infinity,
@@ -516,5 +595,146 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
       ],
     );
+  }
+}
+
+class _SubscriptionSection extends StatelessWidget {
+  final SubscriptionState state;
+  final Future<void> Function() onUpgrade;
+  final Future<void> Function() onRestore;
+  final Future<void> Function() onManageSubscription;
+  final Future<void> Function(Package package) onBuyPackage;
+
+  const _SubscriptionSection({
+    required this.state,
+    required this.onUpgrade,
+    required this.onRestore,
+    required this.onManageSubscription,
+    required this.onBuyPackage,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final packages = state.offerings?.current?.availablePackages ?? const [];
+    final statusLabel = state.hasTracklyProEntitlement
+        ? 'Trackly Pro active'
+        : state.isTrialActive
+        ? 'Free trial active'
+        : 'Free tier';
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: scheme.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: Theme.of(context).dividerColor.withValues(alpha: 0.35),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Subscription',
+            style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            statusLabel,
+            style: GoogleFonts.inter(
+              color: scheme.onSurface.withValues(alpha: 0.72),
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          if (state.errorMessage != null && '${state.errorMessage}'.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Text(
+              '${state.errorMessage}',
+              style: GoogleFonts.inter(color: Colors.redAccent, fontSize: 12),
+            ),
+          ],
+          const SizedBox(height: 12),
+          if (packages.isNotEmpty)
+            ...packages
+                .where((p) => _supportedProductIds.contains(p.storeProduct.identifier))
+                .map(
+                  (package) => ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(
+                      _labelForProduct(package.storeProduct.identifier),
+                      style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+                    ),
+                    subtitle: Text(
+                      package.storeProduct.priceString,
+                      style: GoogleFonts.inter(
+                        color: scheme.onSurface.withValues(alpha: 0.7),
+                      ),
+                    ),
+                    trailing: TextButton(
+                      onPressed: state.isLoading ? null : () => onBuyPackage(package),
+                      child: const Text('Buy'),
+                    ),
+                  ),
+                ),
+          if (packages.isEmpty)
+            Text(
+              'Plans are loading...',
+              style: GoogleFonts.inter(
+                color: scheme.onSurface.withValues(alpha: 0.7),
+              ),
+            ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: state.isLoading ? null : onUpgrade,
+                  child: const Text('Upgrade'),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: state.isLoading ? null : onRestore,
+                  child: const Text('Restore'),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            child: TextButton(
+              onPressed: state.isLoading ? null : onManageSubscription,
+              child: const Text('Manage subscription'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+const Set<String> _supportedProductIds = {
+  'monthly',
+  'quarterly',
+  'yearly',
+  'lifetime',
+};
+
+String _labelForProduct(String productId) {
+  switch (productId) {
+    case 'monthly':
+      return 'Monthly';
+    case 'quarterly':
+      return 'Quarterly';
+    case 'yearly':
+      return 'Annual';
+    case 'lifetime':
+      return 'Lifetime';
+    default:
+      return productId;
   }
 }

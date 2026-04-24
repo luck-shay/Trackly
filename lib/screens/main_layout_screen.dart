@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 
 import '../models/habit.dart';
 import '../providers/navigation_provider.dart';
+import '../providers/subscription_provider.dart';
 import '../services/social_service.dart';
 import 'calendar_screen.dart';
 import 'create_group_screen.dart';
@@ -104,6 +105,22 @@ class MainLayoutScreen extends StatelessWidget {
     final action = await _showCreateChooser(context);
     if (action == null || !context.mounted) {
       return null;
+    }
+
+    if (action == _CreateEntryAction.group) {
+      final subscription = context.read<SubscriptionProvider>();
+      final canUsePremium = await subscription.canUsePremiumFeatures();
+      if (!canUsePremium) {
+        await subscription.presentPaywall();
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Trackly Pro is required to create groups.'),
+            ),
+          );
+        }
+        return null;
+      }
     }
 
     final destination = switch (action) {

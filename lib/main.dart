@@ -14,6 +14,7 @@ import 'providers/friends_provider.dart';
 import 'providers/profile_provider.dart';
 import 'providers/login_provider.dart';
 import 'providers/theme_mode_provider.dart';
+import 'providers/subscription_provider.dart';
 import 'package:trackly/theme/color_scheme.dart';
 
 void main() async {
@@ -22,6 +23,7 @@ void main() async {
   
   Object? bootstrapError;
   final themeModeProvider = ThemeModeProvider();
+  SubscriptionProvider? subscriptionProvider;
 
   try {
     if (kDebugMode) debugPrint('Trackly: Initializing Firebase...');
@@ -51,11 +53,22 @@ void main() async {
   }
 
   await themeModeProvider.loadThemePreference();
+  if (bootstrapError == null) {
+    subscriptionProvider = SubscriptionProvider();
+    try {
+      await subscriptionProvider.configure();
+    } catch (error) {
+      if (kDebugMode) {
+        debugPrint('Trackly: RevenueCat init warning: $error');
+      }
+    }
+  }
 
   runApp(
     MyApp(
       bootstrapError: bootstrapError,
       themeModeProvider: themeModeProvider,
+      subscriptionProvider: subscriptionProvider,
     ),
   );
 }
@@ -63,11 +76,13 @@ void main() async {
 class MyApp extends StatelessWidget {
   final Object? bootstrapError;
   final ThemeModeProvider themeModeProvider;
+  final SubscriptionProvider? subscriptionProvider;
 
   const MyApp({
     super.key,
     this.bootstrapError,
     required this.themeModeProvider,
+    required this.subscriptionProvider,
   });
 
   @override
@@ -90,6 +105,10 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => HabitsProvider()),
         ChangeNotifierProvider(create: (_) => ProfileProvider()),
         ChangeNotifierProvider(create: (_) => LoginProvider()),
+        if (subscriptionProvider != null)
+          ChangeNotifierProvider<SubscriptionProvider>.value(
+            value: subscriptionProvider!,
+          ),
       ],
       child: Consumer<ThemeModeProvider>(
         builder: (context, themeProvider, _) {

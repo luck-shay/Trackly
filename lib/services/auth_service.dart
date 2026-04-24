@@ -4,11 +4,13 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/user_profile.dart';
 import 'notification_service.dart';
+import 'subscription_service.dart';
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final GoogleSignIn _googleSignIn = GoogleSignIn.instance;
   bool _isGoogleSignInInitialized = false;
+  final SubscriptionService _subscriptionService = SubscriptionService();
 
   // Firebase Web OAuth client ID (from google-services.json, client_type: 3).
   // Required by google_sign_in on Android to issue the token used by Firebase Auth.
@@ -35,6 +37,9 @@ class AuthService {
           googleProvider,
         );
         await syncUserToFirestore(userCredential.user);
+        if (userCredential.user != null) {
+          await _subscriptionService.logIn(userCredential.user!.uid);
+        }
         return userCredential;
       } else {
         await _ensureGoogleSignInInitialized();
@@ -56,6 +61,9 @@ class AuthService {
           credential,
         );
         await syncUserToFirestore(userCredential.user);
+        if (userCredential.user != null) {
+          await _subscriptionService.logIn(userCredential.user!.uid);
+        }
         return userCredential;
       }
     } catch (e) {
@@ -75,6 +83,11 @@ class AuthService {
       await _googleSignIn.signOut();
     } catch (e) {
       debugPrint('Error signing out of Google: $e');
+    }
+    try {
+      await _subscriptionService.logOut();
+    } catch (e) {
+      debugPrint('Error logging out RevenueCat user: $e');
     }
     await _auth.signOut();
   }

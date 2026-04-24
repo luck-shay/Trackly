@@ -1405,24 +1405,9 @@ class _DashboardScreenState extends State<DashboardScreen>
                           .toList(),
                   };
 
-                  final showGroups =
-                      filteredGroupHabits.isNotEmpty ||
-                      _selectedFilter == DashboardFilter.all ||
-                      _selectedFilter == DashboardFilter.group ||
-                      _selectedFilter == DashboardFilter.incomplete ||
-                      _selectedFilter == DashboardFilter.completed;
-                  final showIndividual =
-                      filteredIndividualHabits.isNotEmpty ||
-                      _selectedFilter == DashboardFilter.all ||
-                      _selectedFilter == DashboardFilter.individual ||
-                      _selectedFilter == DashboardFilter.incomplete ||
-                      _selectedFilter == DashboardFilter.completed;
-                  final showShared =
-                      filteredSharedHabits.isNotEmpty ||
-                      _selectedFilter == DashboardFilter.all ||
-                      _selectedFilter == DashboardFilter.shared ||
-                      _selectedFilter == DashboardFilter.incomplete ||
-                      _selectedFilter == DashboardFilter.completed;
+                  final showGroups = filteredGroupHabits.isNotEmpty;
+                  final showIndividual = filteredIndividualHabits.isNotEmpty;
+                  final showShared = filteredSharedHabits.isNotEmpty;
 
                   final showPersonal = showIndividual || showShared;
                   final filteredPersonalHabits = [
@@ -1474,10 +1459,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                         });
                       }
 
-                      final showChallenges =
-                          filteredChallenges.isNotEmpty ||
-                          _selectedFilter == DashboardFilter.all ||
-                          _selectedFilter == DashboardFilter.challenges;
+                      final showChallenges = filteredChallenges.isNotEmpty;
 
                       if (personalHabits.isEmpty &&
                           groupHabits.isEmpty &&
@@ -1576,15 +1558,13 @@ class _DashboardScreenState extends State<DashboardScreen>
                                 incompleteCount: incompleteCount,
                                 completedCount: completedCount,
                               ),
-                              if (showChallenges &&
-                                  filteredChallenges.isNotEmpty)
+                              if (showChallenges)
                                 _buildSectionLabel(
                                   context,
                                   title: 'LIVE CHALLENGES',
                                   count: filteredChallenges.length,
                                 ),
-                              if (showChallenges &&
-                                  filteredChallenges.isNotEmpty)
+                              if (showChallenges && filteredChallenges.isNotEmpty)
                                 ...filteredChallenges.map((challenge) {
                                   final status = !challenge.isReadyToStart
                                       ? 'Waiting for accepts'
@@ -2015,43 +1995,6 @@ class _DashboardScreenState extends State<DashboardScreen>
                                       },
                                     ),
                                   ],
-                                ),
-                              if ((showGroups && filteredGroupHabits.isEmpty) ||
-                                  (showPersonal &&
-                                      filteredPersonalHabits.isEmpty))
-                                const SizedBox(height: 4),
-                              if (showGroups && filteredGroupHabits.isEmpty)
-                                Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 24,
-                                    vertical: 12,
-                                  ),
-                                  child: Text(
-                                    'No matching group tasks for this status.',
-                                    style: GoogleFonts.inter(
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .onSurface
-                                          .withValues(alpha: 0.62),
-                                    ),
-                                  ),
-                                ),
-                              if (showPersonal &&
-                                  filteredPersonalHabits.isEmpty)
-                                Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 24,
-                                    vertical: 12,
-                                  ),
-                                  child: Text(
-                                    'No matching personal/shared tasks for this status.',
-                                    style: GoogleFonts.inter(
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .onSurface
-                                          .withValues(alpha: 0.62),
-                                    ),
-                                  ),
                                 ),
                               const SizedBox(
                                 height: DashboardScreen._bottomNavClearance,

@@ -4,7 +4,10 @@ import 'package:google_fonts/google_fonts.dart';
 import '../models/user_profile.dart';
 import '../services/group_service.dart';
 import '../services/social_service.dart';
+import '../services/subscription_exceptions.dart';
+import '../providers/subscription_provider.dart';
 import '../theme/app_layout.dart';
+import 'package:provider/provider.dart';
 
 class CreateGroupScreen extends StatefulWidget {
   const CreateGroupScreen({super.key});
@@ -61,6 +64,16 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
         'targetTab': 2,
         'snackbarMessage': 'Group created: ${group.name}',
       });
+    } on UpgradeRequiredException catch (error) {
+      if (!mounted) {
+        return;
+      }
+      try {
+        await context.read<SubscriptionProvider>().presentPaywall();
+      } catch (_) {}
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error.message)));
     } catch (error) {
       if (!mounted) {
         return;

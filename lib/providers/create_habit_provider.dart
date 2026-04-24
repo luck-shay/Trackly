@@ -4,6 +4,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../models/habit.dart';
 import '../services/social_service.dart';
 import '../services/database_service.dart';
+import '../services/subscription_constants.dart';
+import '../services/subscription_exceptions.dart';
+import '../services/subscription_service.dart';
 
 class CreateHabitProvider extends ChangeNotifier {
   int _targetDays = 7;
@@ -17,6 +20,7 @@ class CreateHabitProvider extends ChangeNotifier {
   String? _reminderTime;
   bool _isEditMode = false;
   String? _editingHabitId;
+  final SubscriptionService _subscriptionService = SubscriptionService();
 
 
   // Placeholder cycling logic
@@ -199,6 +203,23 @@ class CreateHabitProvider extends ChangeNotifier {
 
       await databaseService.saveHabit(savedHabit);
     } else {
+      if (_spaceType == HabitSpaceType.sharedTask) {
+        final customerInfo = await _subscriptionService.getCustomerInfo();
+        final hasAccess = await _subscriptionService.canAccessPremiumFeatures(
+          userId: currentUserId,
+          customerInfo: customerInfo,
+        );
+        if (!hasAccess) {
+          final sharedCount = await _subscriptionService
+              .sharedTaskParticipationCount(currentUserId);
+          if (sharedCount >= kFreeSharedTaskLimit) {
+            throw const UpgradeRequiredException(
+              'Free tier allows up to 3 shared tasks. Upgrade to Trackly Pro.',
+            );
+          }
+        }
+      }
+
       savedHabit = Habit(
         id: databaseService.createHabitId(),
         title: title,

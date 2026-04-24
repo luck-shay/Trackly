@@ -5,11 +5,14 @@ import 'package:google_fonts/google_fonts.dart';
 import '../models/group.dart';
 import '../models/group_invite.dart';
 import '../models/group_task.dart';
+import '../providers/subscription_provider.dart';
+import '../services/subscription_exceptions.dart';
 import '../services/group_service.dart';
 import '../services/social_service.dart';
 import '../theme/app_layout.dart';
 import 'create_group_screen.dart';
 import 'group_detail_screen.dart';
+import 'package:provider/provider.dart';
 
 class GroupsScreen extends StatelessWidget {
   const GroupsScreen({super.key});
@@ -33,6 +36,20 @@ class GroupsScreen extends StatelessWidget {
   }
 
   Future<void> _openCreateGroup(BuildContext context) async {
+    final subscription = context.read<SubscriptionProvider>();
+    final canUsePremium = await subscription.canUsePremiumFeatures();
+    if (!canUsePremium) {
+      await subscription.presentPaywall();
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Trackly Pro is required to create groups.'),
+          ),
+        );
+      }
+      return;
+    }
+
     final result = await Navigator.push<dynamic>(
       context,
       MaterialPageRoute(builder: (_) => const CreateGroupScreen()),
@@ -224,6 +241,24 @@ class GroupsScreen extends StatelessWidget {
                                               await social.acceptGroupInvite(
                                                 invite.id,
                                                 invite.groupId,
+                                              );
+                                            } on UpgradeRequiredException catch (
+                                              error
+                                            ) {
+                                              if (!context.mounted) {
+                                                return;
+                                              }
+                                              try {
+                                                await context
+                                                    .read<SubscriptionProvider>()
+                                                    .presentPaywall();
+                                              } catch (_) {}
+                                              ScaffoldMessenger.of(
+                                                context,
+                                              ).showSnackBar(
+                                                SnackBar(
+                                                  content: Text(error.message),
+                                                ),
                                               );
                                             } catch (_) {
                                               if (!context.mounted) {
