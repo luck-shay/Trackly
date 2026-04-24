@@ -46,6 +46,8 @@ class NotificationService with WidgetsBindingObserver {
   StreamSubscription<QuerySnapshot>? _groupInviteResponseSubscription;
   StreamSubscription<QuerySnapshot>? _challengeInviteResponseSubscription;
   StreamSubscription<QuerySnapshot>? _habitNoticeSubscription;
+  StreamSubscription<RemoteMessage>? _onMessageSubscription;
+  StreamSubscription<RemoteMessage>? _onMessageOpenedSubscription;
   
   Set<String> _notifiedInviteIds = {};
   bool _isInitialized = false;
@@ -58,8 +60,10 @@ class NotificationService with WidgetsBindingObserver {
   DateTime? _lastRetryExhaustedLogAt;
   bool _isPushTokenRegistrationBlocked = false;
   String? _pushTokenBlockReason;
+  String? _activeNotificationUserId;
 
   static const int _maxTokenSaveRetries = 8;
+  static const int _maxNotifiedEventCacheSize = 1200;
 
   bool _shouldLogWithCooldown(DateTime? lastLogAt, Duration cooldown) {
     final now = DateTime.now();
@@ -82,8 +86,7 @@ class NotificationService with WidgetsBindingObserver {
       await _evaluatePushTokenEnvironment();
 
       // 1. SharedPreferences
-      final prefs = await SharedPreferences.getInstance();
-      _notifiedInviteIds = prefs.getStringList('notified_invite_ids')?.toSet() ?? {};
+      await _loadNotifiedEventIdsForCurrentUser();
 
       // 2. Request permissions (with timeout to avoid hanging main)
       if (kDebugMode) debugPrint('NotificationService: Requesting FCM permissions...');
@@ -179,13 +182,26 @@ class NotificationService with WidgetsBindingObserver {
       // 4. Listeners
       FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
-      FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+      _onMessageSubscription?.cancel();
+      _onMessageSubscription = FirebaseMessaging.onMessage.listen((RemoteMessage message) {
         _showForegroundNotification(message);
       });
 
-      FirebaseMessaging.onMessageOpenedApp.listen((message) {
+      _onMessageOpenedSubscription?.cancel();
+      _onMessageOpenedSubscription = FirebaseMessaging.onMessageOpenedApp.listen((message) {
         _handleNotificationTap(message.data.toString());
       });
+
+      try {
+        final initialMessage = await _fcm.getInitialMessage();
+        if (initialMessage != null) {
+          _handleNotificationTap(initialMessage.data.toString());
+        }
+      } catch (e) {
+        if (kDebugMode) {
+          debugPrint('NotificationService: Failed to read initial push message: $e');
+        }
+      }
 
       _fcm.onTokenRefresh.listen((token) {
         _ensureTokenRegistration(token: token, reason: 'token_refresh');
@@ -204,31 +220,51 @@ class NotificationService with WidgetsBindingObserver {
   }
 
   void _showForegroundNotification(RemoteMessage message) {
-    RemoteNotification? notification = message.notification;
-    AndroidNotification? android = message.notification?.android;
+    final notification = message.notification;
+    final android = notification?.android;
 
-    if (notification != null) {
-      _localNotifications.show(
-        id: notification.hashCode,
-        title: notification.title,
-        body: notification.body,
-        notificationDetails: NotificationDetails(
-          android: AndroidNotificationDetails(
-            'high_importance_channel',
-            'High Importance Notifications',
-            importance: Importance.max,
-            priority: Priority.high,
-            icon: android?.smallIcon ?? '@mipmap/ic_launcher',
-          ),
-          iOS: const DarwinNotificationDetails(
-            presentAlert: true,
-            presentBadge: true,
-            presentSound: true,
-          ),
-        ),
-        payload: message.data.toString(),
-      );
+    final title = (notification?.title?.trim().isNotEmpty ?? false)
+        ? notification!.title!
+        : _firstNonEmptyDataValue(message.data, const ['title', 'notification_title']);
+    final body = (notification?.body?.trim().isNotEmpty ?? false)
+        ? notification!.body!
+        : _firstNonEmptyDataValue(message.data, const ['body', 'message', 'notification_body']);
+
+    if (title == null && body == null) {
+      return;
     }
+
+    _localNotifications.show(
+      id: message.messageId?.hashCode ?? DateTime.now().millisecondsSinceEpoch ~/ 1000,
+      title: title,
+      body: body,
+      notificationDetails: NotificationDetails(
+        android: AndroidNotificationDetails(
+          'high_importance_channel',
+          'High Importance Notifications',
+          importance: Importance.max,
+          priority: Priority.high,
+          icon: android?.smallIcon ?? '@mipmap/ic_launcher',
+        ),
+        iOS: const DarwinNotificationDetails(
+          presentAlert: true,
+          presentBadge: true,
+          presentSound: true,
+        ),
+      ),
+      payload: message.data.toString(),
+    );
+  }
+
+  String? _firstNonEmptyDataValue(Map<String, dynamic> data, List<String> keys) {
+    for (final key in keys) {
+      final raw = data[key];
+      final value = raw?.toString().trim();
+      if (value != null && value.isNotEmpty) {
+        return value;
+      }
+    }
+    return null;
   }
 
   void _handleNotificationTap(String? payload) {
@@ -256,10 +292,16 @@ class NotificationService with WidgetsBindingObserver {
         _lastReminderSignature = null;
         _tokenRetryCount = 0;
         _tokenRetryTimer?.cancel();
+        _activeNotificationUserId = null;
+        _notifiedInviteIds = <String>{};
         return;
       }
       
       if (kDebugMode) debugPrint('NotificationService: User Logged In (${user.uid}). Setting up watchers...');
+      if (_activeNotificationUserId != user.uid) {
+        _activeNotificationUserId = user.uid;
+        await _loadNotifiedEventIdsForCurrentUser();
+      }
       
       await _ensureTokenRegistration(reason: 'auth_state');
       // We don't await scheduleAllHabitReminders here to avoid blocking
@@ -362,8 +404,6 @@ class NotificationService with WidgetsBindingObserver {
   }
 
     Future<void> _processHabitNoticeSnapshot(QuerySnapshot snapshot) async {
-      final prefs = await SharedPreferences.getInstance();
-
       for (final doc in snapshot.docs) {
         final eventKey = 'habitNotice:${doc.id}';
         if (_notifiedInviteIds.contains(eventKey)) {
@@ -394,8 +434,7 @@ class NotificationService with WidgetsBindingObserver {
             ),
           );
 
-          _notifiedInviteIds.add(eventKey);
-          await prefs.setStringList('notified_invite_ids', _notifiedInviteIds.toList());
+            await _markEventNotified(eventKey);
           await FirebaseFirestore.instance
               .collection('habitNotices')
               .doc(doc.id)
@@ -412,8 +451,6 @@ class NotificationService with WidgetsBindingObserver {
     }
 
   Future<void> _processInviteSnapshot(QuerySnapshot snapshot, String type) async {
-    final prefs = await SharedPreferences.getInstance();
-    
     for (var doc in snapshot.docs) {
       final eventKey = '$type:${doc.id}:pending';
       if (_notifiedInviteIds.contains(eventKey)) continue;
@@ -464,8 +501,7 @@ class NotificationService with WidgetsBindingObserver {
           ),
         );
 
-        _notifiedInviteIds.add(eventKey);
-        await prefs.setStringList('notified_invite_ids', _notifiedInviteIds.toList());
+        await _markEventNotified(eventKey);
       } catch (e) {
         if (kDebugMode) debugPrint('Error processing invite notification: $e');
       }
@@ -473,8 +509,6 @@ class NotificationService with WidgetsBindingObserver {
   }
 
   Future<void> _processInviteResponseSnapshot(QuerySnapshot snapshot, String type) async {
-    final prefs = await SharedPreferences.getInstance();
-
     for (var doc in snapshot.docs) {
       final data = doc.data() as Map<String, dynamic>;
       final status = (data['status'] as String?) ?? '';
@@ -548,8 +582,7 @@ class NotificationService with WidgetsBindingObserver {
           ),
         );
 
-        _notifiedInviteIds.add(eventKey);
-        await prefs.setStringList('notified_invite_ids', _notifiedInviteIds.toList());
+        await _markEventNotified(eventKey);
       } catch (e) {
         if (kDebugMode) {
           debugPrint('Error processing invite response notification: $e');
@@ -1009,13 +1042,17 @@ class NotificationService with WidgetsBindingObserver {
   Future<void> dispose() async {
     WidgetsBinding.instance.removeObserver(this);
     _tokenRetryTimer?.cancel();
+    await _onMessageSubscription?.cancel();
+    await _onMessageOpenedSubscription?.cancel();
 
     await _friendInviteSubscription?.cancel();
     await _habitInviteSubscription?.cancel();
     await _groupInviteSubscription?.cancel();
+    await _challengeInviteSubscription?.cancel();
     await _friendInviteResponseSubscription?.cancel();
     await _habitInviteResponseSubscription?.cancel();
     await _groupInviteResponseSubscription?.cancel();
+    await _challengeInviteResponseSubscription?.cancel();
     await _habitNoticeSubscription?.cancel();
     await _authSubscription?.cancel();
   }
@@ -1025,5 +1062,36 @@ class NotificationService with WidgetsBindingObserver {
       'fcmTokens': FieldValue.arrayUnion([token]),
       'lastTokenUpdate': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
+  }
+
+  String _notifiedEventsStorageKey(String? uid) {
+    final keyUser = (uid == null || uid.trim().isEmpty) ? 'anon' : uid.trim();
+    return 'notified_invite_ids_$keyUser';
+  }
+
+  Future<void> _loadNotifiedEventIdsForCurrentUser() async {
+    final prefs = await SharedPreferences.getInstance();
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    _activeNotificationUserId = uid;
+    _notifiedInviteIds = prefs.getStringList(_notifiedEventsStorageKey(uid))?.toSet() ?? <String>{};
+    await _persistNotifiedEventIdsForCurrentUser();
+  }
+
+  Future<void> _persistNotifiedEventIdsForCurrentUser() async {
+    // Keep dedupe cache bounded to avoid unbounded growth in local storage.
+    while (_notifiedInviteIds.length > _maxNotifiedEventCacheSize) {
+      _notifiedInviteIds.remove(_notifiedInviteIds.first);
+    }
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(
+      _notifiedEventsStorageKey(_activeNotificationUserId),
+      _notifiedInviteIds.toList(),
+    );
+  }
+
+  Future<void> _markEventNotified(String eventKey) async {
+    _notifiedInviteIds.add(eventKey);
+    await _persistNotifiedEventIdsForCurrentUser();
   }
 }
