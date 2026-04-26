@@ -136,11 +136,7 @@ class GroupService {
       throw StateError('You must be signed in to create groups.');
     }
 
-    final info = await _subscriptionService.getCustomerInfo();
-    final hasAccess = await _subscriptionService.canAccessPremiumFeatures(
-      userId: userId,
-      customerInfo: info,
-    );
+    final hasAccess = await _subscriptionService.hasPremiumAccess(userId);
     if (!hasAccess) {
       throw const UpgradeRequiredException(
         'Trackly Pro is required to create groups.',

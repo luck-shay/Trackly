@@ -38,7 +38,7 @@ class AuthService {
         );
         await syncUserToFirestore(userCredential.user);
         if (userCredential.user != null) {
-          await _subscriptionService.logIn(userCredential.user!.uid);
+          await _syncSubscriptionIdentity(userCredential.user!.uid);
         }
         return userCredential;
       } else {
@@ -62,7 +62,7 @@ class AuthService {
         );
         await syncUserToFirestore(userCredential.user);
         if (userCredential.user != null) {
-          await _subscriptionService.logIn(userCredential.user!.uid);
+          await _syncSubscriptionIdentity(userCredential.user!.uid);
         }
         return userCredential;
       }
@@ -132,6 +132,14 @@ class AuthService {
     
     if (!kIsWeb) {
       await NotificationService().saveTokenToDatabase();
+    }
+  }
+
+  Future<void> _syncSubscriptionIdentity(String userId) async {
+    try {
+      await _subscriptionService.logIn(userId);
+    } catch (error) {
+      debugPrint('RevenueCat login skipped: $error');
     }
   }
 }

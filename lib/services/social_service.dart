@@ -286,11 +286,7 @@ class SocialService {
   Future<void> acceptHabitInvite(String inviteId, String habitId) async {
     if (userId.isEmpty) return;
 
-    final info = await _subscriptionService.getCustomerInfo();
-    final hasAccess = await _subscriptionService.canAccessPremiumFeatures(
-      userId: userId,
-      customerInfo: info,
-    );
+    final hasAccess = await _subscriptionService.hasPremiumAccess(userId);
     if (!hasAccess) {
       final sharedCount = await _subscriptionService.sharedTaskParticipationCount(
         userId,

@@ -702,6 +702,8 @@ class NotificationService with WidgetsBindingObserver {
         ? 'Plan your day and stay consistent with your habits.'
         : 'Check your progress and finish your habits strong.';
 
+    final androidScheduleMode = await _resolveAndroidScheduleMode();
+
     await _localNotifications.zonedSchedule(
       id: id,
       title: title,
@@ -716,7 +718,7 @@ class NotificationService with WidgetsBindingObserver {
         ),
         iOS: DarwinNotificationDetails(),
       ),
-      androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+      androidScheduleMode: androidScheduleMode,
       matchDateTimeComponents: DateTimeComponents.time,
     );
   }
@@ -727,6 +729,8 @@ class NotificationService with WidgetsBindingObserver {
     required int hour,
     required int minute,
   }) async {
+    final androidScheduleMode = await _resolveAndroidScheduleMode();
+
     await _localNotifications.zonedSchedule(
       id: id,
       title: 'Habit Reminder',
@@ -741,7 +745,7 @@ class NotificationService with WidgetsBindingObserver {
         ),
         iOS: DarwinNotificationDetails(),
       ),
-      androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+      androidScheduleMode: androidScheduleMode,
       matchDateTimeComponents: DateTimeComponents.time,
     );
   }
@@ -778,6 +782,18 @@ class NotificationService with WidgetsBindingObserver {
     final android = _localNotifications
         .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
     await android?.requestNotificationsPermission();
+    try {
+      final canScheduleExact = await android?.canScheduleExactNotifications();
+      if (canScheduleExact == false) {
+        await android?.requestExactAlarmsPermission();
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint(
+          'NotificationService: Exact alarm permission request failed: $e',
+        );
+      }
+    }
 
     final ios = _localNotifications
         .resolvePlatformSpecificImplementation<IOSFlutterLocalNotificationsPlugin>();
@@ -786,6 +802,26 @@ class NotificationService with WidgetsBindingObserver {
     final macos = _localNotifications
         .resolvePlatformSpecificImplementation<MacOSFlutterLocalNotificationsPlugin>();
     await macos?.requestPermissions(alert: true, badge: true, sound: true);
+  }
+
+  Future<AndroidScheduleMode> _resolveAndroidScheduleMode() async {
+    final android = _localNotifications
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >();
+    try {
+      final canScheduleExact = await android?.canScheduleExactNotifications();
+      if (canScheduleExact ?? false) {
+        return AndroidScheduleMode.exactAllowWhileIdle;
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint(
+          'NotificationService: Falling back to inexact reminder scheduling: $e',
+        );
+      }
+    }
+    return AndroidScheduleMode.inexactAllowWhileIdle;
   }
 
   String _normalizeTimeZoneId(String raw) {

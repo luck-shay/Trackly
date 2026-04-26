@@ -6,3 +6,12 @@ class UpgradeRequiredException implements Exception {
   @override
   String toString() => message;
 }
+
+class SubscriptionUnavailableException implements Exception {
+  final String message;
+
+  const SubscriptionUnavailableException(this.message);
+
+  @override
+  String toString() => message;
+}

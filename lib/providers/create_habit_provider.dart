@@ -204,10 +204,8 @@ class CreateHabitProvider extends ChangeNotifier {
       await databaseService.saveHabit(savedHabit);
     } else {
       if (_spaceType == HabitSpaceType.sharedTask) {
-        final customerInfo = await _subscriptionService.getCustomerInfo();
-        final hasAccess = await _subscriptionService.canAccessPremiumFeatures(
-          userId: currentUserId,
-          customerInfo: customerInfo,
+        final hasAccess = await _subscriptionService.hasPremiumAccess(
+          currentUserId,
         );
         if (!hasAccess) {
           final sharedCount = await _subscriptionService

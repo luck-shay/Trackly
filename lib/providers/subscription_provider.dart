@@ -7,7 +7,7 @@ import 'package:purchases_ui_flutter/paywall_result.dart';
 
 import '../models/subscription_state.dart';
 import '../services/subscription_service.dart';
-
+ 
 class SubscriptionProvider extends ChangeNotifier {
   final SubscriptionService _service;
   SubscriptionState _state = const SubscriptionState();
@@ -30,6 +30,11 @@ class SubscriptionProvider extends ChangeNotifier {
   bool get isPremium => _state.hasTracklyProEntitlement;
 
   Future<void> configure() async {
+    if (!_service.isEnabled) {
+      _state = _state.copyWith(initialized: true, clearError: true);
+      notifyListeners();
+      return;
+    }
     try {
       await _service.configure();
       _state = _state.copyWith(initialized: true, clearError: true);
@@ -47,15 +52,30 @@ class SubscriptionProvider extends ChangeNotifier {
   Future<void> bootstrapForUser(String userId) async {
     _state = _state.copyWith(isLoading: true, clearError: true);
     notifyListeners();
+    DateTime? trialStartAt;
+    bool trialConsumed = false;
+
     try {
-      await _service.logIn(userId);
       await _service.ensureTrialIfNeeded(userId);
       await _service.syncTrialConsumption(userId);
+      trialStartAt = await _service.getTrialStart(userId);
+      trialConsumed = await _service.isTrialConsumed(userId);
 
+      if (!_service.isEnabled) {
+        _state = _state.copyWith(
+          initialized: true,
+          isLoading: false,
+          trialStartAt: trialStartAt,
+          trialConsumed: trialConsumed,
+          clearError: true,
+        );
+        notifyListeners();
+        return;
+      }
+
+      await _service.logIn(userId);
       final offerings = await _service.getOfferings();
       final info = await _service.getCustomerInfo();
-      final trialStartAt = await _service.getTrialStart(userId);
-      final trialConsumed = await _service.isTrialConsumed(userId);
       _state = _state.copyWith(
         initialized: true,
         isLoading: false,
@@ -68,7 +88,10 @@ class SubscriptionProvider extends ChangeNotifier {
       notifyListeners();
     } catch (error) {
       _state = _state.copyWith(
+        initialized: trialStartAt != null,
         isLoading: false,
+        trialStartAt: trialStartAt,
+        trialConsumed: trialConsumed,
         errorMessage: _service.toUserMessage(error),
       );
       notifyListeners();
@@ -80,10 +103,21 @@ class SubscriptionProvider extends ChangeNotifier {
     if (uid == null || uid.isEmpty) return;
     _state = _state.copyWith(isRefreshingCustomerInfo: true, clearError: true);
     notifyListeners();
+    await _service.syncTrialConsumption(uid);
+    final trialConsumed = await _service.isTrialConsumed(uid);
+
+    if (!_service.isEnabled) {
+      _state = _state.copyWith(
+        isRefreshingCustomerInfo: false,
+        trialConsumed: trialConsumed,
+        clearError: true,
+      );
+      notifyListeners();
+      return;
+    }
+
     try {
       final info = await _service.getCustomerInfo();
-      await _service.syncTrialConsumption(uid);
-      final trialConsumed = await _service.isTrialConsumed(uid);
       _state = _state.copyWith(
         customerInfo: info,
         isRefreshingCustomerInfo: false,
@@ -93,6 +127,7 @@ class SubscriptionProvider extends ChangeNotifier {
     } catch (error) {
       _state = _state.copyWith(
         isRefreshingCustomerInfo: false,
+        trialConsumed: trialConsumed,
         errorMessage: _service.toUserMessage(error),
       );
       notifyListeners();
@@ -100,6 +135,11 @@ class SubscriptionProvider extends ChangeNotifier {
   }
 
   Future<void> refreshOfferings() async {
+    if (!_service.isEnabled) {
+      _state = _state.copyWith(clearError: true);
+      notifyListeners();
+      return;
+    }
     try {
       final offerings = await _service.getOfferings();
       _state = _state.copyWith(offerings: offerings, clearError: true);
@@ -166,6 +206,9 @@ class SubscriptionProvider extends ChangeNotifier {
   Future<bool> canUsePremiumFeatures() async {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null || uid.isEmpty) return false;
+    if (!_service.isEnabled) {
+      return true;
+    }
     return _service.canAccessPremiumFeatures(
       userId: uid,
       customerInfo: _state.customerInfo,
