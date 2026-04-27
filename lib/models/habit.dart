@@ -46,6 +46,16 @@ extension GroupTaskModeX on GroupTaskMode {
 }
 
 class Habit {
+  static const List<int> weekdaysMondayFirst = <int>[
+    DateTime.monday,
+    DateTime.tuesday,
+    DateTime.wednesday,
+    DateTime.thursday,
+    DateTime.friday,
+    DateTime.saturday,
+    DateTime.sunday,
+  ];
+
   final String id;
   final String? groupEntityId;
   final String title;
@@ -68,6 +78,7 @@ class Habit {
   Map<String, double> memberQuantMax;
   final bool requiresPhotoValidation;
   final String? reminderTime; // HH:mm format
+  final List<int> reminderWeekdays;
 
   Habit({
     required this.id,
@@ -92,13 +103,18 @@ class Habit {
     Map<String, double>? memberQuantMax,
     this.requiresPhotoValidation = false,
     this.reminderTime,
+    List<int>? reminderWeekdays,
   }) : completions = completions ?? {},
        quantifiedValues = quantifiedValues ?? {},
        participants = participants ?? [],
        memberTasks = memberTasks ?? {},
        memberIsQuantified = memberIsQuantified ?? {},
        memberQuantUnits = memberQuantUnits ?? {},
-       memberQuantMax = memberQuantMax ?? {};
+       memberQuantMax = memberQuantMax ?? {},
+       reminderWeekdays = _normalizeReminderWeekdays(
+         reminderWeekdays,
+         targetDaysPerWeek,
+       );
 
   Habit copyWith({
     String? id,
@@ -123,6 +139,7 @@ class Habit {
     Map<String, double>? memberQuantMax,
     bool? requiresPhotoValidation,
     String? reminderTime,
+    List<int>? reminderWeekdays,
   }) {
     return Habit(
       id: id ?? this.id,
@@ -148,6 +165,7 @@ class Habit {
       requiresPhotoValidation:
           requiresPhotoValidation ?? this.requiresPhotoValidation,
       reminderTime: reminderTime ?? this.reminderTime,
+      reminderWeekdays: reminderWeekdays ?? this.reminderWeekdays,
     );
   }
 
@@ -162,6 +180,15 @@ class Habit {
 
   bool get hasMemberDefinedGroupTasks {
     return isGroup && groupTaskMode == GroupTaskMode.memberDefined;
+  }
+
+  bool get isDailyTarget => targetDaysPerWeek >= 7;
+
+  List<int> get effectiveReminderWeekdays {
+    if ((reminderTime ?? '').trim().isEmpty) {
+      return const <int>[];
+    }
+    return _normalizeReminderWeekdays(reminderWeekdays, targetDaysPerWeek);
   }
 
   String taskFor(String userId) {
@@ -227,6 +254,33 @@ class Habit {
     );
   }
 
+  int weeklyCompletionCountFor(String userId, {DateTime? anchor}) {
+    final weekStart = _weekStartFor(anchor ?? DateTime.now());
+    final weekEnd = weekStart.add(const Duration(days: 7));
+    final seen = <String>{};
+
+    for (final date in completions[userId] ?? const <DateTime>[]) {
+      final normalized = _dateOnly(date);
+      if (normalized.isBefore(weekStart) || !normalized.isBefore(weekEnd)) {
+        continue;
+      }
+      seen.add(dateKeyFor(normalized));
+    }
+
+    return seen.length;
+  }
+
+  double weeklyTargetProgressFor(String userId, {DateTime? anchor}) {
+    final count = weeklyCompletionCountFor(userId, anchor: anchor);
+    final target = targetDaysPerWeek.clamp(1, 7);
+    return (count / target).clamp(0, 1);
+  }
+
+  bool hasMetWeeklyTarget(String userId, {DateTime? anchor}) {
+    return weeklyCompletionCountFor(userId, anchor: anchor) >=
+        targetDaysPerWeek.clamp(1, 7);
+  }
+
   double completionProgressFor(String userId, DateTime date) {
     if (!isQuantifiedFor(userId)) {
       return isCompletedOnDate(userId, date) ? 1 : 0;
@@ -243,6 +297,14 @@ class Habit {
 
   // Calculate current streak based on completion dates for a specific user
   int currentStreakFor(String userId) {
+    if (!isDailyTarget) {
+      return _currentWeeklyTargetStreakFor(userId);
+    }
+
+    return _currentDailyStreakFor(userId);
+  }
+
+  int _currentDailyStreakFor(String userId) {
     if (!completions.containsKey(userId) || completions[userId]!.isEmpty) {
       return 0;
     }
@@ -280,6 +342,69 @@ class Habit {
     return streak;
   }
 
+  int _currentWeeklyTargetStreakFor(String userId) {
+    final dates = completions[userId] ?? const <DateTime>[];
+    if (dates.isEmpty) {
+      return 0;
+    }
+
+    final today = DateTime.now();
+    var weekAnchor = _weekStartFor(today);
+    var streak = 0;
+
+    if (!hasMetWeeklyTarget(userId, anchor: weekAnchor)) {
+      weekAnchor = weekAnchor.subtract(const Duration(days: 7));
+    }
+
+    while (hasMetWeeklyTarget(userId, anchor: weekAnchor)) {
+      streak++;
+      weekAnchor = weekAnchor.subtract(const Duration(days: 7));
+    }
+
+    return streak;
+  }
+
+  static DateTime _dateOnly(DateTime date) {
+    return DateTime(date.year, date.month, date.day);
+  }
+
+  static DateTime _weekStartFor(DateTime date) {
+    final normalized = _dateOnly(date);
+    return normalized.subtract(Duration(days: normalized.weekday - 1));
+  }
+
+  static List<int> _normalizeReminderWeekdays(
+    List<int>? reminderWeekdays,
+    int targetDaysPerWeek,
+  ) {
+    final target = targetDaysPerWeek.clamp(1, 7);
+    if (target >= 7) {
+      return List<int>.from(weekdaysMondayFirst);
+    }
+
+    final normalized = <int>[];
+    for (final day in reminderWeekdays ?? const <int>[]) {
+      if (weekdaysMondayFirst.contains(day) && !normalized.contains(day)) {
+        normalized.add(day);
+      }
+    }
+
+    normalized.sort();
+
+    final result = <int>[...normalized];
+    for (final day in weekdaysMondayFirst) {
+      if (result.length >= target) {
+        break;
+      }
+      if (!result.contains(day)) {
+        result.add(day);
+      }
+    }
+
+    result.sort();
+    return result.take(target).toList(growable: false);
+  }
+
   // Serialize to Map for Firestore
   Map<String, dynamic> toMap() {
     return {
@@ -308,6 +433,7 @@ class Habit {
       'memberQuantMax': memberQuantMax,
       'requiresPhotoValidation': requiresPhotoValidation,
       'reminderTime': reminderTime,
+      'reminderWeekdays': reminderWeekdays,
     };
   }
 
@@ -397,6 +523,19 @@ class Habit {
       });
     }
 
+    final parsedReminderWeekdays = <int>[];
+    final rawReminderWeekdays = map['reminderWeekdays'];
+    if (rawReminderWeekdays is List) {
+      for (final value in rawReminderWeekdays) {
+        final weekday = (value as num?)?.toInt();
+        if (weekday != null &&
+            weekdaysMondayFirst.contains(weekday) &&
+            !parsedReminderWeekdays.contains(weekday)) {
+          parsedReminderWeekdays.add(weekday);
+        }
+      }
+    }
+
     return Habit(
       id: id ?? map['id'] ?? '',
       groupEntityId: map['groupEntityId'] as String?,
@@ -420,6 +559,7 @@ class Habit {
       memberQuantMax: parsedMemberQuantMax,
       requiresPhotoValidation: map['requiresPhotoValidation'] ?? false,
       reminderTime: map['reminderTime'] as String?,
+      reminderWeekdays: parsedReminderWeekdays,
     );
   }
 }

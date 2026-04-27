@@ -753,13 +753,13 @@ class NotificationService with WidgetsBindingObserver {
           continue;
         }
 
-        await _scheduleHabitSpecific(
-          id: _habitReminderId(habit.id),
-          habitTitle: habit.title,
+        scheduledHabitReminders += await _scheduleHabitSpecific(
+          habitId: habit.id,
+          habitTitle: habit.displayTitle,
           hour: parsed.$1,
           minute: parsed.$2,
+          weekdays: habit.effectiveReminderWeekdays,
         );
-        scheduledHabitReminders++;
       }
 
       _lastReminderSignature = signature;
@@ -825,31 +825,60 @@ class NotificationService with WidgetsBindingObserver {
     );
   }
 
-  Future<void> _scheduleHabitSpecific({
-    required int id,
+  Future<int> _scheduleHabitSpecific({
+    required String habitId,
     required String habitTitle,
     required int hour,
     required int minute,
+    required List<int> weekdays,
   }) async {
     final androidScheduleMode = await _resolveAndroidScheduleMode();
 
-    await _localNotifications.zonedSchedule(
-      id: id,
-      title: 'Habit Reminder',
-      body: 'Time for: $habitTitle',
-      scheduledDate: _nextDateTime(hour, minute),
-      notificationDetails: const NotificationDetails(
-        android: AndroidNotificationDetails(
-          'habit_reminders',
-          'Habit Reminders',
-          importance: Importance.high,
-          priority: Priority.high,
+    final effectiveWeekdays = weekdays.isEmpty
+        ? Habit.weekdaysMondayFirst
+        : weekdays;
+    if (effectiveWeekdays.length >= Habit.weekdaysMondayFirst.length) {
+      await _localNotifications.zonedSchedule(
+        id: _habitReminderId(habitId),
+        title: 'Habit Reminder',
+        body: 'Time for: $habitTitle',
+        scheduledDate: _nextDateTime(hour, minute),
+        notificationDetails: const NotificationDetails(
+          android: AndroidNotificationDetails(
+            'habit_reminders',
+            'Habit Reminders',
+            importance: Importance.high,
+            priority: Priority.high,
+          ),
+          iOS: DarwinNotificationDetails(),
         ),
-        iOS: DarwinNotificationDetails(),
-      ),
-      androidScheduleMode: androidScheduleMode,
-      matchDateTimeComponents: DateTimeComponents.time,
-    );
+        androidScheduleMode: androidScheduleMode,
+        matchDateTimeComponents: DateTimeComponents.time,
+      );
+      return 1;
+    }
+
+    for (final weekday in effectiveWeekdays) {
+      await _localNotifications.zonedSchedule(
+        id: _habitReminderIdForWeekday(habitId, weekday),
+        title: 'Habit Reminder',
+        body: 'Time for: $habitTitle',
+        scheduledDate: _nextDateTimeForWeekday(weekday, hour, minute),
+        notificationDetails: const NotificationDetails(
+          android: AndroidNotificationDetails(
+            'habit_reminders',
+            'Habit Reminders',
+            importance: Importance.high,
+            priority: Priority.high,
+          ),
+          iOS: DarwinNotificationDetails(),
+        ),
+        androidScheduleMode: androidScheduleMode,
+        matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
+      );
+    }
+
+    return effectiveWeekdays.length;
   }
 
   Future<void> _initializeTimeZone() async {
@@ -961,6 +990,24 @@ class NotificationService with WidgetsBindingObserver {
     return scheduled;
   }
 
+  tz.TZDateTime _nextDateTimeForWeekday(int weekday, int hour, int minute) {
+    final now = tz.TZDateTime.now(tz.local);
+    var scheduled = tz.TZDateTime(
+      tz.local,
+      now.year,
+      now.month,
+      now.day,
+      hour,
+      minute,
+    );
+
+    while (scheduled.weekday != weekday || !scheduled.isAfter(now)) {
+      scheduled = scheduled.add(const Duration(days: 1));
+    }
+
+    return scheduled;
+  }
+
   (int, int)? _parseReminderTime(String? rawTime) {
     if (rawTime == null) return null;
 
@@ -976,8 +1023,16 @@ class NotificationService with WidgetsBindingObserver {
   }
 
   int _habitReminderId(String habitId) {
+    return _hashReminderId(habitId);
+  }
+
+  int _habitReminderIdForWeekday(String habitId, int weekday) {
+    return _hashReminderId('$habitId|$weekday');
+  }
+
+  int _hashReminderId(String value) {
     var hash = 0;
-    for (final codeUnit in habitId.codeUnits) {
+    for (final codeUnit in value.codeUnits) {
       hash = ((hash * 31) + codeUnit) & 0x3fffffff;
     }
     return _habitReminderBaseId + (hash % _habitReminderModulo);
@@ -1007,7 +1062,10 @@ class NotificationService with WidgetsBindingObserver {
   }) {
     final reminderEntries = habits
         .where((habit) => habit.reminderTime != null && habit.reminderTime!.trim().isNotEmpty)
-        .map((habit) => '${habit.id}|${habit.title}|${habit.reminderTime!.trim()}')
+        .map(
+          (habit) =>
+              '${habit.id}|${habit.title}|${habit.reminderTime!.trim()}|${habit.effectiveReminderWeekdays.join(',')}',
+        )
         .toList()
       ..sort();
 

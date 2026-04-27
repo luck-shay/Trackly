@@ -12,6 +12,16 @@ import '../services/subscription_exceptions.dart';
 import '../theme/app_layout.dart';
 import '../utils/quantity_format.dart';
 
+const List<(int, String)> _weekdayChoices = <(int, String)>[
+  (DateTime.monday, 'Mon'),
+  (DateTime.tuesday, 'Tue'),
+  (DateTime.wednesday, 'Wed'),
+  (DateTime.thursday, 'Thu'),
+  (DateTime.friday, 'Fri'),
+  (DateTime.saturday, 'Sat'),
+  (DateTime.sunday, 'Sun'),
+];
+
 class CreateHabitScreen extends StatelessWidget {
   final HabitSpaceType initialSpaceType;
   final Habit? initialHabit;
@@ -664,6 +674,86 @@ class _CreateHabitViewState extends State<_CreateHabitView> {
                   );
                 },
               ).animate().fade(delay: 400.ms).slideX(begin: 0.05),
+
+              Consumer<CreateHabitProvider>(
+                builder: (context, provider, child) {
+                  final needsSpecificReminderDays =
+                      provider.reminderTime != null && provider.targetDays < 7;
+                  if (!needsSpecificReminderDays) {
+                    return const SizedBox.shrink();
+                  }
+
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const VGap(AppLayout.lg),
+                      Text(
+                        'REMINDER DAYS',
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.onSurface.withValues(alpha: 0.68),
+                          letterSpacing: 1.2,
+                        ),
+                      ),
+                      const VGap(AppLayout.xs),
+                      Text(
+                        'Choose exactly ${provider.targetDays} day${provider.targetDays == 1 ? '' : 's'} for this reminder.',
+                        style: GoogleFonts.inter(
+                          fontSize: 13,
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.onSurface.withValues(alpha: 0.62),
+                          height: 1.45,
+                        ),
+                      ),
+                      const VGap(AppLayout.sm),
+                      Wrap(
+                        spacing: 10,
+                        runSpacing: 10,
+                        children: _weekdayChoices.map((choice) {
+                          final weekday = choice.$1;
+                          final label = choice.$2;
+                          final selected = provider.reminderWeekdays.contains(
+                            weekday,
+                          );
+                          return FilterChip(
+                            label: Text(label, style: GoogleFonts.inter()),
+                            selected: selected,
+                            onSelected: (_) =>
+                                provider.toggleReminderWeekday(weekday),
+                            selectedColor: Theme.of(
+                              context,
+                            ).colorScheme.primary.withValues(alpha: 0.2),
+                            checkmarkColor: Theme.of(
+                              context,
+                            ).colorScheme.primary,
+                            labelStyle: GoogleFonts.inter(
+                              color: selected
+                                  ? Theme.of(context).colorScheme.primary
+                                  : Theme.of(context).colorScheme.onSurface,
+                              fontWeight: FontWeight.w600,
+                            ),
+                            side: BorderSide(
+                              color: selected
+                                  ? Theme.of(
+                                      context,
+                                    ).colorScheme.primary.withValues(alpha: 0.45)
+                                  : Theme.of(context).colorScheme.onSurface
+                                        .withValues(alpha: 0.12),
+                            ),
+                            backgroundColor: Theme.of(
+                              context,
+                            ).colorScheme.surface,
+                          );
+                        }).toList(),
+                      ),
+                    ],
+                  ).animate().fade(delay: 425.ms);
+                },
+              ),
 
               const VGap(AppLayout.xxl),
 

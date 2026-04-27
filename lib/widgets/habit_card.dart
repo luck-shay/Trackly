@@ -30,26 +30,13 @@ class HabitCard extends StatefulWidget {
   State<HabitCard> createState() => _HabitCardState();
 }
 
-class _HabitCardState extends State<HabitCard>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(vsync: this, duration: 200.ms);
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
+class _HabitCardState extends State<HabitCard> {
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     DateTime now = DateTime.now();
+    final streak = widget.habit.currentStreakFor(widget.currentUserId);
     final groupTaskTitle = widget.habit.hasMemberDefinedGroupTasks
         ? (widget.habit.taskFor(widget.currentUserId).trim().isEmpty
               ? 'No personal task set yet'
@@ -71,18 +58,23 @@ class _HabitCardState extends State<HabitCard>
     final userIsQuantified = widget.habit.isQuantifiedFor(widget.currentUserId);
     final userQuantUnit = widget.habit.quantUnitFor(widget.currentUserId);
     final userQuantMax = widget.habit.quantMaxFor(widget.currentUserId);
+    final weeklyCount = widget.habit.weeklyCompletionCountFor(
+      widget.currentUserId,
+      anchor: now,
+    );
+    final weeklyTarget = widget.habit.targetDaysPerWeek.clamp(1, 7);
+    final weeklyTargetMet = widget.habit.hasMetWeeklyTarget(
+      widget.currentUserId,
+      anchor: now,
+    );
+    final reminderTimeText = (widget.habit.reminderTime ?? '').trim();
+    final hasReminderTime = reminderTimeText.isNotEmpty;
     final completedToday = widget.habit.isCompletedOnDate(
       widget.currentUserId,
       now,
     );
     final userCompletions =
         widget.habit.completions[widget.currentUserId] ?? [];
-
-    if (completedToday) {
-      _controller.forward();
-    } else {
-      _controller.reverse();
-    }
 
     return Container(
       margin: widget.margin,
@@ -126,7 +118,7 @@ class _HabitCardState extends State<HabitCard>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // Animated Checkbox
                     GestureDetector(
@@ -152,16 +144,33 @@ class _HabitCardState extends State<HabitCard>
                           ),
                         ),
                         child: Center(
-                          child: completedToday
-                              ? const Icon(
-                                  Icons.check_rounded,
-                                  color: Colors.black,
-                                  size: 20,
-                                ).animate().scale(
-                                  duration: 200.ms,
-                                  curve: Curves.easeOutBack,
-                                )
-                              : null,
+                          child: AnimatedSwitcher(
+                            duration: 180.ms,
+                            switchInCurve: Curves.easeOutCubic,
+                            switchOutCurve: Curves.easeInCubic,
+                            transitionBuilder: (child, animation) {
+                              return ScaleTransition(
+                                scale: Tween<double>(
+                                  begin: 0.7,
+                                  end: 1.0,
+                                ).animate(animation),
+                                child: FadeTransition(
+                                  opacity: animation,
+                                  child: child,
+                                ),
+                              );
+                            },
+                            child: completedToday
+                                ? const Icon(
+                                    Icons.check_rounded,
+                                    key: ValueKey('completed_icon'),
+                                    color: Colors.black,
+                                    size: 20,
+                                  )
+                                : const SizedBox(
+                                    key: ValueKey('empty_icon'),
+                                  ),
+                          ),
                         ),
                       ),
                     ),
@@ -216,27 +225,6 @@ class _HabitCardState extends State<HabitCard>
                             ],
                           ),
                           const SizedBox(height: 8),
-                          if (!widget.habit.isGroup)
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 5,
-                              ),
-                              decoration: BoxDecoration(
-                                color: scheme.onSurface.withValues(alpha: 0.06),
-                                borderRadius: BorderRadius.circular(999),
-                              ),
-                              child: Text(
-                                widget.habit.spaceType.label,
-                                style: GoogleFonts.inter(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                  color: scheme.onSurface.withValues(
-                                    alpha: 0.65,
-                                  ),
-                                ),
-                              ),
-                            ),
                           if (widget.habit.isGroup &&
                               groupLabel.isNotEmpty) ...[
                             const SizedBox(height: 4),
@@ -262,68 +250,145 @@ class _HabitCardState extends State<HabitCard>
                               overflow: TextOverflow.ellipsis,
                             ),
                           ],
-                        ],
-                      ),
-                    ),
-                    // Streak indicator
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 8,
-                      ),
-                      decoration: BoxDecoration(
-                        color:
-                            widget.habit.currentStreakFor(
-                                  widget.currentUserId,
-                                ) >
-                                0
-                            ? Colors.orange.withValues(alpha: 0.1)
-                            : scheme.onSurface.withValues(alpha: 0.06),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(
-                                Icons.local_fire_department_rounded,
-                                color:
-                                    widget.habit.currentStreakFor(
-                                          widget.currentUserId,
-                                        ) >
-                                        0
-                                    ? Colors.orange
-                                    : scheme.onSurface.withValues(alpha: 0.45),
-                                size: 20,
-                              )
-                              .animate(
-                                target:
-                                    (widget.habit.currentStreakFor(
-                                              widget.currentUserId,
-                                            ) >=
-                                            2 &&
-                                        completedToday)
-                                    ? 1
-                                    : 0,
-                              )
-                              .scaleXY(end: 1.2, duration: 200.ms)
-                              .then()
-                              .scaleXY(end: 1.0, duration: 200.ms),
-                          const SizedBox(width: 4),
-                          Text(
-                            '${widget.habit.currentStreakFor(widget.currentUserId)}',
-                            style: GoogleFonts.outfit(
-                              fontWeight: FontWeight.w700,
-                              fontSize: 16,
-                              color:
-                                  widget.habit.currentStreakFor(
-                                        widget.currentUserId,
-                                      ) >
-                                      0
-                                  ? Colors.orange
-                                  : scheme.onSurface.withValues(alpha: 0.45),
-                            ),
+                          const SizedBox(height: 8),
+                          LayoutBuilder(
+                            builder: (context, constraints) {
+                              final pillWidth = (constraints.maxWidth - 8) / 2;
+                              final pills = <Widget>[
+                                if (!widget.habit.isGroup)
+                                  _MetaPill(
+                                    label: widget.habit.spaceType.label,
+                                    backgroundColor: scheme.onSurface.withValues(
+                                      alpha: 0.06,
+                                    ),
+                                    foregroundColor: scheme.onSurface.withValues(
+                                      alpha: 0.72,
+                                    ),
+                                  ),
+                                _MetaPill(
+                                  label: widget.habit.isDailyTarget
+                                      ? 'Daily target'
+                                      : '$weeklyCount/$weeklyTarget this week',
+                                  backgroundColor: widget.habit.isDailyTarget
+                                      ? scheme.onSurface.withValues(alpha: 0.06)
+                                      : (weeklyTargetMet
+                                            ? scheme.primary.withValues(
+                                                alpha: 0.16,
+                                              )
+                                            : scheme.onSurface.withValues(
+                                                alpha: 0.06,
+                                              )),
+                                  foregroundColor: widget.habit.isDailyTarget
+                                      ? scheme.onSurface.withValues(alpha: 0.72)
+                                      : (weeklyTargetMet
+                                            ? scheme.primary
+                                            : scheme.onSurface.withValues(
+                                                alpha: 0.72,
+                                              )),
+                                ),
+                              ];
+
+                              return Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                children: [
+                                  for (final pill in pills)
+                                    SizedBox(width: pillWidth, child: pill),
+                                ],
+                              );
+                            },
                           ),
                         ],
                       ),
+                    ),
+                    const SizedBox(width: 12),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        if (hasReminderTime)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 7,
+                            ),
+                            decoration: BoxDecoration(
+                              color: scheme.onSurface.withValues(alpha: 0.06),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.notifications_active_rounded,
+                                  size: 16,
+                                  color: scheme.onSurface.withValues(
+                                    alpha: 0.72,
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  reminderTimeText,
+                                  style: GoogleFonts.inter(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                    color: scheme.onSurface.withValues(
+                                      alpha: 0.78,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        if (hasReminderTime) const SizedBox(height: 10),
+                        // Streak indicator
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            color:
+                                streak > 0
+                                ? Colors.orange.withValues(alpha: 0.1)
+                                : scheme.onSurface.withValues(alpha: 0.06),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                    Icons.local_fire_department_rounded,
+                                    color: streak > 0
+                                        ? Colors.orange
+                                        : scheme.onSurface.withValues(
+                                            alpha: 0.45,
+                                          ),
+                                    size: 20,
+                                  )
+                                  .animate(
+                                    target: (streak >= 2 && completedToday)
+                                        ? 1
+                                        : 0,
+                                  )
+                                  .scaleXY(end: 1.2, duration: 200.ms)
+                                  .then()
+                                  .scaleXY(end: 1.0, duration: 200.ms),
+                              const SizedBox(width: 4),
+                              Text(
+                                '$streak',
+                                style: GoogleFonts.outfit(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 16,
+                                  color: streak > 0
+                                      ? Colors.orange
+                                      : scheme.onSurface.withValues(
+                                          alpha: 0.45,
+                                        ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -418,3 +483,37 @@ class _HabitCardState extends State<HabitCard>
     );
   }
 }
+
+class _MetaPill extends StatelessWidget {
+  final String label;
+  final Color backgroundColor;
+  final Color foregroundColor;
+
+  const _MetaPill({
+    required this.label,
+    required this.backgroundColor,
+    required this.foregroundColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        label,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: GoogleFonts.inter(
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+          color: foregroundColor,
+        ),
+      ),
+    );
+  }
+}
+

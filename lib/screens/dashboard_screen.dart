@@ -51,7 +51,6 @@ class _DashboardScreenState extends State<DashboardScreen>
   // ignore: unused_field
   List<String> _sectionOrder = ['group', 'challenges', 'individual', 'shared'];
   final Set<String> _completedHabitIdsForOrdering = <String>{};
-  final Set<String> _movingToBottomHabitIds = <String>{};
   bool _hasCapturedInitialCompletionOrder = false;
   NavigationProvider? _navigationProvider;
   int _lastNavIndex = 0;
@@ -412,30 +411,8 @@ class _DashboardScreenState extends State<DashboardScreen>
     required String habitId,
     required Widget child,
   }) {
-    final moving = _movingToBottomHabitIds.contains(habitId);
-
-    return AnimatedSlide(
-      duration: const Duration(milliseconds: 280),
-      curve: Curves.easeInOut,
-      offset: moving ? const Offset(0, 0.18) : Offset.zero,
-      child: AnimatedOpacity(
-        duration: const Duration(milliseconds: 240),
-        curve: Curves.easeInOut,
-        opacity: moving ? 0.75 : 1,
-        child: AnimatedSize(
-          duration: const Duration(milliseconds: 280),
-          curve: Curves.easeInOut,
-          alignment: Alignment.topCenter,
-          child: ClipRect(
-            child: Align(
-              alignment: Alignment.topCenter,
-              heightFactor: moving ? 0.0 : 1.0,
-              child: child,
-            ),
-          ),
-        ),
-      ),
-    );
+    // Keep completion transition minimal to avoid list reflow jank.
+    return child;
   }
 
   Widget _buildSectionLabel(
@@ -1083,7 +1060,7 @@ class _DashboardScreenState extends State<DashboardScreen>
             key: ValueKey('habit_slidable_${habit.id}'),
             closeOnScroll: true,
             startActionPane: ActionPane(
-              motion: const DrawerMotion(),
+              motion: const ScrollMotion(),
               extentRatio: 0.28,
               dismissible: DismissiblePane(
                 onDismissed: () {},
@@ -1109,16 +1086,8 @@ class _DashboardScreenState extends State<DashboardScreen>
               ],
             ),
             endActionPane: ActionPane(
-              motion: const DrawerMotion(),
+              motion: const ScrollMotion(),
               extentRatio: 0.28,
-              dismissible: DismissiblePane(
-                onDismissed: () {},
-                closeOnCancel: true,
-                confirmDismiss: () async {
-                  await _deleteHabitWithPermissions(context, provider, habit);
-                  return false;
-                },
-              ),
               children: [
                 _buildHabitSwipeAction(
                   label: deleteLabel,
@@ -1960,35 +1929,24 @@ class _DashboardScreenState extends State<DashboardScreen>
                                                 handleToggleCompletion,
                                             child: _wrapCompletionMoveAnimation(
                                               habitId: habit.id,
-                                              child:
-                                                  HabitCard(
-                                                        habit: habit,
-                                                        currentUserId:
-                                                            provider.userId,
-                                                        margin: EdgeInsets.zero,
-                                                        showShadow: false,
-                                                        onCheck:
-                                                            handleToggleCompletion,
-                                                        onCardTap: () {
-                                                          Navigator.push(
-                                                            context,
-                                                            MaterialPageRoute(
-                                                              builder: (context) =>
-                                                                  HabitLeaderboardScreen(
-                                                                    habit:
-                                                                        habit,
-                                                                  ),
-                                                            ),
-                                                          );
-                                                        },
-                                                      )
-                                                      .animate(
-                                                        key: ValueKey(
-                                                          'anim_${habit.id}',
-                                                        ),
-                                                      )
-                                                      .fade()
-                                                      .slideY(begin: 0.2),
+                                              child: HabitCard(
+                                                habit: habit,
+                                                currentUserId: provider.userId,
+                                                margin: EdgeInsets.zero,
+                                                showShadow: false,
+                                                onCheck: handleToggleCompletion,
+                                                onCardTap: () {
+                                                  Navigator.push(
+                                                    context,
+                                                    MaterialPageRoute(
+                                                      builder: (context) =>
+                                                          HabitLeaderboardScreen(
+                                                            habit: habit,
+                                                          ),
+                                                    ),
+                                                  );
+                                                },
+                                              ),
                                             ),
                                           ),
                                         );
