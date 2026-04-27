@@ -288,6 +288,7 @@ class FriendsScreen extends StatelessWidget {
                                             .read<SubscriptionProvider>()
                                             .presentPaywall();
                                       } catch (_) {}
+                                      if (!context.mounted) return;
                                       ScaffoldMessenger.of(context).showSnackBar(
                                         SnackBar(content: Text(error.message)),
                                       );

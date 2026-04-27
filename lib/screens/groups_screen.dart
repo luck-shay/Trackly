@@ -38,15 +38,19 @@ class GroupsScreen extends StatelessWidget {
   Future<void> _openCreateGroup(BuildContext context) async {
     final subscription = context.read<SubscriptionProvider>();
     final canUsePremium = await subscription.canUsePremiumFeatures();
+    if (!context.mounted) {
+      return;
+    }
     if (!canUsePremium) {
       await subscription.presentPaywall();
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Trackly Pro is required to create groups.'),
-          ),
-        );
+      if (!context.mounted) {
+        return;
       }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Trackly Pro is required to create groups.'),
+        ),
+      );
       return;
     }
 
@@ -253,6 +257,9 @@ class GroupsScreen extends StatelessWidget {
                                                     .read<SubscriptionProvider>()
                                                     .presentPaywall();
                                               } catch (_) {}
+                                              if (!context.mounted) {
+                                                return;
+                                              }
                                               ScaffoldMessenger.of(
                                                 context,
                                               ).showSnackBar(

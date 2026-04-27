@@ -183,7 +183,25 @@ class HabitsProvider extends ChangeNotifier {
     _habits = merged;
     _isLoading = !(_baseLoaded && _groupsLoaded);
     notifyListeners();
-    NotificationService().scheduleAllHabitReminders();
+    _refreshReminderSchedule(reason: 'habits_provider_publish');
+  }
+
+  void _refreshReminderSchedule({required String reason, bool force = false}) {
+    unawaited(
+      NotificationService()
+          .refreshReminderSchedule(
+            habitsOverride: List<Habit>.from(_habits),
+            reason: reason,
+            force: force,
+          )
+          .catchError((error) {
+            if (kDebugMode) {
+              debugPrint(
+                'HabitsProvider: Reminder refresh failed ($reason): $error',
+              );
+            }
+          }),
+    );
   }
 
   Future<void> toggleHabitCompletion(Habit habit) async {
@@ -447,6 +465,7 @@ class HabitsProvider extends ChangeNotifier {
         notifyListeners();
         rethrow;
       }
+      _refreshReminderSchedule(reason: 'habit_deleted');
       return;
     }
 
@@ -487,6 +506,8 @@ class HabitsProvider extends ChangeNotifier {
       notifyListeners();
       rethrow;
     }
+
+    _refreshReminderSchedule(reason: 'shared_habit_left');
 
     await _notifyParticipantDeparture(
       habit: habit,

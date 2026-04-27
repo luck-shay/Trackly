@@ -36,6 +36,8 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
       return;
     }
 
+    final subscriptionProvider = context.read<SubscriptionProvider>();
+
     setState(() {
       _isSaving = true;
     });
@@ -69,8 +71,11 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
         return;
       }
       try {
-        await context.read<SubscriptionProvider>().presentPaywall();
+        await subscriptionProvider.presentPaywall();
       } catch (_) {}
+      if (!mounted) {
+        return;
+      }
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text(error.message)));

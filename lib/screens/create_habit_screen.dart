@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../models/user_profile.dart';
 import '../models/habit.dart';
 import '../services/social_service.dart';
+import '../services/notification_service.dart';
 import '../providers/create_habit_provider.dart';
 import '../providers/subscription_provider.dart';
 import '../services/subscription_exceptions.dart';
@@ -885,6 +886,14 @@ class _CreateHabitViewState extends State<_CreateHabitView> {
                               return;
                             }
 
+                            if (provider.reminderTime != null) {
+                              await NotificationService()
+                                  .prepareReminderPermissions();
+                              if (!context.mounted) {
+                                return;
+                              }
+                            }
+
                             setState(() {
                               _isSubmitting = true;
                             });
@@ -923,6 +932,9 @@ class _CreateHabitViewState extends State<_CreateHabitView> {
                                       .read<SubscriptionProvider>()
                                       .presentPaywall();
                                 } catch (_) {}
+                                if (!context.mounted) {
+                                  return;
+                                }
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(content: Text(error.message)),
                                 );

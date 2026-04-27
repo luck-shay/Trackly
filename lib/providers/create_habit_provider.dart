@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../models/habit.dart';
 import '../services/social_service.dart';
 import '../services/database_service.dart';
+import '../services/notification_service.dart';
 import '../services/subscription_constants.dart';
 import '../services/subscription_exceptions.dart';
 import '../services/subscription_service.dart';
@@ -127,10 +128,10 @@ class CreateHabitProvider extends ChangeNotifier {
   }
 
   void setRequiresPhotoValidation(bool value) {
-    if (_requiresPhotoValidation == false) {
+    if (_requiresPhotoValidation == value) {
       return;
     }
-    _requiresPhotoValidation = false;
+    _requiresPhotoValidation = value;
     notifyListeners();
   }
 
@@ -202,6 +203,18 @@ class CreateHabitProvider extends ChangeNotifier {
       );
 
       await databaseService.saveHabit(savedHabit);
+      unawaited(
+        NotificationService().refreshReminderSchedule(
+          reason: 'edit_habit_saved',
+          force: true,
+        ).catchError((error) {
+          if (kDebugMode) {
+            debugPrint(
+              'CreateHabitProvider: Reminder refresh failed after edit: $error',
+            );
+          }
+        }),
+      );
     } else {
       if (_spaceType == HabitSpaceType.sharedTask) {
         final hasAccess = await _subscriptionService.hasPremiumAccess(
@@ -260,6 +273,18 @@ class CreateHabitProvider extends ChangeNotifier {
 
       // Save to Database so it automatically streams to Dashboard via HabitsProvider
       await databaseService.saveHabit(savedHabit);
+      unawaited(
+        NotificationService().refreshReminderSchedule(
+          reason: 'new_habit_saved',
+          force: true,
+        ).catchError((error) {
+          if (kDebugMode) {
+            debugPrint(
+              'CreateHabitProvider: Reminder refresh failed after create: $error',
+            );
+          }
+        }),
+      );
 
       for (final friendUid in _selectedFriends) {
         if (_spaceType == HabitSpaceType.group) {

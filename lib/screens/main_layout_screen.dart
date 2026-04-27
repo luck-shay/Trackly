@@ -110,15 +110,19 @@ class MainLayoutScreen extends StatelessWidget {
     if (action == _CreateEntryAction.group) {
       final subscription = context.read<SubscriptionProvider>();
       final canUsePremium = await subscription.canUsePremiumFeatures();
+      if (!context.mounted) {
+        return null;
+      }
       if (!canUsePremium) {
         await subscription.presentPaywall();
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Trackly Pro is required to create groups.'),
-            ),
-          );
+        if (!context.mounted) {
+          return null;
         }
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Trackly Pro is required to create groups.'),
+          ),
+        );
         return null;
       }
     }

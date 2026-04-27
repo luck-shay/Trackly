@@ -53,6 +53,11 @@ class NotificationService with WidgetsBindingObserver {
   bool _isInitialized = false;
   bool _isTimeZoneInitialized = false;
   String? _lastReminderSignature;
+  Future<void>? _initializeFuture;
+  Future<void>? _reminderRefreshFuture;
+  List<Habit>? _queuedReminderHabits;
+  bool _queuedReminderForce = false;
+  String? _queuedReminderReason;
   bool _isSavingToken = false;
   int _tokenRetryCount = 0;
   Timer? _tokenRetryTimer;
@@ -77,6 +82,24 @@ class NotificationService with WidgetsBindingObserver {
   }
 
   Future<void> initialize() async {
+    if (_isInitialized) return;
+    if (_initializeFuture != null) {
+      await _initializeFuture;
+      return;
+    }
+
+    final future = _initializeInternal();
+    _initializeFuture = future;
+    try {
+      await future;
+    } finally {
+      if (identical(_initializeFuture, future)) {
+        _initializeFuture = null;
+      }
+    }
+  }
+
+  Future<void> _initializeInternal() async {
     if (_isInitialized) return;
     if (kDebugMode) debugPrint('NotificationService: Initializing...');
 
@@ -294,6 +317,10 @@ class NotificationService with WidgetsBindingObserver {
         _tokenRetryTimer?.cancel();
         _activeNotificationUserId = null;
         _notifiedInviteIds = <String>{};
+        _queuedReminderHabits = null;
+        _queuedReminderForce = false;
+        _queuedReminderReason = null;
+        await _cancelReminderNotificationsOnly();
         return;
       }
       
@@ -304,8 +331,11 @@ class NotificationService with WidgetsBindingObserver {
       }
       
       await _ensureTokenRegistration(reason: 'auth_state');
-      // We don't await scheduleAllHabitReminders here to avoid blocking
-      scheduleAllHabitReminders().catchError((e) => debugPrint('Error scheduling: $e'));
+      unawaited(
+        refreshReminderSchedule(reason: 'auth_state').catchError(
+          (e) => debugPrint('Error scheduling reminders after auth change: $e'),
+        ),
+      );
 
       // Production notifications should be delivered by backend FCM triggers.
       // Keep Firestore listener fallback for debug and simulator/mismatch diagnostics.
@@ -594,36 +624,93 @@ class NotificationService with WidgetsBindingObserver {
   // --- Habit Reminders ---
 
   Future<void> scheduleAllHabitReminders() async {
+    await refreshReminderSchedule(reason: 'legacy_schedule_call');
+  }
+
+  Future<void> refreshReminderSchedule({
+    List<Habit>? habitsOverride,
+    String reason = 'manual',
+    bool force = false,
+  }) async {
     if (kIsWeb) return;
 
-    if (!_isInitialized) {
-      if (kDebugMode) {
-        debugPrint(
-          'NotificationService: Skipping reminder scheduling until initialization completes.',
-        );
-      }
+    _queuedReminderHabits = habitsOverride ?? _queuedReminderHabits;
+    _queuedReminderForce = _queuedReminderForce || force;
+    _queuedReminderReason = reason;
+
+    if (_reminderRefreshFuture != null) {
+      await _reminderRefreshFuture;
       return;
+    }
+
+    while (true) {
+      final nextHabits = _queuedReminderHabits;
+      final nextForce = _queuedReminderForce;
+      final nextReason = _queuedReminderReason ?? reason;
+      _queuedReminderHabits = null;
+      _queuedReminderForce = false;
+      _queuedReminderReason = null;
+
+      final future = _refreshReminderScheduleInternal(
+        habitsOverride: nextHabits,
+        reason: nextReason,
+        force: nextForce,
+      );
+      _reminderRefreshFuture = future;
+
+      try {
+        await future;
+      } finally {
+        if (identical(_reminderRefreshFuture, future)) {
+          _reminderRefreshFuture = null;
+        }
+      }
+
+      if (_queuedReminderHabits == null &&
+          !_queuedReminderForce &&
+          _queuedReminderReason == null) {
+        break;
+      }
+    }
+  }
+
+  Future<void> _refreshReminderScheduleInternal({
+    List<Habit>? habitsOverride,
+    required String reason,
+    required bool force,
+  }) async {
+    if (!_isInitialized) {
+      await initialize();
+      if (!_isInitialized) {
+        if (kDebugMode) {
+          debugPrint(
+            'NotificationService: Reminder refresh skipped because initialization did not complete.',
+          );
+        }
+        return;
+      }
     }
 
     if (!_isTimeZoneInitialized) {
       await _initializeTimeZone();
     }
 
-    if (kDebugMode) debugPrint('NotificationService: Refreshing habit reminders...');
+    final db = DatabaseService();
+    final uid = db.userId;
+    if (uid.isEmpty) {
+      _lastReminderSignature = null;
+      await _cancelReminderNotificationsOnly();
+      return;
+    }
+
+    if (kDebugMode) {
+      debugPrint(
+        'NotificationService: Refreshing habit reminders ($reason)...',
+      );
+    }
 
     try {
-      final db = DatabaseService();
-      final uid = db.userId;
-      if (uid.isEmpty) return;
-
-      // Use a one-time fetch instead of .first to avoid hanging on stream behavior
-      final snapshot = await FirebaseFirestore.instance
-          .collection('habits')
-          .where('participants', arrayContains: uid)
-          .get()
-          .timeout(const Duration(seconds: 5));
-
-      final habits = snapshot.docs.map((doc) => Habit.fromMap(doc.data(), id: doc.id)).toList();
+      final habits = habitsOverride ?? await _loadReminderHabits(uid);
       final prefs = await SharedPreferences.getInstance();
       final morningTime = prefs.getString('morning_time') ?? '8:00';
       final eveningTime = prefs.getString('evening_time') ?? '21:00';
@@ -634,16 +721,17 @@ class NotificationService with WidgetsBindingObserver {
         morningTime: morningTime,
         eveningTime: eveningTime,
       );
-      if (_lastReminderSignature == signature) {
+      if (!force && _lastReminderSignature == signature) {
         if (kDebugMode) {
-          debugPrint('NotificationService: Reminder configuration unchanged, skipping re-schedule.');
+          debugPrint(
+            'NotificationService: Reminder configuration unchanged, skipping re-schedule.',
+          );
         }
         return;
       }
 
       await _cancelReminderNotificationsOnly();
 
-      // 1. Morning Plan (8 AM)
       await _scheduleDailySummary(
         id: _morningSummaryId,
         prefKey: 'morning_time',
@@ -651,7 +739,6 @@ class NotificationService with WidgetsBindingObserver {
         isMorning: true,
       );
 
-      // 2. Evening Brief (9 PM)
       await _scheduleDailySummary(
         id: _eveningSummaryId,
         prefKey: 'evening_time',
@@ -659,8 +746,8 @@ class NotificationService with WidgetsBindingObserver {
         isMorning: false,
       );
 
-      // 3. Individual Habits
-      for (var habit in habits) {
+      var scheduledHabitReminders = 0;
+      for (final habit in habits) {
         final parsed = _parseReminderTime(habit.reminderTime);
         if (parsed == null) {
           continue;
@@ -672,17 +759,32 @@ class NotificationService with WidgetsBindingObserver {
           hour: parsed.$1,
           minute: parsed.$2,
         );
-      }
-      if (kDebugMode) {
-        debugPrint(
-          'NotificationService: Scheduled ${habits.length + 2} timed reminders (including daily summaries).',
-        );
+        scheduledHabitReminders++;
       }
 
       _lastReminderSignature = signature;
+      if (kDebugMode) {
+        debugPrint(
+          'NotificationService: Scheduled ${scheduledHabitReminders + 2} timed reminders ($scheduledHabitReminders habit reminders, 2 summaries).',
+        );
+      }
     } catch (e) {
-      if (kDebugMode) debugPrint('NotificationService: Error scheduling habits: $e');
+      if (kDebugMode) {
+        debugPrint('NotificationService: Error scheduling habits: $e');
+      }
+      rethrow;
     }
+  }
+
+  Future<List<Habit>> _loadReminderHabits(String uid) async {
+    final snapshot = await FirebaseFirestore.instance
+        .collection('habits')
+        .where('participants', arrayContains: uid)
+        .get()
+        .timeout(const Duration(seconds: 5));
+    return snapshot.docs
+        .map((doc) => Habit.fromMap(doc.data(), id: doc.id))
+        .toList();
   }
 
   Future<void> _scheduleDailySummary({
@@ -804,6 +906,15 @@ class NotificationService with WidgetsBindingObserver {
     await macos?.requestPermissions(alert: true, badge: true, sound: true);
   }
 
+  Future<void> prepareReminderPermissions() async {
+    if (kIsWeb) return;
+    await initialize();
+    if (!_isInitialized) {
+      return;
+    }
+    await _requestLocalNotificationPermissions();
+  }
+
   Future<AndroidScheduleMode> _resolveAndroidScheduleMode() async {
     final android = _localNotifications
         .resolvePlatformSpecificImplementation<
@@ -907,6 +1018,11 @@ class NotificationService with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       _ensureTokenRegistration(reason: 'app_resumed');
+      unawaited(
+        refreshReminderSchedule(reason: 'app_resumed').catchError(
+          (e) => debugPrint('Error refreshing reminders on resume: $e'),
+        ),
+      );
     }
   }
 
