@@ -21,17 +21,8 @@ class CalendarScreen extends StatelessWidget {
   }
 }
 
-enum _CalendarScope { mine, team }
-
-class _CalendarView extends StatefulWidget {
+class _CalendarView extends StatelessWidget {
   const _CalendarView();
-
-  @override
-  State<_CalendarView> createState() => _CalendarViewState();
-}
-
-class _CalendarViewState extends State<_CalendarView> {
-  _CalendarScope _scope = _CalendarScope.mine;
 
   bool _isCompletedForDay(
     Habit habit,
@@ -44,10 +35,10 @@ class _CalendarViewState extends State<_CalendarView> {
     return habit.completionProgressFor(userId, day) >= 1;
   }
 
-  List<Habit> _getEventsForDay(DateTime day, List<Habit> habits) {
+  List<Habit> _getEventsForDay(DateTime day, List<Habit> habits, CalendarScope scope) {
     final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
     return habits.where((habit) {
-      if (_scope == _CalendarScope.mine) {
+      if (scope == CalendarScope.mine) {
         return _isCompletedForDay(habit, uid, day);
       }
 
@@ -109,24 +100,28 @@ class _CalendarViewState extends State<_CalendarView> {
             children: [
               Padding(
                 padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
-                child: Row(
-                  children: [
-                    ChoiceChip(
-                      label: const Text('My activity'),
-                      selected: _scope == _CalendarScope.mine,
-                      onSelected: (_) {
-                        setState(() => _scope = _CalendarScope.mine);
-                      },
-                    ),
-                    const SizedBox(width: 8),
-                    ChoiceChip(
-                      label: const Text('Shared activity'),
-                      selected: _scope == _CalendarScope.team,
-                      onSelected: (_) {
-                        setState(() => _scope = _CalendarScope.team);
-                      },
-                    ),
-                  ],
+                child: Consumer<CalendarProvider>(
+                  builder: (context, calendarProvider, _) {
+                    return Row(
+                      children: [
+                        ChoiceChip(
+                          label: const Text('My activity'),
+                          selected: calendarProvider.scope == CalendarScope.mine,
+                          onSelected: (_) {
+                            calendarProvider.setScope(CalendarScope.mine);
+                          },
+                        ),
+                        const SizedBox(width: 8),
+                        ChoiceChip(
+                          label: const Text('Shared activity'),
+                          selected: calendarProvider.scope == CalendarScope.team,
+                          onSelected: (_) {
+                            calendarProvider.setScope(CalendarScope.team);
+                          },
+                        ),
+                      ],
+                    );
+                  },
                 ),
               ),
               Container(
@@ -168,7 +163,7 @@ class _CalendarViewState extends State<_CalendarView> {
                           );
                         }
                       },
-                      eventLoader: (day) => _getEventsForDay(day, habits),
+                      eventLoader: (day) => _getEventsForDay(day, habits, calendarProvider.scope),
                       headerStyle: HeaderStyle(
                         formatButtonVisible: false,
                         titleCentered: true,
@@ -261,8 +256,9 @@ class _CalendarViewState extends State<_CalendarView> {
 
                     return _buildEventList(
                       context,
-                      _getEventsForDay(calendarProvider.selectedDay!, habits),
+                      _getEventsForDay(calendarProvider.selectedDay!, habits, calendarProvider.scope),
                       calendarProvider.selectedDay!,
+                      calendarProvider.scope,
                     );
                   },
                 ),
@@ -278,6 +274,7 @@ class _CalendarViewState extends State<_CalendarView> {
     BuildContext context,
     List<Habit> completedHabits,
     DateTime selectedDay,
+    CalendarScope scope,
   ) {
     final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
     if (completedHabits.isEmpty) {
@@ -288,7 +285,7 @@ class _CalendarViewState extends State<_CalendarView> {
             Icon(Icons.bedtime_rounded, size: 64, color: Colors.grey[800]),
             const SizedBox(height: 16),
             Text(
-              _scope == _CalendarScope.mine
+              scope == CalendarScope.mine
                   ? 'No routines completed this day.'
                   : 'No shared completions on this day.',
               style: GoogleFonts.inter(color: Colors.grey[600]),
@@ -309,7 +306,7 @@ class _CalendarViewState extends State<_CalendarView> {
         ) {
           return _isCompletedForDay(habit, participantId, selectedDay);
         }).length;
-        final participationSummary = _scope == _CalendarScope.mine
+        final participationSummary = scope == CalendarScope.mine
             ? '${habit.currentStreakFor(uid)} 🔥'
             : '$dayParticipantsCompleted/${habit.participants.length} members';
 
@@ -367,7 +364,7 @@ class _CalendarViewState extends State<_CalendarView> {
             trailing: Text(
               participationSummary,
               style: GoogleFonts.outfit(
-                color: _scope == _CalendarScope.mine
+                color: scope == CalendarScope.mine
                     ? Colors.orange
                     : Theme.of(context).colorScheme.primary,
                 fontWeight: FontWeight.bold,

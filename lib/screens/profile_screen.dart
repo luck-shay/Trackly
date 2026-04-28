@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -131,23 +132,96 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         ),
         body: StreamBuilder<DocumentSnapshot>(
-          stream: FirebaseFirestore.instance
-              .collection('users')
-              .doc(userId)
-              .snapshots(),
+          stream: userId.isEmpty 
+              ? Stream.error('User not authenticated')
+              : FirebaseFirestore.instance
+                  .collection('users')
+                  .doc(userId)
+                  .snapshots()
+                  .handleError((error) {
+                    if (kDebugMode) debugPrint('Profile stream error: $error');
+                    throw error;
+                  }),
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
               return const Center(child: CircularProgressIndicator());
             }
+            
+            if (snapshot.hasError) {
+              return Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.error_outline,
+                      size: 48,
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Failed to load profile',
+                      style: GoogleFonts.outfit(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      snapshot.error.toString().split('\n').first,
+                      style: GoogleFonts.inter(
+                        fontSize: 14,
+                        color: Colors.grey[500],
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 24),
+                    ElevatedButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('Go Back'),
+                    ),
+                  ],
+                ),
+              );
+            }
+            
             if (!snapshot.hasData ||
                 !snapshot.data!.exists ||
                 snapshot.data!.data() == null) {
               return const Center(child: Text('Failed to load profile.'));
             }
 
-            final profile = UserProfile.fromMap(
-              snapshot.data!.data() as Map<String, dynamic>,
-            );
+            UserProfile profile;
+            try {
+              profile = UserProfile.fromMap(
+                snapshot.data!.data() as Map<String, dynamic>,
+              );
+            } catch (e) {
+              return Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.error_outline,
+                      size: 48,
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Error parsing profile data',
+                      style: GoogleFonts.outfit(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    ElevatedButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('Go Back'),
+                    ),
+                  ],
+                ),
+              );
+            }
 
             if (!profileProvider.isEditing) {
               _nameController.text = profile.displayName;

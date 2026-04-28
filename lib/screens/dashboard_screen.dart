@@ -1038,10 +1038,6 @@ class _DashboardScreenState extends State<DashboardScreen>
       provider.userId,
       DateTime.now(),
     );
-    final toggleLabel = completedToday ? 'Undo' : 'Done';
-    final toggleIcon = completedToday
-        ? Icons.undo_rounded
-        : Icons.check_circle_rounded;
     final isShared = !habit.isGroup && habit.participants.length > 1;
     final deleteLabel = isShared ? 'Leave' : 'Delete';
 
@@ -1059,35 +1055,13 @@ class _DashboardScreenState extends State<DashboardScreen>
           child: Slidable(
             key: ValueKey('habit_slidable_${habit.id}'),
             closeOnScroll: true,
-            startActionPane: ActionPane(
+            endActionPane: ActionPane(
               motion: const ScrollMotion(),
               extentRatio: 0.28,
               dismissible: DismissiblePane(
                 onDismissed: () {},
                 closeOnCancel: true,
-                confirmDismiss: () async {
-                  await onToggleCompletion();
-                  return false;
-                },
               ),
-              children: [
-                _buildHabitSwipeAction(
-                  label: toggleLabel,
-                  icon: toggleIcon,
-                  color: Theme.of(
-                    context,
-                  ).colorScheme.primary.withValues(alpha: 0.9),
-                  onPressed: onToggleCompletion,
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(24),
-                    bottomLeft: Radius.circular(24),
-                  ),
-                ),
-              ],
-            ),
-            endActionPane: ActionPane(
-              motion: const ScrollMotion(),
-              extentRatio: 0.28,
               children: [
                 _buildHabitSwipeAction(
                   label: deleteLabel,
