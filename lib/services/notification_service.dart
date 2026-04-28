@@ -243,50 +243,40 @@ class NotificationService with WidgetsBindingObserver {
   }
 
   void _showForegroundNotification(RemoteMessage message) {
-    try {
-      final notification = message.notification;
-      final android = notification?.android;
+    final notification = message.notification;
+    final android = notification?.android;
 
-      final title = (notification?.title?.trim().isNotEmpty ?? false)
-          ? notification!.title!
-          : _firstNonEmptyDataValue(message.data, const ['title', 'notification_title']);
-      final body = (notification?.body?.trim().isNotEmpty ?? false)
-          ? notification!.body!
-          : _firstNonEmptyDataValue(message.data, const ['body', 'message', 'notification_body']);
+    final title = (notification?.title?.trim().isNotEmpty ?? false)
+        ? notification!.title!
+        : _firstNonEmptyDataValue(message.data, const ['title', 'notification_title']);
+    final body = (notification?.body?.trim().isNotEmpty ?? false)
+        ? notification!.body!
+        : _firstNonEmptyDataValue(message.data, const ['body', 'message', 'notification_body']);
 
-      if (title == null && body == null) {
-        return;
-      }
-
-      _localNotifications.show(
-        id: message.messageId?.hashCode ?? DateTime.now().millisecondsSinceEpoch ~/ 1000,
-        title: title,
-        body: body,
-        notificationDetails: NotificationDetails(
-          android: AndroidNotificationDetails(
-            'high_importance_channel',
-            'High Importance Notifications',
-            importance: Importance.max,
-            priority: Priority.high,
-            icon: android?.smallIcon ?? '@mipmap/ic_launcher',
-          ),
-          iOS: const DarwinNotificationDetails(
-            presentAlert: true,
-            presentBadge: true,
-            presentSound: true,
-          ),
-        ),
-        payload: message.data.toString(),
-      ).catchError((e) {
-        if (kDebugMode) {
-          debugPrint('NotificationService: Error showing foreground notification: $e');
-        }
-      });
-    } catch (e) {
-      if (kDebugMode) {
-        debugPrint('NotificationService: Exception in _showForegroundNotification: $e');
-      }
+    if (title == null && body == null) {
+      return;
     }
+
+    _localNotifications.show(
+      id: message.messageId?.hashCode ?? DateTime.now().millisecondsSinceEpoch ~/ 1000,
+      title: title,
+      body: body,
+      notificationDetails: NotificationDetails(
+        android: AndroidNotificationDetails(
+          'high_importance_channel',
+          'High Importance Notifications',
+          importance: Importance.max,
+          priority: Priority.high,
+          icon: android?.smallIcon ?? '@mipmap/ic_launcher',
+        ),
+        iOS: const DarwinNotificationDetails(
+          presentAlert: true,
+          presentBadge: true,
+          presentSound: true,
+        ),
+      ),
+      payload: message.data.toString(),
+    );
   }
 
   String? _firstNonEmptyDataValue(Map<String, dynamic> data, List<String> keys) {

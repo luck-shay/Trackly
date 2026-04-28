@@ -411,6 +411,8 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
     required int completedTodayCount,
     required Widget child,
   }) {
+    final secondaryColor = Theme.of(context).colorScheme.secondary;
+
     return Padding(
       padding: const EdgeInsets.only(bottom: AppLayout.sm),
       child: ClipRRect(
@@ -418,10 +420,64 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
         child: Slidable(
           key: ValueKey('group_task_slide_${task.id}'),
           closeOnScroll: true,
+          startActionPane: ActionPane(
+            motion: const DrawerMotion(),
+            extentRatio: isGroupAdmin ? 0.5 : 0.25,
+            dismissible: DismissiblePane(
+              onDismissed: () {},
+              closeOnCancel: true,
+              confirmDismiss: () async {
+                await _showTaskInfoSheet(
+                  context,
+                  task,
+                  completedTodayCount: completedTodayCount,
+                );
+                return false;
+              },
+            ),
+            children: [
+              _buildGroupTaskSwipeAction(
+                label: 'Info',
+                icon: Icons.info_outline_rounded,
+                color: secondaryColor.withValues(alpha: 0.9),
+                onPressed: () => _showTaskInfoSheet(
+                  context,
+                  task,
+                  completedTodayCount: completedTodayCount,
+                ),
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(18),
+                  bottomLeft: Radius.circular(18),
+                ),
+              ),
+              if (isGroupAdmin)
+                _buildGroupTaskSwipeAction(
+                  label: 'Edit',
+                  icon: Icons.edit_rounded,
+                  color: secondaryColor.withValues(alpha: 0.72),
+                  onPressed: () => _editTask(context, group, task),
+                ),
+            ],
+          ),
           endActionPane: isGroupAdmin
               ? ActionPane(
-                  motion: const ScrollMotion(),
+                  motion: const DrawerMotion(),
                   extentRatio: 0.28,
+                  dismissible: DismissiblePane(
+                    onDismissed: () {},
+                    closeOnCancel: true,
+                    confirmDismiss: () async {
+                      final shouldDelete = await _confirmDeleteTask(
+                        context,
+                        task,
+                      );
+                      if (!context.mounted || !shouldDelete) {
+                        return false;
+                      }
+                      await _deleteTask(context, group, task);
+                      return false;
+                    },
+                  ),
                   children: [
                     _buildGroupTaskSwipeAction(
                       label: 'Delete',
