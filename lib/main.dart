@@ -7,6 +7,7 @@ import 'firebase_options.dart';
 import 'screens/login_screen.dart';
 import 'screens/main_layout_screen.dart';
 import 'services/notification_service.dart';
+import 'services/auth_service.dart';
 import 'package:provider/provider.dart';
 import 'providers/navigation_provider.dart';
 import 'providers/habits_provider.dart';
@@ -20,7 +21,7 @@ import 'package:trackly/theme/color_scheme.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   if (kDebugMode) debugPrint('Trackly: App Starting...');
-  
+
   Object? bootstrapError;
   final themeModeProvider = ThemeModeProvider();
   SubscriptionProvider? subscriptionProvider;
@@ -35,7 +36,8 @@ void main() async {
     if (!kIsWeb) {
       // NON-BLOCKING notification setup
       // We do NOT 'await' this so that the UI can boot immediately.
-      if (kDebugMode) debugPrint('Trackly: Warming up notifications (Background)...');
+      if (kDebugMode)
+        debugPrint('Trackly: Warming up notifications (Background)...');
       NotificationService().initialize().catchError((e, stack) {
         if (kDebugMode) debugPrint('Trackly: Notification Init Error: $e');
       });
@@ -135,7 +137,7 @@ class MyApp extends StatelessWidget {
                   if (kDebugMode) {
                     debugPrint('Trackly: Session Found. Routing to Main.');
                   }
-                  return MainLayoutScreen();
+                  return _AuthBootstrapGate(user: snapshot.data!);
                 }
                 if (kDebugMode) {
                   debugPrint('Trackly: No Session. Routing to Login.');
@@ -190,6 +192,103 @@ class _BootstrapErrorScreen extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _AuthBootstrapGate extends StatefulWidget {
+  final User user;
+
+  const _AuthBootstrapGate({required this.user});
+
+  @override
+  State<_AuthBootstrapGate> createState() => _AuthBootstrapGateState();
+}
+
+class _AuthBootstrapGateState extends State<_AuthBootstrapGate> {
+  Future<void>? _bootstrapFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _startBootstrap();
+  }
+
+  @override
+  void didUpdateWidget(covariant _AuthBootstrapGate oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.user.uid != widget.user.uid) {
+      _startBootstrap();
+    }
+  }
+
+  void _startBootstrap() {
+    _bootstrapFuture = AuthService().syncUserToFirestore(widget.user);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<void>(
+      future: _bootstrapFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState != ConnectionState.done) {
+          return const Scaffold(
+            backgroundColor: Color(0xFF101010),
+            body: Center(
+              child: CircularProgressIndicator(color: Color(0xFF00E676)),
+            ),
+          );
+        }
+
+        if (snapshot.hasError) {
+          return Scaffold(
+            backgroundColor: const Color(0xFF101010),
+            body: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.cloud_off_rounded,
+                      color: Colors.redAccent,
+                      size: 56,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Profile setup failed',
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.outfit(
+                        fontSize: 28,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Signed in with Firebase Auth, but could not create or load the Firestore profile document. Please try again.',
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.inter(
+                        color: Colors.white70,
+                        height: 1.5,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    TextButton(
+                      onPressed: () {
+                        setState(_startBootstrap);
+                      },
+                      child: const Text('Retry'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }
+
+        return MainLayoutScreen();
+      },
     );
   }
 }

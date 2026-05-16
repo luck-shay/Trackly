@@ -1060,16 +1060,8 @@ class _DashboardScreenState extends State<DashboardScreen>
             key: ValueKey('habit_slidable_${habit.id}'),
             closeOnScroll: true,
             startActionPane: ActionPane(
-              motion: const ScrollMotion(),
+              motion: const DrawerMotion(),
               extentRatio: 0.28,
-              dismissible: DismissiblePane(
-                onDismissed: () {},
-                closeOnCancel: true,
-                confirmDismiss: () async {
-                  await onToggleCompletion();
-                  return false;
-                },
-              ),
               children: [
                 _buildHabitSwipeAction(
                   label: toggleLabel,

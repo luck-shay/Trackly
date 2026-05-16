@@ -97,16 +97,15 @@ class AuthService {
 
     final db = FirebaseFirestore.instance;
     final docRef = db.collection('users').doc(user.uid);
-
     final doc = await docRef.get();
+    final profile = UserProfile(
+      uid: user.uid,
+      email: user.email ?? '',
+      displayName: user.displayName ?? 'Anonymous User',
+      photoUrl: user.photoURL,
+    );
+
     if (!doc.exists) {
-      // Create new profile
-      final profile = UserProfile(
-        uid: user.uid,
-        email: user.email ?? '',
-        displayName: user.displayName ?? 'Anonymous User',
-        photoUrl: user.photoURL,
-      );
       await docRef.set(profile.toMap());
     } else {
       // Update auth-linked fields, but preserve user-edited displayName.
@@ -114,22 +113,20 @@ class AuthService {
       final currentDisplayName =
           (existing['displayName'] as String?)?.trim() ?? '';
       final currentPhotoUrl = (existing['photoUrl'] as String?)?.trim() ?? '';
-      final updates = <String, dynamic>{
-        'email': user.email ?? '',
-      };
+      final updates = <String, dynamic>{'email': profile.email};
 
       // Keep a customized profile picture if the user has already set one.
       if (currentPhotoUrl.isEmpty) {
-        updates['photoUrl'] = user.photoURL;
+        updates['photoUrl'] = profile.photoUrl;
       }
 
       if (currentDisplayName.isEmpty) {
-        updates['displayName'] = user.displayName ?? 'Anonymous User';
+        updates['displayName'] = profile.displayName;
       }
 
-      await docRef.update(updates);
+      await docRef.set(updates, SetOptions(merge: true));
     }
-    
+
     if (!kIsWeb) {
       await NotificationService().saveTokenToDatabase();
     }

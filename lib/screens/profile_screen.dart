@@ -22,6 +22,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final _nameController = TextEditingController();
   final _usernameController = TextEditingController();
   ProfileProvider? _profileProvider;
+  Future<void>? _profileBootstrapFuture;
+
+  Future<void> _ensureProfileDocumentExists() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      return;
+    }
+
+    await AuthService().syncUserToFirestore(user);
+  }
 
   Future<void> _changeProfilePhoto(BuildContext context) async {
     final error = await context.read<ProfileProvider>().uploadProfilePicture();
@@ -142,7 +152,52 @@ class _ProfileScreenState extends State<ProfileScreen> {
             if (!snapshot.hasData ||
                 !snapshot.data!.exists ||
                 snapshot.data!.data() == null) {
-              return const Center(child: Text('Failed to load profile.'));
+              _profileBootstrapFuture ??= _ensureProfileDocumentExists();
+
+              return FutureBuilder<void>(
+                future: _profileBootstrapFuture,
+                builder: (context, bootstrapSnapshot) {
+                  if (bootstrapSnapshot.connectionState !=
+                      ConnectionState.done) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+
+                  if (bootstrapSnapshot.hasError) {
+                    return Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(24.0),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.person_off_rounded,
+                              size: 56,
+                              color: Colors.grey[500],
+                            ),
+                            const SizedBox(height: 12),
+                            Text(
+                              'Setting up your profile is taking a moment.',
+                              textAlign: TextAlign.center,
+                              style: GoogleFonts.inter(fontSize: 16),
+                            ),
+                            const SizedBox(height: 8),
+                            TextButton(
+                              onPressed: () {
+                                setState(() {
+                                  _profileBootstrapFuture = null;
+                                });
+                              },
+                              child: const Text('Try again'),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }
+
+                  return const Center(child: CircularProgressIndicator());
+                },
+              );
             }
 
             final profile = UserProfile.fromMap(
@@ -638,7 +693,10 @@ class _SubscriptionSection extends StatelessWidget {
         children: [
           Text(
             'Subscription',
-            style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.w700),
+            style: GoogleFonts.outfit(
+              fontSize: 20,
+              fontWeight: FontWeight.w700,
+            ),
           ),
           const SizedBox(height: 6),
           Text(
@@ -648,7 +706,8 @@ class _SubscriptionSection extends StatelessWidget {
               fontWeight: FontWeight.w600,
             ),
           ),
-          if (state.errorMessage != null && '${state.errorMessage}'.isNotEmpty) ...[
+          if (state.errorMessage != null &&
+              '${state.errorMessage}'.isNotEmpty) ...[
             const SizedBox(height: 10),
             Text(
               '${state.errorMessage}',
@@ -658,7 +717,10 @@ class _SubscriptionSection extends StatelessWidget {
           const SizedBox(height: 12),
           if (packages.isNotEmpty)
             ...packages
-                .where((p) => _supportedProductIds.contains(p.storeProduct.identifier))
+                .where(
+                  (p) =>
+                      _supportedProductIds.contains(p.storeProduct.identifier),
+                )
                 .map(
                   (package) => ListTile(
                     contentPadding: EdgeInsets.zero,
@@ -673,7 +735,9 @@ class _SubscriptionSection extends StatelessWidget {
                       ),
                     ),
                     trailing: TextButton(
-                      onPressed: state.isLoading ? null : () => onBuyPackage(package),
+                      onPressed: state.isLoading
+                          ? null
+                          : () => onBuyPackage(package),
                       child: const Text('Buy'),
                     ),
                   ),
