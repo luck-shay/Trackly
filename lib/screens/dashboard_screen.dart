@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -17,6 +15,7 @@ import '../providers/habits_provider.dart';
 import '../providers/navigation_provider.dart';
 import '../providers/quantified_log_provider.dart';
 import '../services/group_service.dart';
+import '../utils/app_snackbar.dart';
 import '../utils/quantity_format.dart';
 import 'group_challenge_detail_screen.dart';
 import 'group_detail_screen.dart';
@@ -262,12 +261,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
             await provider.saveQuantifiedProgress(habit, value);
 
             if (value >= quantMax && context.mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(
+              showAppSnackBar(
+                context,
+                message:
                     'Awesome! You hit today\'s ${habit.quantUnitFor(provider.userId)} goal.',
-                  ),
-                ),
               );
             }
           }
@@ -343,32 +340,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
     Habit habit,
   ) async {
     if (!context.mounted) return;
-    final messenger = ScaffoldMessenger.maybeOf(context);
-    if (messenger == null) {
-      return;
-    }
-
     final completionLabel = _completionLabelForHabit(habit, provider.userId);
-
-    messenger.hideCurrentSnackBar();
-    final controller = messenger.showSnackBar(
-      SnackBar(
-        duration: const Duration(seconds: 3),
-        content: Text('Nice work! "$completionLabel" completed.'),
-        action: SnackBarAction(
-          label: 'Undo',
-          onPressed: () {
-            provider.clearTodayProgress(habit);
-          },
-        ),
-      ),
+    showAppSnackBar(
+      context,
+      message: 'Nice work! "$completionLabel" completed.',
+      actionLabel: 'Undo',
+      onAction: () {
+        provider.clearTodayProgress(habit);
+      },
     );
-
-    // Force-close the same controller to avoid lingering action snackbars.
-    Timer(const Duration(milliseconds: 3600), () {
-      if (!context.mounted) return;
-      controller.close();
-    });
   }
 
   String _completionLabelForHabit(Habit habit, String userId) {
@@ -509,10 +489,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       onSubmitted: (raw) {
                         final ok = quantProvider.trySetFromText(raw);
                         if (!ok) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Please enter a valid number.'),
-                            ),
+                          showAppSnackBar(
+                            context,
+                            message: 'Please enter a valid number.',
                           );
                           return;
                         }
@@ -609,10 +588,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             valueController.text,
                           );
                           if (!ok) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Please enter a valid number.'),
-                              ),
+                            showAppSnackBar(
+                              context,
+                              message: 'Please enter a valid number.',
                             );
                             return;
                           }
@@ -685,10 +663,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
       if (group == null) {
         context.read<NavigationProvider>().setIndex(2);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Could not find that group. Opened Groups instead.'),
-          ),
+        showAppSnackBar(
+          context,
+          message: 'Could not find that group. Opened Groups instead.',
         );
         return;
       }
@@ -702,12 +679,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
         return;
       }
       context.read<NavigationProvider>().setIndex(2);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Could not open group. ${error.toString().split('\n').first}',
-          ),
-        ),
+      showAppSnackBar(
+        context,
+        message: 'Could not open group. ${error.toString().split('\n').first}',
       );
     }
   }
@@ -722,9 +696,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         return;
       }
       if (group == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not find that group.')),
-        );
+        showAppSnackBar(context, message: 'Could not find that group.');
         return;
       }
 
@@ -739,12 +711,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
       if (!mounted || !context.mounted) {
         return;
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
+      showAppSnackBar(
+        context,
+        message:
             'Could not open challenge. ${error.toString().split('\n').first}',
-          ),
-        ),
       );
     }
   }
@@ -822,10 +792,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
 
     if (!canDelete) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Only group members can delete group tasks.'),
-        ),
+      showAppSnackBar(
+        context,
+        message: 'Only group members can delete group tasks.',
       );
       return;
     }
@@ -844,60 +813,49 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
       final canJoinBack = !habit.isGroup && habit.participants.length > 1;
       if (canJoinBack) {
-        final messenger = ScaffoldMessenger.of(context);
-        messenger.hideCurrentSnackBar();
-        messenger.showSnackBar(
-          SnackBar(
-            content: Text('You left "${habit.title}".'),
-            action: SnackBarAction(
-              label: 'Join back',
-              onPressed: () async {
-                try {
-                  final rejoined = await provider.rejoinSharedHabit(habit);
-                  if (!context.mounted) {
-                    return;
-                  }
-                  if (!rejoined) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text(
-                          'Could not join back. Ask a participant to invite you.',
-                        ),
-                      ),
-                    );
-                    return;
-                  }
+        showAppSnackBar(
+          context,
+          message: 'You left "${habit.title}".',
+          actionLabel: 'Join back',
+          onAction: () async {
+            try {
+              final rejoined = await provider.rejoinSharedHabit(habit);
+              if (!context.mounted) {
+                return;
+              }
+              if (!rejoined) {
+                showAppSnackBar(
+                  context,
+                  message:
+                      'Could not join back. Ask a participant to invite you.',
+                );
+                return;
+              }
 
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Rejoined "${habit.title}".')),
-                  );
-                } catch (error) {
-                  if (!context.mounted) {
-                    return;
-                  }
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        'Could not join back. ${error.toString().split('\n').first}',
-                      ),
-                    ),
-                  );
-                }
-              },
-            ),
-          ),
+              showAppSnackBar(
+                context,
+                message: 'Rejoined "${habit.title}".',
+              );
+            } catch (error) {
+              if (!context.mounted) {
+                return;
+              }
+              showAppSnackBar(
+                context,
+                message:
+                    'Could not join back. ${error.toString().split('\n').first}',
+              );
+            }
+          },
         );
       }
     } catch (error) {
       if (!context.mounted) {
         return;
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Could not delete task. ${error.toString().split('\n').first}',
-          ),
-        ),
+      showAppSnackBar(
+        context,
+        message: 'Could not delete task. ${error.toString().split('\n').first}',
       );
     }
   }
@@ -1390,12 +1348,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 .syncHealthDataForStepsHabits();
                           } catch (error) {
                             if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(
+                              showAppSnackBar(
+                                context,
+                                message:
                                     'Refresh failed. ${error.toString().split('\n').first}',
-                                  ),
-                                ),
                               );
                             }
                           }

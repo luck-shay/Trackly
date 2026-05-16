@@ -415,12 +415,69 @@ class HabitsProvider extends ChangeNotifier {
     final steps = await healthService.fetchStepsForToday();
     if (steps == 0) return;
 
+    final now = DateTime.now();
+    final updates = <String, Habit>{};
     for (final habit in stepsHabits) {
-      final existingValue = habit.completionValueFor(uid, DateTime.now()) ?? 0;
-      if (steps > existingValue) {
-        // Optimization: only update if steps have increased.
-        await saveQuantifiedProgress(habit, steps.toDouble());
+      final existingValue = habit.completionValueFor(uid, now) ?? 0;
+      if (steps <= existingValue) {
+        continue;
       }
+
+      final quantMax = habit.quantMaxFor(uid);
+      final normalizedValue = steps.toDouble().clamp(
+        habit.quantMinFor(uid),
+        quantMax,
+      );
+      final todayKey = habit.dateKeyFor(now);
+
+      final newCompletions = Map<String, List<DateTime>>.from(habit.completions);
+      final newQuantifiedValues = Map<String, Map<String, double>>.from(
+        habit.quantifiedValues,
+      );
+
+      final userCompletions = List<DateTime>.from(newCompletions[uid] ?? []);
+      final userValues = Map<String, double>.from(
+        newQuantifiedValues[uid] ?? {},
+      );
+
+      userValues[todayKey] = normalizedValue;
+      userCompletions.removeWhere(
+        (date) =>
+            date.year == now.year &&
+            date.month == now.month &&
+            date.day == now.day,
+      );
+      if (normalizedValue >= quantMax) {
+        userCompletions.add(now);
+      }
+
+      newCompletions[uid] = userCompletions;
+      newQuantifiedValues[uid] = userValues;
+
+      updates[habit.id] = habit.copyWith(
+        completions: newCompletions,
+        quantifiedValues: newQuantifiedValues,
+      );
+    }
+
+    if (updates.isEmpty) {
+      return;
+    }
+
+    final previousHabits = List<Habit>.from(_habits);
+    final nextHabits = _habits
+        .map((habit) => updates[habit.id] ?? habit)
+        .toList(growable: false);
+
+    _replaceHabits(nextHabits);
+
+    try {
+      for (final updatedHabit in updates.values) {
+        await _persistHabit(updatedHabit);
+      }
+    } catch (_) {
+      _replaceHabits(previousHabits);
+      rethrow;
     }
   }
 
