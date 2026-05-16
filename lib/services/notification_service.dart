@@ -16,6 +16,22 @@ import '../models/habit.dart';
 import '../services/social_service.dart';
 import '../services/database_service.dart';
 
+class ReminderReadiness {
+  final bool notificationsEnabled;
+  final bool canScheduleReminders;
+  final bool exactAlarmsEnabled;
+  final String? blockingReason;
+  final String? warningMessage;
+
+  const ReminderReadiness({
+    required this.notificationsEnabled,
+    required this.canScheduleReminders,
+    required this.exactAlarmsEnabled,
+    this.blockingReason,
+    this.warningMessage,
+  });
+}
+
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   if (kDebugMode) {
@@ -28,6 +44,7 @@ class NotificationService with WidgetsBindingObserver {
   static const int _eveningSummaryId = 1002;
   static const int _habitReminderBaseId = 20000;
   static const int _habitReminderModulo = 700000;
+  static const String _androidNotificationIcon = 'ic_stat_trackly';
 
   static final NotificationService _instance = NotificationService._internal();
   factory NotificationService() => _instance;
@@ -125,7 +142,7 @@ class NotificationService with WidgetsBindingObserver {
 
       // 3. Setup Local Notifications
       const AndroidInitializationSettings initializationSettingsAndroid =
-          AndroidInitializationSettings('@mipmap/ic_launcher');
+          AndroidInitializationSettings(_androidNotificationIcon);
       const DarwinInitializationSettings initializationSettingsDarwin =
           DarwinInitializationSettings();
       
@@ -267,7 +284,7 @@ class NotificationService with WidgetsBindingObserver {
           'High Importance Notifications',
           importance: Importance.max,
           priority: Priority.high,
-          icon: android?.smallIcon ?? '@mipmap/ic_launcher',
+          icon: android?.smallIcon ?? _androidNotificationIcon,
         ),
         iOS: const DarwinNotificationDetails(
           presentAlert: true,
@@ -459,6 +476,7 @@ class NotificationService with WidgetsBindingObserver {
                 'Social Alerts',
                 importance: Importance.high,
                 priority: Priority.high,
+                icon: _androidNotificationIcon,
               ),
               iOS: DarwinNotificationDetails(),
             ),
@@ -526,6 +544,7 @@ class NotificationService with WidgetsBindingObserver {
               'Social Alerts',
               importance: Importance.high,
               priority: Priority.high,
+              icon: _androidNotificationIcon,
             ),
             iOS: DarwinNotificationDetails(),
           ),
@@ -607,6 +626,7 @@ class NotificationService with WidgetsBindingObserver {
               'Social Alerts',
               importance: Importance.high,
               priority: Priority.high,
+              icon: _androidNotificationIcon,
             ),
             iOS: DarwinNotificationDetails(),
           ),
@@ -693,6 +713,24 @@ class NotificationService with WidgetsBindingObserver {
 
     if (!_isTimeZoneInitialized) {
       await _initializeTimeZone();
+    }
+
+    final readiness = await currentReminderReadiness();
+    if (!readiness.canScheduleReminders) {
+      _lastReminderSignature = null;
+      await _cancelReminderNotificationsOnly();
+      if (kDebugMode && readiness.blockingReason != null) {
+        debugPrint(
+          'NotificationService: Reminder refresh skipped ($reason): ${readiness.blockingReason}',
+        );
+      }
+      return;
+    }
+
+    if (kDebugMode && readiness.warningMessage != null) {
+      debugPrint(
+        'NotificationService: Reminder scheduling warning ($reason): ${readiness.warningMessage}',
+      );
     }
 
     final db = DatabaseService();
@@ -817,6 +855,7 @@ class NotificationService with WidgetsBindingObserver {
           'Daily Summaries',
           importance: Importance.defaultImportance,
           priority: Priority.defaultPriority,
+          icon: _androidNotificationIcon,
         ),
         iOS: DarwinNotificationDetails(),
       ),
@@ -849,6 +888,7 @@ class NotificationService with WidgetsBindingObserver {
             'Habit Reminders',
             importance: Importance.high,
             priority: Priority.high,
+            icon: _androidNotificationIcon,
           ),
           iOS: DarwinNotificationDetails(),
         ),
@@ -870,6 +910,7 @@ class NotificationService with WidgetsBindingObserver {
             'Habit Reminders',
             importance: Importance.high,
             priority: Priority.high,
+            icon: _androidNotificationIcon,
           ),
           iOS: DarwinNotificationDetails(),
         ),
@@ -935,13 +976,125 @@ class NotificationService with WidgetsBindingObserver {
     await macos?.requestPermissions(alert: true, badge: true, sound: true);
   }
 
-  Future<void> prepareReminderPermissions() async {
-    if (kIsWeb) return;
+  Future<ReminderReadiness> currentReminderReadiness() async {
     await initialize();
     if (!_isInitialized) {
-      return;
+      return const ReminderReadiness(
+        notificationsEnabled: false,
+        canScheduleReminders: false,
+        exactAlarmsEnabled: false,
+        blockingReason: 'Reminder services could not be initialized on this device.',
+      );
     }
-    await _requestLocalNotificationPermissions();
+    return _evaluateReminderReadiness(requestIfNeeded: false);
+  }
+
+  Future<ReminderReadiness> prepareReminderPermissions() async {
+    await initialize();
+    if (!_isInitialized) {
+      return const ReminderReadiness(
+        notificationsEnabled: false,
+        canScheduleReminders: false,
+        exactAlarmsEnabled: false,
+        blockingReason: 'Reminder services could not be initialized on this device.',
+      );
+    }
+    return _evaluateReminderReadiness(requestIfNeeded: true);
+  }
+
+  Future<ReminderReadiness> _evaluateReminderReadiness({
+    required bool requestIfNeeded,
+  }) async {
+    if (kIsWeb) {
+      return const ReminderReadiness(
+        notificationsEnabled: false,
+        canScheduleReminders: false,
+        exactAlarmsEnabled: false,
+        blockingReason: 'Reminders are not supported on web builds.',
+      );
+    }
+
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      final android = _localNotifications
+          .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin
+          >();
+
+      if (requestIfNeeded) {
+        await android?.requestNotificationsPermission();
+      }
+
+      final notificationsEnabled =
+          await android?.areNotificationsEnabled() ?? false;
+
+      var exactAlarmsEnabled = true;
+      try {
+        exactAlarmsEnabled =
+            await android?.canScheduleExactNotifications() ?? true;
+        if (!exactAlarmsEnabled && requestIfNeeded) {
+          await android?.requestExactAlarmsPermission();
+          exactAlarmsEnabled =
+              await android?.canScheduleExactNotifications() ?? false;
+        }
+      } catch (e) {
+        if (kDebugMode) {
+          debugPrint(
+            'NotificationService: Exact alarm readiness check failed: $e',
+          );
+        }
+      }
+
+      return ReminderReadiness(
+        notificationsEnabled: notificationsEnabled,
+        canScheduleReminders: notificationsEnabled,
+        exactAlarmsEnabled: exactAlarmsEnabled,
+        blockingReason: notificationsEnabled
+            ? null
+            : 'Notifications are turned off for Trackly on this device.',
+        warningMessage: exactAlarmsEnabled
+            ? null
+            : 'Exact alarms are turned off. Reminders may arrive a little late while the phone is idle.',
+      );
+    }
+
+    if (defaultTargetPlatform == TargetPlatform.iOS ||
+        defaultTargetPlatform == TargetPlatform.macOS) {
+      final ios = _localNotifications
+          .resolvePlatformSpecificImplementation<
+            IOSFlutterLocalNotificationsPlugin
+          >();
+      final macos = _localNotifications
+          .resolvePlatformSpecificImplementation<
+            MacOSFlutterLocalNotificationsPlugin
+          >();
+
+      if (requestIfNeeded) {
+        await ios?.requestPermissions(alert: true, badge: true, sound: true);
+        await macos?.requestPermissions(alert: true, badge: true, sound: true);
+      }
+
+      final iosStatus = await ios?.checkPermissions();
+      final macosStatus = await macos?.checkPermissions();
+      final status = iosStatus ?? macosStatus;
+      final notificationsEnabled = status?.isEnabled ?? false;
+
+      return ReminderReadiness(
+        notificationsEnabled: notificationsEnabled,
+        canScheduleReminders: notificationsEnabled,
+        exactAlarmsEnabled: true,
+        blockingReason: notificationsEnabled
+            ? null
+            : 'Notifications are turned off for Trackly on this device.',
+      );
+    }
+
+    return const ReminderReadiness(
+      notificationsEnabled: false,
+      canScheduleReminders: false,
+      exactAlarmsEnabled: false,
+      blockingReason:
+          'Reminder notifications are not supported on this platform.',
+    );
   }
 
   Future<AndroidScheduleMode> _resolveAndroidScheduleMode() async {

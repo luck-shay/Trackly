@@ -977,10 +977,28 @@ class _CreateHabitViewState extends State<_CreateHabitView> {
                             }
 
                             if (provider.reminderTime != null) {
-                              await NotificationService()
+                              final readiness = await NotificationService()
                                   .prepareReminderPermissions();
                               if (!context.mounted) {
                                 return;
+                              }
+                              if (!readiness.canScheduleReminders) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      readiness.blockingReason ??
+                                          'Enable notifications to use reminders.',
+                                    ),
+                                  ),
+                                );
+                                return;
+                              }
+                              if (readiness.warningMessage != null) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(readiness.warningMessage!),
+                                  ),
+                                );
                               }
                             }
 

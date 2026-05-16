@@ -105,7 +105,10 @@ class _CalendarViewState extends State<_CalendarView> {
 
           final habits = habitsProvider.habits;
 
-          return Column(
+          final calendarProvider = context.watch<CalendarProvider>();
+
+          return ListView(
+            physics: const BouncingScrollPhysics(),
             children: [
               Padding(
                 padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
@@ -245,28 +248,24 @@ class _CalendarViewState extends State<_CalendarView> {
                   ).animate().fade(delay: 200.ms),
                 ),
               ),
-              Expanded(
-                child: Consumer<CalendarProvider>(
-                  builder: (context, calendarProvider, child) {
-                    if (calendarProvider.selectedDay == null) {
-                      return Center(
-                        child: Text(
-                          'Select a day to view your progress.',
-                          style: GoogleFonts.inter(
-                            color: scheme.onSurface.withValues(alpha: 0.6),
-                          ),
-                        ),
-                      ).animate().fade(delay: 300.ms);
-                    }
-
-                    return _buildEventList(
-                      context,
-                      _getEventsForDay(calendarProvider.selectedDay!, habits),
-                      calendarProvider.selectedDay!,
-                    );
-                  },
+              if (calendarProvider.selectedDay == null)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 48),
+                  child: Center(
+                    child: Text(
+                      'Select a day to view your progress.',
+                      style: GoogleFonts.inter(
+                        color: scheme.onSurface.withValues(alpha: 0.6),
+                      ),
+                    ),
+                  ).animate().fade(delay: 300.ms),
+                )
+              else
+                _buildEventList(
+                  context,
+                  _getEventsForDay(calendarProvider.selectedDay!, habits),
+                  calendarProvider.selectedDay!,
                 ),
-              ),
             ],
           );
         },
@@ -281,102 +280,105 @@ class _CalendarViewState extends State<_CalendarView> {
   ) {
     final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
     if (completedHabits.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.bedtime_rounded, size: 64, color: Colors.grey[800]),
-            const SizedBox(height: 16),
-            Text(
-              _scope == _CalendarScope.mine
-                  ? 'No routines completed this day.'
-                  : 'No shared completions on this day.',
-              style: GoogleFonts.inter(color: Colors.grey[600]),
-            ),
-          ],
-        ),
-      ).animate().fade();
-    }
-
-    return ListView.builder(
-      physics: const BouncingScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 120),
-      itemCount: completedHabits.length,
-      itemBuilder: (context, index) {
-        final habit = completedHabits[index];
-        final dayParticipantsCompleted = habit.participants.where((
-          participantId,
-        ) {
-          return _isCompletedForDay(habit, participantId, selectedDay);
-        }).length;
-        final participationSummary = _scope == _CalendarScope.mine
-            ? '${habit.currentStreakFor(uid)} 🔥'
-            : '$dayParticipantsCompleted/${habit.participants.length} members';
-
-        return Container(
-          margin: const EdgeInsets.only(bottom: 12),
-          decoration: BoxDecoration(
-            color: Theme.of(
-              context,
-            ).colorScheme.surface.withValues(alpha: 0.96),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: Theme.of(
-                context,
-              ).colorScheme.onSurface.withValues(alpha: 0.08),
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.1),
-                blurRadius: 16,
-                offset: const Offset(0, 8),
-              ),
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.06),
-                blurRadius: 4,
-                offset: const Offset(0, 2),
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 48),
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.bedtime_rounded, size: 64, color: Colors.grey[800]),
+              const SizedBox(height: 16),
+              Text(
+                _scope == _CalendarScope.mine
+                    ? 'No routines completed this day.'
+                    : 'No shared completions on this day.',
+                style: GoogleFonts.inter(color: Colors.grey[600]),
               ),
             ],
           ),
-          child: ListTile(
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 20,
-              vertical: 8,
-            ),
-            leading: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
+        ).animate().fade(),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 120),
+      child: Column(
+        children: List.generate(completedHabits.length, (index) {
+          final habit = completedHabits[index];
+          final dayParticipantsCompleted = habit.participants.where((
+            participantId,
+          ) {
+            return _isCompletedForDay(habit, participantId, selectedDay);
+          }).length;
+          final participationSummary = _scope == _CalendarScope.mine
+              ? '${habit.currentStreakFor(uid)} 🔥'
+              : '$dayParticipantsCompleted/${habit.participants.length} members';
+
+          return Container(
+            margin: const EdgeInsets.only(bottom: 12),
+            decoration: BoxDecoration(
+              color: Theme.of(
+                context,
+              ).colorScheme.surface.withValues(alpha: 0.96),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
                 color: Theme.of(
                   context,
-                ).colorScheme.primary.withValues(alpha: 0.2),
-                shape: BoxShape.circle,
+                ).colorScheme.onSurface.withValues(alpha: 0.08),
               ),
-              child: Icon(
-                Icons.check_rounded,
-                color: Theme.of(context).colorScheme.primary,
-                size: 20,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.1),
+                  blurRadius: 16,
+                  offset: const Offset(0, 8),
+                ),
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.06),
+                  blurRadius: 4,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: ListTile(
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 20,
+                vertical: 8,
+              ),
+              leading: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.primary.withValues(alpha: 0.2),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.check_rounded,
+                  color: Theme.of(context).colorScheme.primary,
+                  size: 20,
+                ),
+              ),
+              title: Text(
+                habit.title,
+                style: GoogleFonts.outfit(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 18,
+                ),
+              ),
+              trailing: Text(
+                participationSummary,
+                style: GoogleFonts.outfit(
+                  color: _scope == _CalendarScope.mine
+                      ? Colors.orange
+                      : Theme.of(context).colorScheme.primary,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                ),
               ),
             ),
-            title: Text(
-              habit.title,
-              style: GoogleFonts.outfit(
-                fontWeight: FontWeight.w600,
-                fontSize: 18,
-              ),
-            ),
-            trailing: Text(
-              participationSummary,
-              style: GoogleFonts.outfit(
-                color: _scope == _CalendarScope.mine
-                    ? Colors.orange
-                    : Theme.of(context).colorScheme.primary,
-                fontWeight: FontWeight.bold,
-                fontSize: 14,
-              ),
-            ),
-          ),
-        ).animate().fade(delay: (100 * index).ms).slideX(begin: 0.1);
-      },
+          ).animate().fade(delay: (100 * index).ms).slideX(begin: 0.1);
+        }),
+      ),
     );
   }
 }

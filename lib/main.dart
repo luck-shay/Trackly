@@ -36,8 +36,9 @@ void main() async {
     if (!kIsWeb) {
       // NON-BLOCKING notification setup
       // We do NOT 'await' this so that the UI can boot immediately.
-      if (kDebugMode)
+      if (kDebugMode) {
         debugPrint('Trackly: Warming up notifications (Background)...');
+      }
       NotificationService().initialize().catchError((e, stack) {
         if (kDebugMode) debugPrint('Trackly: Notification Init Error: $e');
       });

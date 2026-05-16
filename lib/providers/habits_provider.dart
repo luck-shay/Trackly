@@ -28,12 +28,14 @@ class HabitsProvider extends ChangeNotifier {
   bool _groupsLoaded = false;
 
   List<Habit> _habits = [];
+  Map<String, Habit> _habitLookup = <String, Habit>{};
   bool _isLoading = true;
   String? _error;
 
   List<Habit> get habits => _habits;
   bool get isLoading => _isLoading;
   String? get error => _error;
+  Habit? habitById(String id) => _habitLookup[id];
 
   String get userId => _db.userId;
 
@@ -180,9 +182,18 @@ class HabitsProvider extends ChangeNotifier {
     }
 
     merged.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-    _habits = merged;
-    _isLoading = !(_baseLoaded && _groupsLoaded);
-    notifyListeners();
+    final stabilized = _stabilizeHabitInstances(merged);
+    final nextIsLoading = !(_baseLoaded && _groupsLoaded);
+    final didHabitsChange = !_sameHabitIdentityList(_habits, stabilized);
+    final didLoadingChange = _isLoading != nextIsLoading;
+
+    _replaceHabits(stabilized, notify: didHabitsChange);
+    _isLoading = nextIsLoading;
+
+    if (didLoadingChange && !didHabitsChange) {
+      notifyListeners();
+    }
+
     _refreshReminderSchedule(reason: 'habits_provider_publish');
   }
 
@@ -416,9 +427,112 @@ class HabitsProvider extends ChangeNotifier {
   void _applyOptimisticUpdate(Habit updatedHabit) {
     final index = _habits.indexWhere((h) => h.id == updatedHabit.id);
     if (index != -1) {
-      _habits[index] = updatedHabit;
+      final nextHabits = List<Habit>.from(_habits);
+      nextHabits[index] = updatedHabit;
+      _replaceHabits(nextHabits);
+    }
+  }
+
+  void _replaceHabits(List<Habit> nextHabits, {bool notify = true}) {
+    _habits = nextHabits;
+    _habitLookup = <String, Habit>{
+      for (final habit in nextHabits) habit.id: habit,
+    };
+    if (notify) {
       notifyListeners();
     }
+  }
+
+  List<Habit> _stabilizeHabitInstances(List<Habit> nextHabits) {
+    if (_habitLookup.isEmpty) {
+      return nextHabits;
+    }
+
+    return nextHabits.map((habit) {
+      final existing = _habitLookup[habit.id];
+      if (existing != null && _habitDataEquals(existing, habit)) {
+        return existing;
+      }
+      return habit;
+    }).toList(growable: false);
+  }
+
+  bool _sameHabitIdentityList(List<Habit> a, List<Habit> b) {
+    if (identical(a, b)) {
+      return true;
+    }
+    if (a.length != b.length) {
+      return false;
+    }
+    for (var i = 0; i < a.length; i++) {
+      if (!identical(a[i], b[i])) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  bool _habitDataEquals(Habit a, Habit b) {
+    return a.id == b.id &&
+        a.groupEntityId == b.groupEntityId &&
+        a.title == b.title &&
+        a.description == b.description &&
+        a.createdAt.isAtSameMomentAs(b.createdAt) &&
+        a.targetDaysPerWeek == b.targetDaysPerWeek &&
+        a.spaceType == b.spaceType &&
+        a.groupName == b.groupName &&
+        a.isQuantified == b.isQuantified &&
+        a.quantUnit == b.quantUnit &&
+        a.quantMin == b.quantMin &&
+        a.quantMax == b.quantMax &&
+        a.groupTaskMode == b.groupTaskMode &&
+        a.requiresPhotoValidation == b.requiresPhotoValidation &&
+        a.reminderTime == b.reminderTime &&
+        listEquals(a.participants, b.participants) &&
+        listEquals(a.reminderWeekdays, b.reminderWeekdays) &&
+        _dateMapEquals(a.completions, b.completions) &&
+        _nestedDoubleMapEquals(a.quantifiedValues, b.quantifiedValues) &&
+        mapEquals(a.memberTasks, b.memberTasks) &&
+        mapEquals(a.memberIsQuantified, b.memberIsQuantified) &&
+        mapEquals(a.memberQuantUnits, b.memberQuantUnits) &&
+        mapEquals(a.memberQuantMax, b.memberQuantMax);
+  }
+
+  bool _dateMapEquals(
+    Map<String, List<DateTime>> a,
+    Map<String, List<DateTime>> b,
+  ) {
+    if (a.length != b.length) {
+      return false;
+    }
+    for (final entry in a.entries) {
+      final other = b[entry.key];
+      if (other == null || entry.value.length != other.length) {
+        return false;
+      }
+      for (var i = 0; i < entry.value.length; i++) {
+        if (!entry.value[i].isAtSameMomentAs(other[i])) {
+          return false;
+        }
+      }
+    }
+    return true;
+  }
+
+  bool _nestedDoubleMapEquals(
+    Map<String, Map<String, double>> a,
+    Map<String, Map<String, double>> b,
+  ) {
+    if (a.length != b.length) {
+      return false;
+    }
+    for (final entry in a.entries) {
+      final other = b[entry.key];
+      if (other == null || !mapEquals(entry.value, other)) {
+        return false;
+      }
+    }
+    return true;
   }
 
   Future<void> _runWithRollback({
@@ -455,14 +569,14 @@ class HabitsProvider extends ChangeNotifier {
     if (habit.participants.length <= 1) {
       // True delete only when this user is the last participant.
       final previousHabits = List<Habit>.from(_habits);
-      _habits.removeWhere((h) => h.id == habit.id);
-      notifyListeners();
+      _replaceHabits(
+        List<Habit>.from(_habits)..removeWhere((h) => h.id == habit.id),
+      );
 
       try {
         await _db.deleteHabit(habit.id);
       } catch (_) {
-        _habits = previousHabits;
-        notifyListeners();
+        _replaceHabits(previousHabits);
         rethrow;
       }
       _refreshReminderSchedule(reason: 'habit_deleted');
@@ -496,14 +610,14 @@ class HabitsProvider extends ChangeNotifier {
     // If current user leaves a shared habit, remove it from local list
     // immediately so list items (e.g. Dismissible) do not keep stale keys.
     final previousHabits = List<Habit>.from(_habits);
-    _habits.removeWhere((h) => h.id == habit.id);
-    notifyListeners();
+    _replaceHabits(
+      List<Habit>.from(_habits)..removeWhere((h) => h.id == habit.id),
+    );
 
     try {
       await _db.saveHabit(updatedHabit, ensureCurrentUserParticipant: false);
     } catch (_) {
-      _habits = previousHabits;
-      notifyListeners();
+      _replaceHabits(previousHabits);
       rethrow;
     }
 
@@ -612,13 +726,13 @@ class HabitsProvider extends ChangeNotifier {
 
     if (newParticipants.isEmpty) {
       final previousHabits = List<Habit>.from(_habits);
-      _habits.removeWhere((h) => h.id == habit.id);
-      notifyListeners();
+      _replaceHabits(
+        List<Habit>.from(_habits)..removeWhere((h) => h.id == habit.id),
+      );
       try {
         await _db.deleteHabit(habit.id);
       } catch (_) {
-        _habits = previousHabits;
-        notifyListeners();
+        _replaceHabits(previousHabits);
         rethrow;
       }
       return;
@@ -636,14 +750,14 @@ class HabitsProvider extends ChangeNotifier {
 
     // User is leaving this group, so optimistically remove from local list.
     final previousHabits = List<Habit>.from(_habits);
-    _habits.removeWhere((h) => h.id == habit.id);
-    notifyListeners();
+    _replaceHabits(
+      List<Habit>.from(_habits)..removeWhere((h) => h.id == habit.id),
+    );
 
     try {
       await _db.saveHabit(updatedHabit, ensureCurrentUserParticipant: false);
     } catch (_) {
-      _habits = previousHabits;
-      notifyListeners();
+      _replaceHabits(previousHabits);
       rethrow;
     }
 
