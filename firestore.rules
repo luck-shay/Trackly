@@ -14,7 +14,7 @@ service cloud.firestore {
     }
 
     function isLegacyOwner(data) {
-      return isSignedIn() && data != null &&
+      return isSignedIn() && data is map &&
         (
           ('ownerId' in data && data.ownerId == request.auth.uid) ||
           ('createdBy' in data && data.createdBy == request.auth.uid) ||
@@ -23,11 +23,13 @@ service cloud.firestore {
     }
 
     function isHabitParticipant() {
-      return ('participants' in resource.data && isParticipantByList(resource.data.participants)) || isLegacyOwner(resource.data);
+      return resource.data is map &&
+        (('participants' in resource.data && isParticipantByList(resource.data.participants)) ||
+          isLegacyOwner(resource.data));
     }
 
     function isGroupMember() {
-      return isSignedIn() &&
+      return isSignedIn() && resource.data is map &&
         (
           ('memberIds' in resource.data && resource.data.memberIds is list && request.auth.uid in resource.data.memberIds) ||
           ('participants' in resource.data && resource.data.participants is list && request.auth.uid in resource.data.participants) ||
@@ -37,8 +39,8 @@ service cloud.firestore {
 
     function parentGroupAllowsAccess(groupId) {
       let groupPath = /databases/$(database)/documents/groups/$(groupId);
-      let group = exists(groupPath) ? get(groupPath).data : null;
-      return isSignedIn() && group != null &&
+      let group = exists(groupPath) ? get(groupPath).data : {};
+      return isSignedIn() && group is map &&
         (
           ('memberIds' in group && group.memberIds is list && request.auth.uid in group.memberIds) ||
           ('participants' in group && group.participants is list && request.auth.uid in group.participants) ||
@@ -47,26 +49,26 @@ service cloud.firestore {
     }
 
     function canSelfJoinGroup() {
-      return isSignedIn() &&
+      return isSignedIn() && resource.data is map &&
         request.resource.data.memberIds is list &&
         request.resource.data.memberIds.hasAny([request.auth.uid]) &&
         request.resource.data.diff(resource.data).changedKeys().hasOnly(['memberIds']);
     }
 
     function canOnlyChangeStatus() {
-      return request.resource.data.diff(resource.data).changedKeys().hasOnly(['status']);
+      return resource.data is map &&
+        request.resource.data.diff(resource.data).changedKeys().hasOnly(['status']);
     }
 
     function isRecipientOrSender(fromField, toField) {
-      return isSignedIn() &&
+      return isSignedIn() && resource.data is map &&
         (resource.data[fromField] == request.auth.uid || resource.data[toField] == request.auth.uid);
     }
 
     match /users/{uid} {
       allow read: if isSignedIn();
 
-      allow create: if isCurrentUser(uid) &&
-        request.resource.data.uid == uid;
+      allow create: if isCurrentUser(uid);
 
       allow update: if isCurrentUser(uid) ||
         (
