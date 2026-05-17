@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
 import 'package:purchases_flutter/models/package_wrapper.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../services/auth_service.dart';
 import '../models/user_profile.dart';
 import '../models/subscription_state.dart';
@@ -19,6 +20,9 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
+  static final Uri _coffeePageUri = Uri.parse(
+    'https://trackly-web-teal.vercel.app/coffee.html',
+  );
   final _nameController = TextEditingController();
   final _usernameController = TextEditingController();
   ProfileProvider? _profileProvider;
@@ -92,6 +96,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  Future<void> _openCoffeePage() async {
+    await launchUrl(
+      _coffeePageUri,
+      mode: LaunchMode.externalApplication,
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -140,6 +151,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
             'Profile',
             style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
           ),
+          actions: [
+            IconButton(
+              tooltip: themeModeProvider.isDarkMode
+                  ? 'Switch to light mode'
+                  : 'Switch to dark mode',
+              icon: Icon(
+                themeModeProvider.isDarkMode
+                    ? Icons.dark_mode_rounded
+                    : Icons.light_mode_rounded,
+              ),
+              onPressed: () {
+                context
+                    .read<ThemeModeProvider>()
+                    .setDarkModeEnabled(!themeModeProvider.isDarkMode);
+              },
+            ),
+          ],
         ),
         body: StreamBuilder<DocumentSnapshot>(
           stream: FirebaseFirestore.instance
@@ -441,6 +469,45 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
                     if (!profileProvider.isEditing) ...[
                       const SizedBox(height: 24),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.surface,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: Theme.of(
+                              context,
+                            ).dividerColor.withValues(alpha: 0.3),
+                          ),
+                        ),
+                        child: ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          leading: Icon(
+                            Icons.local_cafe_rounded,
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
+                          title: Text(
+                            'Buy me a coffee',
+                            style: GoogleFonts.inter(
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          subtitle: Text(
+                            'Support Trackly with a quick UPI payment',
+                            style: GoogleFonts.inter(
+                              color: Colors.grey[500],
+                              fontSize: 12,
+                            ),
+                          ),
+                          trailing: const Icon(Icons.arrow_forward_ios_rounded),
+                          onTap: _openCoffeePage,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
                       _SubscriptionSection(
                         state: subscriptionState,
                         onUpgrade: () async {
@@ -515,55 +582,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ],
                     if (!profileProvider.isEditing) ...[
                       const SizedBox(height: 48),
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 6,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Theme.of(context).colorScheme.surface,
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                            color: Theme.of(
-                              context,
-                            ).dividerColor.withValues(alpha: 0.3),
-                          ),
-                        ),
-                        child: SwitchListTile.adaptive(
-                          value: themeModeProvider.isDarkMode,
-                          onChanged: (value) {
-                            context
-                                .read<ThemeModeProvider>()
-                                .setDarkModeEnabled(value);
-                          },
-                          contentPadding: EdgeInsets.zero,
-                          title: Text(
-                            'Dark Mode',
-                            style: GoogleFonts.inter(
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          subtitle: Text(
-                            themeModeProvider.isDarkMode
-                                ? 'Using dark appearance'
-                                : 'Using light appearance',
-                            style: GoogleFonts.inter(
-                              color: Colors.grey[500],
-                              fontSize: 12,
-                            ),
-                          ),
-                          secondary: Icon(
-                            themeModeProvider.isDarkMode
-                                ? Icons.dark_mode_rounded
-                                : Icons.light_mode_rounded,
-                            color: Theme.of(context).colorScheme.primary,
-                          ),
-                          activeThumbColor: Theme.of(
-                            context,
-                          ).colorScheme.primary,
-                        ),
-                      ),
                     ],
                     if (!profileProvider.isEditing) ...[
                       const SizedBox(height: 24),
