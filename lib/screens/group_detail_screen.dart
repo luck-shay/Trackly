@@ -119,11 +119,10 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
             ),
             FilledButton(
               style: FilledButton.styleFrom(
-                backgroundColor: Theme.of(context).colorScheme.error,
-                foregroundColor: Theme.of(context).colorScheme.onError,
-              ),
+                backgroundColor:  Colors.redAccent.withValues(alpha: 0.9),
+                ),
               onPressed: () => Navigator.pop(dialogContext, true),
-              child: const Text('Leave'),
+              child: const Text('Leave', style: TextStyle(color: Colors.white),),
             ),
           ],
         );

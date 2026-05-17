@@ -760,7 +760,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
                 ElevatedButton(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color.fromARGB(255, 217, 4, 4),
+                    backgroundColor:  Colors.redAccent.withValues(alpha: 0.9),
                   ),
                   onPressed: () => Navigator.pop(dialogContext, true),
                   child: Text(
@@ -946,7 +946,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               _buildHabitSwipeAction(
                 label: deleteLabel,
                 icon: Icons.delete_rounded,
-                color: Theme.of(context).colorScheme.error,
+                color: Colors.redAccent.withValues(alpha: 0.9),
                 onPressed: () =>
                     _deleteHabitWithPermissions(context, provider, habit),
                 borderRadius: const BorderRadius.only(
