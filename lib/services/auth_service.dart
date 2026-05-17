@@ -98,10 +98,12 @@ class AuthService {
     final db = FirebaseFirestore.instance;
     final docRef = db.collection('users').doc(user.uid);
     final doc = await docRef.get();
+    final initialUsername = await _resolveInitialUsername(user);
     final profile = UserProfile(
       uid: user.uid,
-      email: user.email ?? '',
+      email: (user.email ?? '').toLowerCase(),
       displayName: user.displayName ?? 'Anonymous User',
+      username: initialUsername,
       photoUrl: user.photoURL,
     );
 
@@ -124,6 +126,12 @@ class AuthService {
         updates['displayName'] = profile.displayName;
       }
 
+      final currentUsername =
+          (existing['username'] as String?)?.trim() ?? '';
+      if (currentUsername.isEmpty && profile.username != null) {
+        updates['username'] = profile.username;
+      }
+
       await docRef.set(updates, SetOptions(merge: true));
     }
 
@@ -138,5 +146,49 @@ class AuthService {
     } catch (error) {
       debugPrint('RevenueCat login skipped: $error');
     }
+  }
+
+  Future<String?> _resolveInitialUsername(User user) async {
+    final base = _sanitizeUsernameBase(_localPartFromEmail(user.email))
+        .ifEmpty(_sanitizeUsernameBase(user.displayName))
+        .ifEmpty('user');
+
+    final snapshot = await FirebaseFirestore.instance
+        .collection('users')
+        .where('username', isEqualTo: base)
+        .get();
+
+    final isAvailable = snapshot.docs.isEmpty ||
+        (snapshot.docs.length == 1 && snapshot.docs.first.id == user.uid);
+    if (isAvailable) return base;
+
+    return '${base}-${_shortUidSuffix(user.uid)}';
+  }
+
+  String _localPartFromEmail(String? email) {
+    final value = (email ?? '').trim();
+    if (value.isEmpty || !value.contains('@')) return '';
+    return value.split('@').first;
+  }
+
+  String _sanitizeUsernameBase(String? value) {
+    final cleaned = (value ?? '')
+        .toLowerCase()
+        .replaceAll(RegExp(r'[^a-z0-9]'), '')
+        .trim();
+    if (cleaned.length <= 20) return cleaned;
+    return cleaned.substring(0, 20);
+  }
+
+  String _shortUidSuffix(String uid) {
+    if (uid.isEmpty) return '000000';
+    return uid.length <= 6 ? uid : uid.substring(uid.length - 6);
+  }
+}
+
+extension _StringFallback on String {
+  String ifEmpty(String? fallback) {
+    if (trim().isNotEmpty) return this;
+    return (fallback ?? '').trim();
   }
 }
