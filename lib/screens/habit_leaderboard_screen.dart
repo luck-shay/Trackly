@@ -93,12 +93,15 @@ class _HabitLeaderboardView extends StatelessWidget {
       return;
     }
 
+    final messenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
+
     await context.read<HabitsProvider>().leaveGroup(habit);
     if (context.mounted) {
-      Navigator.pop(context);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('You left the group.')));
+      navigator.pop();
+      messenger.showSnackBar(
+        const SnackBar(content: Text('You left the group.')),
+      );
     }
   }
 
@@ -1044,7 +1047,9 @@ class _HabitLeaderboardView extends StatelessWidget {
                                     Icons.local_fire_department_rounded,
                                     color: streak > 0
                                         ? Colors.orange
-                                        : scheme.onSurface.withValues(alpha: 0.62),
+                                        : scheme.onSurface.withValues(
+                                            alpha: 0.62,
+                                          ),
                                     size: 20,
                                   ),
                                   const SizedBox(width: 4),
@@ -1055,7 +1060,9 @@ class _HabitLeaderboardView extends StatelessWidget {
                                       fontSize: 18,
                                       color: streak > 0
                                           ? Colors.orange
-                                          : scheme.onSurface.withValues(alpha: 0.62),
+                                          : scheme.onSurface.withValues(
+                                              alpha: 0.62,
+                                            ),
                                     ),
                                   ),
                                 ],

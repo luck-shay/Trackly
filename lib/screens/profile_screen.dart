@@ -112,7 +112,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   void dispose() {
     // Ensure profile always reopens in view mode.
-    _profileProvider?.cancelEditing();
+    _profileProvider?.resetEditingState();
     _nameController.dispose();
     _usernameController.dispose();
     super.dispose();
@@ -127,8 +127,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final userId = FirebaseAuth.instance.currentUser?.uid ?? '';
 
     return PopScope(
+      canPop: !profileProvider.isEditing,
       onPopInvokedWithResult: (didPop, result) {
-        if (didPop) {
+        if (!didPop && profileProvider.isEditing) {
           context.read<ProfileProvider>().cancelEditing();
         }
       },

@@ -27,6 +27,7 @@ class GroupDetailScreen extends StatefulWidget {
 class _GroupDetailScreenState extends State<GroupDetailScreen> {
   bool _isChallengesExpanded = true;
   bool _isTasksExpanded = false;
+  bool _isLeavingGroup = false;
 
   Widget _buildChallengesHeader(BuildContext context, int challengeCount) {
     final onSurface = Theme.of(context).colorScheme.onSurface;
@@ -117,6 +118,10 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
               child: const Text('Cancel'),
             ),
             FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: Theme.of(context).colorScheme.error,
+                foregroundColor: Theme.of(context).colorScheme.onError,
+              ),
               onPressed: () => Navigator.pop(dialogContext, true),
               child: const Text('Leave'),
             ),
@@ -129,19 +134,28 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
       return;
     }
 
+    setState(() {
+      _isLeavingGroup = true;
+    });
+    final messenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
+
     try {
       await GroupService().leaveGroup(group.id);
       if (!context.mounted) {
         return;
       }
-      Navigator.pop(context);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('You left the group.')));
+      navigator.pop();
+      messenger.showSnackBar(
+        const SnackBar(content: Text('You left the group.')),
+      );
     } catch (error) {
       if (!context.mounted) {
         return;
       }
+      setState(() {
+        _isLeavingGroup = false;
+      });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -519,19 +533,36 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
         return null;
       }),
       builder: (context, snapshot) {
-        final liveGroup = snapshot.data ?? widget.group;
+        final liveGroup = snapshot.data;
+        final groupMissingFromLiveStream =
+            liveGroup == null &&
+            snapshot.connectionState != ConnectionState.waiting;
+        if (_isLeavingGroup || groupMissingFromLiveStream) {
+          return Scaffold(
+            appBar: AppBar(
+              title: Text(
+                widget.group.name,
+                style: GoogleFonts.outfit(fontWeight: FontWeight.w700),
+              ),
+            ),
+            body: const Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        final group = liveGroup ?? widget.group;
 
         return Scaffold(
           appBar: AppBar(
             title: Text(
-              liveGroup.name,
+              group.name,
               style: GoogleFonts.outfit(fontWeight: FontWeight.w700),
             ),
             actions: [
               PopupMenuButton<String>(
+                enabled: !_isLeavingGroup,
                 onSelected: (value) {
                   if (value == 'leave') {
-                    _confirmLeaveGroup(context, liveGroup);
+                    _confirmLeaveGroup(context, group);
                   }
                 },
                 itemBuilder: (_) {
@@ -566,9 +597,9 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        liveGroup.description.isEmpty
+                        group.description.isEmpty
                             ? 'No description yet.'
-                            : liveGroup.description,
+                            : group.description,
                         style: GoogleFonts.inter(
                           color: Theme.of(
                             context,
@@ -578,7 +609,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                       ),
                       const VGap(AppLayout.sm),
                       Text(
-                        '${liveGroup.memberIds.length} member${liveGroup.memberIds.length == 1 ? '' : 's'}',
+                        '${group.memberIds.length} member${group.memberIds.length == 1 ? '' : 's'}',
                         style: GoogleFonts.inter(
                           fontSize: 12,
                           color: Theme.of(
@@ -588,7 +619,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                       ),
                       const VGap(AppLayout.xs),
                       TextButton.icon(
-                        onPressed: () => _openMembersSheet(context, liveGroup),
+                        onPressed: () => _openMembersSheet(context, group),
                         icon: const Icon(Icons.people_alt_rounded, size: 18),
                         label: const Text('View members'),
                         style: TextButton.styleFrom(
@@ -607,7 +638,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                           Expanded(
                             child: OutlinedButton.icon(
                               onPressed: () =>
-                                  _openInviteMembersSheet(context, liveGroup),
+                                  _openInviteMembersSheet(context, group),
                               icon: const Icon(Icons.person_add_alt_1_rounded),
                               label: const Text('Invite'),
                             ),
@@ -615,7 +646,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                           const HGap(AppLayout.sm),
                           Expanded(
                             child: ElevatedButton.icon(
-                              onPressed: () => _createTask(context, liveGroup),
+                              onPressed: () => _createTask(context, group),
                               icon: const Icon(Icons.add_task_rounded),
                               label: const Text('Add Task'),
                               style: ElevatedButton.styleFrom(
@@ -632,7 +663,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                       SizedBox(
                         width: double.infinity,
                         child: OutlinedButton.icon(
-                          onPressed: () => _createChallenge(context, liveGroup),
+                          onPressed: () => _createChallenge(context, group),
                           icon: const Icon(Icons.flag_rounded),
                           label: const Text('Start Challenge'),
                         ),
@@ -642,7 +673,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                 ),
                 const VGap(AppLayout.lg),
                 StreamBuilder<List<GroupChallenge>>(
-                  stream: GroupService().streamGroupChallenges(liveGroup.id),
+                  stream: GroupService().streamGroupChallenges(group.id),
                   builder: (context, challengeSnapshot) {
                     final challenges =
                         challengeSnapshot.data ?? const <GroupChallenge>[];
@@ -778,7 +809,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                                     child: ListTile(
                                       onTap: () => _openChallenge(
                                         context,
-                                        liveGroup,
+                                        group,
                                         challenge,
                                       ),
                                       title: Text(
@@ -849,7 +880,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                 ),
                 const VGap(AppLayout.md),
                 StreamBuilder<List<GroupTask>>(
-                  stream: GroupService().streamGroupTasks(liveGroup.id),
+                  stream: GroupService().streamGroupTasks(group.id),
                   builder: (context, taskSnapshot) {
                     if (!taskSnapshot.hasData) {
                       return const Center(child: CircularProgressIndicator());
@@ -859,14 +890,14 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                     final now = DateTime.now();
                     final uid = GroupService().userId;
                     final isGroupAdmin =
-                        uid.isNotEmpty && liveGroup.memberIds.contains(uid);
+                        uid.isNotEmpty && group.memberIds.contains(uid);
 
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _GroupPulseCard(group: liveGroup, tasks: tasks),
+                        _GroupPulseCard(group: group, tasks: tasks),
                         const VGap(AppLayout.md),
-                        _GroupLeaderboardCard(group: liveGroup, tasks: tasks),
+                        _GroupLeaderboardCard(group: group, tasks: tasks),
                         const VGap(AppLayout.lg),
                         _buildTasksHeader(context, tasks.length),
                         const VGap(AppLayout.sm),
@@ -909,7 +940,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                                     width: double.infinity,
                                     child: ElevatedButton.icon(
                                       onPressed: () =>
-                                          _createTask(context, liveGroup),
+                                          _createTask(context, group),
                                       icon: const Icon(Icons.add_task_rounded),
                                       label: const Text(
                                         'Create First Group Task',
@@ -1020,7 +1051,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                                                   tooltip: 'Edit task',
                                                   onPressed: () => _editTask(
                                                     context,
-                                                    liveGroup,
+                                                    group,
                                                     task,
                                                   ),
                                                   icon: const Icon(
@@ -1153,7 +1184,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
 
                                 return _buildTaskSlidable(
                                   context,
-                                  liveGroup,
+                                  group,
                                   task,
                                   isGroupAdmin: isGroupAdmin,
                                   completedTodayCount: completedTodayCount,
@@ -1741,6 +1772,14 @@ class _GroupLeaderboardCardState extends State<_GroupLeaderboardCard> {
                     firstDay: DateTime.utc(2020, 1, 1),
                     lastDay: DateTime.utc(2035, 12, 31),
                     focusedDay: _calendarFocusedDay,
+                    headerStyle: HeaderStyle(
+                      formatButtonVisible: false,
+                      titleCentered: true,
+                      titleTextStyle: GoogleFonts.outfit(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
                     selectedDayPredicate: (day) =>
                         _isSameDay(day, _calendarSelectedDay ?? _dayOnly(now)),
                     onDaySelected: (selected, focused) {

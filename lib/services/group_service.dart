@@ -211,17 +211,40 @@ class GroupService {
       return;
     }
 
-    final updates = <String, dynamic>{
-      'memberIds': remainingMembers,
-      'leftMemberIds': FieldValue.arrayUnion([uid]),
-    };
-
-    if (group.ownerId == uid) {
-      updates['ownerId'] = remainingMembers.first;
-    }
-
-    await groupRef.update(updates);
     await markGroupHidden(groupId);
+    try {
+      await _db.runTransaction((transaction) async {
+        final latestDoc = await transaction.get(groupRef);
+        if (!latestDoc.exists || latestDoc.data() == null) {
+          return;
+        }
+
+        final latestGroup = Group.fromMap(latestDoc.data()!, id: latestDoc.id);
+        if (!latestGroup.memberIds.contains(uid)) {
+          return;
+        }
+
+        final latestRemainingMembers = List<String>.from(latestGroup.memberIds)
+          ..removeWhere((memberId) => memberId == uid);
+        if (latestRemainingMembers.isEmpty) {
+          throw StateError('Cannot leave group with no remaining owner.');
+        }
+
+        final updates = <String, dynamic>{
+          'memberIds': latestRemainingMembers,
+          'leftMemberIds': FieldValue.arrayUnion([uid]),
+        };
+
+        if (latestGroup.ownerId == uid) {
+          updates['ownerId'] = latestRemainingMembers.first;
+        }
+
+        transaction.update(groupRef, updates);
+      });
+    } catch (_) {
+      await clearHiddenGroup(groupId);
+      rethrow;
+    }
 
     // Legacy compatibility: older app versions stored groups in `habits` using
     // the same id. Remove the current user from that participant list so
@@ -455,8 +478,10 @@ class GroupService {
         id: challengeSnap.id,
       );
 
-      final nextParticipants = <String>{...challenge.participantIds, userId}
-          .toList();
+      final nextParticipants = <String>{
+        ...challenge.participantIds,
+        userId,
+      }.toList();
 
       txn.update(challengeRef, {'participantIds': nextParticipants});
       txn.update(inviteRef, {'status': 'accepted'});

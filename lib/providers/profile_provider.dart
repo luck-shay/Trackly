@@ -28,14 +28,26 @@ class ProfileProvider extends ChangeNotifier {
   String? get usernameError => _usernameError;
 
   void startEditing() {
+    if (_isEditing) {
+      return;
+    }
     _isEditing = true;
     notifyListeners();
   }
 
   void cancelEditing() {
+    if (!_isEditing && _usernameError == null) {
+      return;
+    }
+    resetEditingState(notify: true);
+  }
+
+  void resetEditingState({bool notify = false}) {
     _isEditing = false;
     _usernameError = null;
-    notifyListeners();
+    if (notify) {
+      notifyListeners();
+    }
   }
 
   Future<bool> saveProfile(String newName, String newUsername) async {
@@ -105,7 +117,9 @@ class ProfileProvider extends ChangeNotifier {
     if (targets.isEmpty) {
       targets.add(
         _StorageTarget(
-          bucketName: FirebaseStorage.instance.app.options.storageBucket ?? 'unknown-bucket',
+          bucketName:
+              FirebaseStorage.instance.app.options.storageBucket ??
+              'unknown-bucket',
           storage: FirebaseStorage.instance,
         ),
       );
@@ -179,7 +193,10 @@ class ProfileProvider extends ChangeNotifier {
 
     // Backward-compat cleanup for legacy single-file path.
     try {
-      final legacyRef = storage.ref().child('profile_pictures').child('$uid.jpg');
+      final legacyRef = storage
+          .ref()
+          .child('profile_pictures')
+          .child('$uid.jpg');
       if (legacyRef.fullPath != newPath) {
         await legacyRef.delete();
       }
@@ -212,7 +229,9 @@ class ProfileProvider extends ChangeNotifier {
       );
     } on PlatformException catch (e) {
       if (kDebugMode) {
-        debugPrint('ProfileProvider: Image pick failed: ${e.code} ${e.message}');
+        debugPrint(
+          'ProfileProvider: Image pick failed: ${e.code} ${e.message}',
+        );
       }
       return 'Photo access failed. Please allow photo permission in Settings.';
     }
@@ -281,11 +300,12 @@ class ProfileProvider extends ChangeNotifier {
           }
 
           if (downloadUrl == null || downloadUrl.isEmpty) {
-            throw lastUrlError ?? FirebaseException(
-              plugin: 'firebase_storage',
-              code: 'object-not-found',
-              message: 'Uploaded object could not be resolved for URL.',
-            );
+            throw lastUrlError ??
+                FirebaseException(
+                  plugin: 'firebase_storage',
+                  code: 'object-not-found',
+                  message: 'Uploaded object could not be resolved for URL.',
+                );
           }
 
           await _social.updateProfile(photoUrl: downloadUrl);
@@ -309,11 +329,12 @@ class ProfileProvider extends ChangeNotifier {
         }
       }
 
-      throw lastStorageError ?? FirebaseException(
-        plugin: 'firebase_storage',
-        code: 'unknown',
-        message: 'Profile upload failed for all configured buckets.',
-      );
+      throw lastStorageError ??
+          FirebaseException(
+            plugin: 'firebase_storage',
+            code: 'unknown',
+            message: 'Profile upload failed for all configured buckets.',
+          );
     } on FirebaseException catch (e) {
       if (kDebugMode) {
         debugPrint(
