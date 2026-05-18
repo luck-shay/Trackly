@@ -98,16 +98,18 @@ class AuthService {
     final db = FirebaseFirestore.instance;
     final docRef = db.collection('users').doc(user.uid);
     final doc = await docRef.get();
-    final initialUsername = await _resolveInitialUsername(user);
-    final profile = UserProfile(
-      uid: user.uid,
-      email: (user.email ?? '').toLowerCase(),
-      displayName: user.displayName ?? 'Anonymous User',
-      username: initialUsername,
-      photoUrl: user.photoURL,
-    );
+    final email = (user.email ?? '').toLowerCase();
+    final displayName = user.displayName ?? 'Anonymous User';
+    final photoUrl = user.photoURL;
 
     if (!doc.exists) {
+      final profile = UserProfile(
+        uid: user.uid,
+        email: email,
+        displayName: displayName,
+        username: await _resolveInitialUsername(user),
+        photoUrl: photoUrl,
+      );
       await docRef.set(profile.toMap());
     } else {
       // Update auth-linked fields, but preserve user-edited displayName.
@@ -115,21 +117,23 @@ class AuthService {
       final currentDisplayName =
           (existing['displayName'] as String?)?.trim() ?? '';
       final currentPhotoUrl = (existing['photoUrl'] as String?)?.trim() ?? '';
-      final updates = <String, dynamic>{'email': profile.email};
+      final updates = <String, dynamic>{'email': email};
 
       // Keep a customized profile picture if the user has already set one.
       if (currentPhotoUrl.isEmpty) {
-        updates['photoUrl'] = profile.photoUrl;
+        updates['photoUrl'] = photoUrl;
       }
 
       if (currentDisplayName.isEmpty) {
-        updates['displayName'] = profile.displayName;
+        updates['displayName'] = displayName;
       }
 
-      final currentUsername =
-          (existing['username'] as String?)?.trim() ?? '';
-      if (currentUsername.isEmpty && profile.username != null) {
-        updates['username'] = profile.username;
+      final currentUsername = (existing['username'] as String?)?.trim() ?? '';
+      if (currentUsername.isEmpty) {
+        final initialUsername = await _resolveInitialUsername(user);
+        if (initialUsername != null) {
+          updates['username'] = initialUsername;
+        }
       }
 
       await docRef.set(updates, SetOptions(merge: true));
@@ -149,20 +153,21 @@ class AuthService {
   }
 
   Future<String?> _resolveInitialUsername(User user) async {
-    final base = _sanitizeUsernameBase(_localPartFromEmail(user.email))
-        .ifEmpty(_sanitizeUsernameBase(user.displayName))
-        .ifEmpty('user');
+    final base = _sanitizeUsernameBase(
+      _localPartFromEmail(user.email),
+    ).ifEmpty(_sanitizeUsernameBase(user.displayName)).ifEmpty('user');
 
     final snapshot = await FirebaseFirestore.instance
         .collection('users')
         .where('username', isEqualTo: base)
         .get();
 
-    final isAvailable = snapshot.docs.isEmpty ||
+    final isAvailable =
+        snapshot.docs.isEmpty ||
         (snapshot.docs.length == 1 && snapshot.docs.first.id == user.uid);
     if (isAvailable) return base;
 
-    return '${base}-${_shortUidSuffix(user.uid)}';
+    return '$base-${_shortUidSuffix(user.uid)}';
   }
 
   String _localPartFromEmail(String? email) {

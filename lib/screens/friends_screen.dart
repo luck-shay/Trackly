@@ -114,12 +114,32 @@ class FriendsScreen extends StatelessWidget {
                       color: Color(0xFF00E676),
                     ),
                     onPressed: () async {
-                      await social.sendFriendRequest(user.uid);
-                      if (context.mounted) {
+                      try {
+                        final result = await social.sendFriendRequest(user.uid);
+                        if (!context.mounted) return;
+
+                        final message = switch (result) {
+                          FriendRequestResult.sent =>
+                            'Friend request sent to ${user.displayName}',
+                          FriendRequestResult.acceptedIncoming =>
+                            'You and ${user.displayName} are now friends.',
+                          FriendRequestResult.alreadyFriends =>
+                            'You are already friends with ${user.displayName}.',
+                          FriendRequestResult.alreadyPending =>
+                            'Friend request is already pending.',
+                          FriendRequestResult.unavailable =>
+                            'Could not send request. Please try again.',
+                        };
+
+                        ScaffoldMessenger.of(
+                          context,
+                        ).showSnackBar(SnackBar(content: Text(message)));
+                      } catch (_) {
+                        if (!context.mounted) return;
                         ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
+                          const SnackBar(
                             content: Text(
-                              'Friend request sent to ${user.displayName}',
+                              'Could not send request. Please try again.',
                             ),
                           ),
                         );
@@ -281,7 +301,9 @@ class FriendsScreen extends StatelessWidget {
                                         doc.id,
                                         habitId,
                                       );
-                                    } on UpgradeRequiredException catch (error) {
+                                    } on UpgradeRequiredException catch (
+                                      error
+                                    ) {
                                       if (!context.mounted) return;
                                       try {
                                         await context
@@ -289,7 +311,9 @@ class FriendsScreen extends StatelessWidget {
                                             .presentPaywall();
                                       } catch (_) {}
                                       if (!context.mounted) return;
-                                      ScaffoldMessenger.of(context).showSnackBar(
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
                                         SnackBar(content: Text(error.message)),
                                       );
                                     } catch (_) {

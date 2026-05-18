@@ -8,6 +8,14 @@ import 'subscription_constants.dart';
 import 'subscription_exceptions.dart';
 import 'subscription_service.dart';
 
+enum FriendRequestResult {
+  sent,
+  alreadyFriends,
+  alreadyPending,
+  acceptedIncoming,
+  unavailable,
+}
+
 class SocialService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   final SubscriptionService _subscriptionService = SubscriptionService();
@@ -75,7 +83,11 @@ class SocialService {
   }
 
   // Update Profile
-  Future<void> updateProfile({String? displayName, String? username, String? photoUrl}) async {
+  Future<void> updateProfile({
+    String? displayName,
+    String? username,
+    String? photoUrl,
+  }) async {
     if (userId.isEmpty) {
       throw StateError('You must be signed in to update your profile.');
     }
@@ -113,14 +125,15 @@ class SocialService {
   }
 
   // Send friend request
-  Future<void> sendFriendRequest(String toUserId) async {
-    if (userId.isEmpty || toUserId.isEmpty) return;
-    if (toUserId == userId) return;
+  Future<FriendRequestResult> sendFriendRequest(String toUserId) async {
+    if (userId.isEmpty || toUserId.isEmpty || toUserId == userId) {
+      return FriendRequestResult.unavailable;
+    }
 
     // Check if already friends
     final myProfile = await getUserProfile(userId);
     if (myProfile != null && myProfile.friends.contains(toUserId)) {
-      return;
+      return FriendRequestResult.alreadyFriends;
     }
 
     // Check if request already exists
@@ -131,7 +144,7 @@ class SocialService {
         .where('status', isEqualTo: 'pending')
         .get();
 
-    if (existing.docs.isNotEmpty) return;
+    if (existing.docs.isNotEmpty) return FriendRequestResult.alreadyPending;
 
     final reverseExisting = await _db
         .collection('friendRequests')
@@ -140,7 +153,10 @@ class SocialService {
         .where('status', isEqualTo: 'pending')
         .get();
 
-    if (reverseExisting.docs.isNotEmpty) return;
+    if (reverseExisting.docs.isNotEmpty) {
+      await acceptFriendRequest(reverseExisting.docs.first.id, toUserId);
+      return FriendRequestResult.acceptedIncoming;
+    }
 
     await _db.collection('friendRequests').add({
       'from': userId,
@@ -148,31 +164,38 @@ class SocialService {
       'status': 'pending',
       'createdAt': FieldValue.serverTimestamp(),
     });
+    return FriendRequestResult.sent;
   }
 
   // Accept a friend request
   Future<void> acceptFriendRequest(String requestId, String fromUserId) async {
     if (userId.isEmpty) return;
 
-    final batch = _db.batch();
-
-    // 1. Mark request as accepted
     final reqRef = _db.collection('friendRequests').doc(requestId);
-    batch.update(reqRef, {'status': 'accepted'});
-
-    // 2. Add fromUserId to my friends list
     final myRef = _db.collection('users').doc(userId);
-    batch.update(myRef, {
-      'friends': FieldValue.arrayUnion([fromUserId]),
-    });
-
-    // 3. Add my userId to fromUser's friends list
     final otherRef = _db.collection('users').doc(fromUserId);
-    batch.update(otherRef, {
-      'friends': FieldValue.arrayUnion([userId]),
-    });
 
-    await batch.commit();
+    await _db.runTransaction((transaction) async {
+      final requestDoc = await transaction.get(reqRef);
+      if (!requestDoc.exists || requestDoc.data() == null) {
+        throw StateError('Friend request no longer exists.');
+      }
+
+      final request = requestDoc.data()!;
+      if (request['to'] != userId ||
+          request['from'] != fromUserId ||
+          request['status'] != 'pending') {
+        throw StateError('Friend request is no longer pending.');
+      }
+
+      transaction.update(reqRef, {'status': 'accepted'});
+      transaction.set(myRef, {
+        'friends': FieldValue.arrayUnion([fromUserId]),
+      }, SetOptions(merge: true));
+      transaction.update(otherRef, {
+        'friends': FieldValue.arrayUnion([userId]),
+      });
+    });
   }
 
   // Decline a friend request
@@ -257,9 +280,7 @@ class SocialService {
         (habitDoc.data()?['participants'] as List?) ?? const <String>[],
       );
       if (participants.length >= kSharedTaskMaxMembers) {
-        throw StateError(
-          'Shared task already has the maximum of 3 members.',
-        );
+        throw StateError('Shared task already has the maximum of 3 members.');
       }
     }
 
@@ -288,9 +309,8 @@ class SocialService {
 
     final hasAccess = await _subscriptionService.hasPremiumAccess(userId);
     if (!hasAccess) {
-      final sharedCount = await _subscriptionService.sharedTaskParticipationCount(
-        userId,
-      );
+      final sharedCount = await _subscriptionService
+          .sharedTaskParticipationCount(userId);
       if (sharedCount >= kFreeSharedTaskLimit) {
         throw const UpgradeRequiredException(
           'Free tier allows up to 3 shared tasks. Upgrade to Trackly Pro.',
