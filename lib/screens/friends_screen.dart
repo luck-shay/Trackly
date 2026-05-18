@@ -42,7 +42,7 @@ class _FriendsScreenState extends State<FriendsScreen> {
   Widget build(BuildContext context) {
     final social = SocialService();
     final db = DatabaseService();
-    final friendsProvider = context.watch<FriendsProvider>();
+    final friendsProvider = context.read<FriendsProvider>();
     final scheme = Theme.of(context).colorScheme;
 
     return Scaffold(
@@ -63,122 +63,145 @@ class _FriendsScreenState extends State<FriendsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Search Bar
-            Container(
-              decoration: BoxDecoration(
-                color: scheme.surface,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(
-                  color: friendsProvider.hasActiveQuery
-                      ? scheme.primary.withValues(alpha: 0.42)
-                      : scheme.onSurface.withValues(alpha: 0.12),
-                ),
-              ),
-              child: TextField(
-                controller: _searchController,
-                style: GoogleFonts.inter(color: scheme.onSurface),
-                decoration: InputDecoration(
-                  prefixIcon: Icon(
-                    Icons.search_rounded,
-                    color: scheme.onSurface.withValues(alpha: 0.64),
-                  ),
-                  hintText: 'Search username',
-                  hintStyle: GoogleFonts.inter(
-                    color: scheme.onSurface.withValues(alpha: 0.62),
-                  ),
-                  border: InputBorder.none,
-                  contentPadding: const EdgeInsets.symmetric(vertical: 16),
-                  suffixIcon: AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 160),
-                    child: friendsProvider.isSearching
-                        ? const Padding(
-                            key: ValueKey('searching'),
-                            padding: EdgeInsets.all(14),
-                            child: SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            ),
-                          )
-                        : friendsProvider.hasActiveQuery
-                        ? IconButton(
-                            key: const ValueKey('clear'),
-                            tooltip: 'Clear search',
-                            icon: const Icon(Icons.close_rounded),
-                            onPressed: () {
-                              _searchController.clear();
-                              context.read<FriendsProvider>().clearSearch();
-                            },
-                          )
-                        : Icon(
-                            key: const ValueKey('idle'),
-                            Icons.person_search_rounded,
-                            color: scheme.onSurface.withValues(alpha: 0.58),
-                          ),
-                  ),
-                ),
-                textInputAction: TextInputAction.search,
-                onChanged: context.read<FriendsProvider>().queueSearch,
-                onSubmitted: (value) =>
-                    context.read<FriendsProvider>().searchUsers(value),
-              ),
-            ),
-            const SizedBox(height: 24),
-
-            if (friendsProvider.searchResults.isNotEmpty) ...[
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      friendsProvider.resultTitle,
-                      style: GoogleFonts.outfit(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                  if (friendsProvider.hasActiveQuery)
-                    Text(
-                      '${friendsProvider.searchResults.length} found',
-                      style: GoogleFonts.inter(
-                        fontSize: 12,
-                        color: scheme.onSurface.withValues(alpha: 0.58),
-                      ),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 10),
-              ...friendsProvider.searchResults.map(
-                (user) => _FriendSearchTile(user: user),
-              ),
-              Divider(
-                color: scheme.onSurface.withValues(alpha: 0.12),
-                height: 48,
-              ),
-            ] else if (friendsProvider.hasSearched &&
-                friendsProvider.lastQuery.trim().isNotEmpty &&
-                !friendsProvider.isSearching) ...[
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.red.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
+            // Search Bar and Results
+            Consumer<FriendsProvider>(
+              builder: (context, provider, _) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Icon(Icons.error_outline, color: Colors.redAccent),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        'No users found for "${friendsProvider.lastQuery.trim()}".',
-                        style: GoogleFonts.inter(color: Colors.redAccent),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: scheme.surface,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: provider.hasActiveQuery
+                              ? scheme.primary.withValues(alpha: 0.42)
+                              : scheme.onSurface.withValues(alpha: 0.12),
+                        ),
+                      ),
+                      child: TextField(
+                        controller: _searchController,
+                        style: GoogleFonts.inter(color: scheme.onSurface),
+                        decoration: InputDecoration(
+                          prefixIcon: Icon(
+                            Icons.search_rounded,
+                            color: scheme.onSurface.withValues(alpha: 0.64),
+                          ),
+                          hintText: 'Search username',
+                          hintStyle: GoogleFonts.inter(
+                            color: scheme.onSurface.withValues(alpha: 0.62),
+                          ),
+                          border: InputBorder.none,
+                          contentPadding: const EdgeInsets.symmetric(
+                            vertical: 16,
+                          ),
+                          suffixIcon: AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 160),
+                            child: provider.isSearching
+                                ? const Padding(
+                                    key: ValueKey('searching'),
+                                    padding: EdgeInsets.all(14),
+                                    child: SizedBox(
+                                      width: 18,
+                                      height: 18,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    ),
+                                  )
+                                : provider.hasActiveQuery
+                                    ? IconButton(
+                                        key: const ValueKey('clear'),
+                                        tooltip: 'Clear search',
+                                        icon: const Icon(Icons.close_rounded),
+                                        onPressed: () {
+                                          _searchController.clear();
+                                          context
+                                              .read<FriendsProvider>()
+                                              .clearSearch();
+                                        },
+                                      )
+                                    : Icon(
+                                        key: const ValueKey('idle'),
+                                        Icons.person_search_rounded,
+                                        color: scheme.onSurface.withValues(
+                                          alpha: 0.58,
+                                        ),
+                                      ),
+                          ),
+                        ),
+                        textInputAction: TextInputAction.search,
+                        onChanged: context.read<FriendsProvider>().queueSearch,
+                        onSubmitted: (value) =>
+                            context.read<FriendsProvider>().searchUsers(value),
                       ),
                     ),
+                    const SizedBox(height: 24),
+                    if (provider.searchResults.isNotEmpty) ...[
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              provider.resultTitle,
+                              style: GoogleFonts.outfit(
+                                fontSize: 20,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                          if (provider.hasActiveQuery)
+                            Text(
+                              '${provider.searchResults.length} found',
+                              style: GoogleFonts.inter(
+                                fontSize: 12,
+                                color: scheme.onSurface.withValues(
+                                  alpha: 0.58,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      ...provider.searchResults.map(
+                        (user) => _FriendSearchTile(user: user),
+                      ),
+                      Divider(
+                        color: scheme.onSurface.withValues(alpha: 0.12),
+                        height: 48,
+                      ),
+                    ] else if (provider.hasSearched &&
+                        provider.lastQuery.trim().isNotEmpty &&
+                        !provider.isSearching) ...[
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.red.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.error_outline,
+                              color: Colors.redAccent,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                'No users found for "${provider.lastQuery.trim()}".',
+                                style: GoogleFonts.inter(
+                                  color: Colors.redAccent,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 32),
+                    ],
                   ],
-                ),
-              ),
-              const SizedBox(height: 32),
-            ],
+                );
+              },
+            ),
 
             // Goal Invites
             StreamBuilder<QuerySnapshot>(
