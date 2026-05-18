@@ -8,6 +8,8 @@ import 'subscription_constants.dart';
 import 'subscription_exceptions.dart';
 import 'subscription_service.dart';
 
+const int _minUserSearchCharacters = 2;
+
 enum FriendRequestResult {
   sent,
   alreadyFriends,
@@ -16,11 +18,21 @@ enum FriendRequestResult {
   unavailable,
 }
 
+enum FriendRelationshipStatus { none, friend, outgoingPending, incomingPending }
+
 class SocialService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   final SubscriptionService _subscriptionService = SubscriptionService();
 
   String get userId => FirebaseAuth.instance.currentUser?.uid ?? '';
+
+  UserProfile _profileFromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
+    final data = Map<String, dynamic>.from(doc.data() ?? <String, dynamic>{});
+    data['uid'] = (data['uid'] as String?)?.trim().isNotEmpty == true
+        ? data['uid']
+        : doc.id;
+    return UserProfile.fromMap(data);
+  }
 
   Iterable<List<T>> _chunk<T>(List<T> values, int size) sync* {
     for (var index = 0; index < values.length; index += size) {
@@ -38,29 +50,108 @@ class SocialService {
         .get();
 
     return snapshot.docs
-        .map((doc) => UserProfile.fromMap(doc.data()))
+        .map(_profileFromDoc)
         .where((user) => user.uid != userId) // exclude self
         .toList();
   }
 
-  // Search users by username (exact match, lowercase)
-  Future<List<UserProfile>> searchUsersByUsername(String username) async {
-    if (username.isEmpty) return [];
+  Future<List<UserProfile>> searchUsers(String query, {int limit = 12}) async {
+    final cleanQuery = _cleanSearchQuery(query);
+    if (cleanQuery.length < _minUserSearchCharacters) {
+      return [];
+    }
 
-    // Strip the @ if user typed it
-    final cleanUsername = username.startsWith('@')
-        ? username.substring(1)
-        : username;
+    final resultsById = <String, UserProfile>{};
 
-    final snapshot = await _db
+    final usernameSnapshot = await _db
         .collection('users')
-        .where('username', isEqualTo: cleanUsername.toLowerCase())
+        .orderBy('username')
+        .startAt([cleanQuery])
+        .endAt(['$cleanQuery\uf8ff'])
+        .limit(limit)
         .get();
 
-    return snapshot.docs
-        .map((doc) => UserProfile.fromMap(doc.data()))
-        .where((user) => user.uid != userId)
-        .toList();
+    for (final doc in usernameSnapshot.docs) {
+      final user = _profileFromDoc(doc);
+      if (user.uid != userId) {
+        resultsById[user.uid] = user;
+      }
+    }
+
+    if (query.trim().contains('@') && resultsById.length < limit) {
+      final emailSnapshot = await _db
+          .collection('users')
+          .where('email', isEqualTo: query.trim().toLowerCase())
+          .limit(1)
+          .get();
+
+      for (final doc in emailSnapshot.docs) {
+        final user = _profileFromDoc(doc);
+        if (user.uid != userId) {
+          resultsById[user.uid] = user;
+        }
+      }
+    }
+
+    final users = resultsById.values.toList();
+    users.sort((a, b) {
+      final aUsername = (a.username ?? '').toLowerCase();
+      final bUsername = (b.username ?? '').toLowerCase();
+      final aStarts = aUsername.startsWith(cleanQuery);
+      final bStarts = bUsername.startsWith(cleanQuery);
+      if (aStarts != bStarts) return aStarts ? -1 : 1;
+      return _searchLabel(a).compareTo(_searchLabel(b));
+    });
+    return users.take(limit).toList();
+  }
+
+  Future<List<UserProfile>> searchUsersByUsername(String username) {
+    return searchUsers(username);
+  }
+
+  Future<Map<String, FriendRelationshipStatus>> relationshipStatusesFor(
+    Iterable<String> userIds,
+  ) async {
+    final ids = userIds
+        .map((id) => id.trim())
+        .where((id) => id.isNotEmpty && id != userId)
+        .toSet();
+    if (userId.isEmpty || ids.isEmpty) return {};
+
+    final statuses = {for (final id in ids) id: FriendRelationshipStatus.none};
+
+    final myProfile = await getUserProfile(userId);
+    for (final friendId in myProfile?.friends ?? const <String>[]) {
+      if (statuses.containsKey(friendId)) {
+        statuses[friendId] = FriendRelationshipStatus.friend;
+      }
+    }
+
+    final outgoing = await _db
+        .collection('friendRequests')
+        .where('from', isEqualTo: userId)
+        .where('status', isEqualTo: 'pending')
+        .get();
+    for (final doc in outgoing.docs) {
+      final toUserId = (doc.data()['to'] as String? ?? '').trim();
+      if (statuses[toUserId] == FriendRelationshipStatus.none) {
+        statuses[toUserId] = FriendRelationshipStatus.outgoingPending;
+      }
+    }
+
+    final incoming = await _db
+        .collection('friendRequests')
+        .where('to', isEqualTo: userId)
+        .where('status', isEqualTo: 'pending')
+        .get();
+    for (final doc in incoming.docs) {
+      final fromUserId = (doc.data()['from'] as String? ?? '').trim();
+      if (statuses[fromUserId] == FriendRelationshipStatus.none) {
+        statuses[fromUserId] = FriendRelationshipStatus.incomingPending;
+      }
+    }
+
+    return statuses;
   }
 
   // Check if a username is available
@@ -110,7 +201,7 @@ class SocialService {
   Future<UserProfile?> getUserProfile(String uid) async {
     final doc = await _db.collection('users').doc(uid).get();
     if (doc.exists && doc.data() != null) {
-      return UserProfile.fromMap(doc.data()!);
+      return _profileFromDoc(doc);
     }
     return null;
   }
@@ -167,6 +258,19 @@ class SocialService {
     return FriendRequestResult.sent;
   }
 
+  String _cleanSearchQuery(String query) {
+    final value = query.trim().toLowerCase();
+    return value.startsWith('@') ? value.substring(1) : value;
+  }
+
+  String _searchLabel(UserProfile user) {
+    final username = user.username?.trim().toLowerCase() ?? '';
+    if (username.isNotEmpty) return username;
+    final name = user.displayName.trim().toLowerCase();
+    if (name.isNotEmpty) return name;
+    return user.email.trim().toLowerCase();
+  }
+
   // Accept a friend request
   Future<void> acceptFriendRequest(String requestId, String fromUserId) async {
     if (userId.isEmpty) return;
@@ -221,11 +325,9 @@ class SocialService {
       for (final ids in _chunk(profile.friends, 10)) {
         final friendsDocs = await _db
             .collection('users')
-            .where('uid', whereIn: ids)
+            .where(FieldPath.documentId, whereIn: ids)
             .get();
-        profiles.addAll(
-          friendsDocs.docs.map((d) => UserProfile.fromMap(d.data())),
-        );
+        profiles.addAll(friendsDocs.docs.map(_profileFromDoc));
       }
 
       profiles.sort((a, b) => a.displayName.compareTo(b.displayName));
@@ -242,18 +344,35 @@ class SocialService {
       return;
     }
 
-    final batch = _db.batch();
     final myRef = _db.collection('users').doc(userId);
     final friendRef = _db.collection('users').doc(friendUserId);
 
-    batch.update(myRef, {
-      'friends': FieldValue.arrayRemove([friendUserId]),
-    });
-    batch.update(friendRef, {
-      'friends': FieldValue.arrayRemove([userId]),
-    });
+    await _db.runTransaction((transaction) async {
+      final myDoc = await transaction.get(myRef);
+      final friendDoc = await transaction.get(friendRef);
+      if (!myDoc.exists || !friendDoc.exists) {
+        throw StateError('Friend profile no longer exists.');
+      }
 
-    await batch.commit();
+      final myFriends = List<String>.from(
+        (myDoc.data()?['friends'] as List?) ?? const <String>[],
+      );
+      final friendFriends = List<String>.from(
+        (friendDoc.data()?['friends'] as List?) ?? const <String>[],
+      );
+
+      if (!myFriends.contains(friendUserId) &&
+          !friendFriends.contains(userId)) {
+        return;
+      }
+
+      transaction.update(myRef, {
+        'friends': FieldValue.arrayRemove([friendUserId]),
+      });
+      transaction.update(friendRef, {
+        'friends': FieldValue.arrayRemove([userId]),
+      });
+    });
   }
 
   // ---------------- HABIT INVITES ----------------

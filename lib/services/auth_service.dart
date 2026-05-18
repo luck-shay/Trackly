@@ -117,7 +117,8 @@ class AuthService {
       final currentDisplayName =
           (existing['displayName'] as String?)?.trim() ?? '';
       final currentPhotoUrl = (existing['photoUrl'] as String?)?.trim() ?? '';
-      final updates = <String, dynamic>{'email': email};
+      final currentFriends = existing['friends'];
+      final updates = <String, dynamic>{'uid': user.uid, 'email': email};
 
       // Keep a customized profile picture if the user has already set one.
       if (currentPhotoUrl.isEmpty) {
@@ -128,14 +129,12 @@ class AuthService {
         updates['displayName'] = displayName;
       }
 
-      final currentUsername = (existing['username'] as String?)?.trim() ?? '';
-      if (currentUsername.isEmpty) {
-        final initialUsername = await _resolveInitialUsername(user);
-        if (initialUsername != null) {
-          updates['username'] = initialUsername;
-        }
+      if (currentFriends is! List) {
+        updates['friends'] = <String>[];
       }
 
+      // Username is intentionally only generated when the profile document is
+      // first created. Later logins must never replace a custom username.
       await docRef.set(updates, SetOptions(merge: true));
     }
 

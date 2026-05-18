@@ -12,8 +12,31 @@ import '../providers/friends_provider.dart';
 import '../providers/subscription_provider.dart';
 import 'friend_profile_screen.dart';
 
-class FriendsScreen extends StatelessWidget {
+class FriendsScreen extends StatefulWidget {
   const FriendsScreen({super.key});
+
+  @override
+  State<FriendsScreen> createState() => _FriendsScreenState();
+}
+
+class _FriendsScreenState extends State<FriendsScreen> {
+  final TextEditingController _searchController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final provider = context.read<FriendsProvider>();
+      _searchController.text = provider.lastQuery;
+    });
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -44,116 +67,97 @@ class FriendsScreen extends StatelessWidget {
             Container(
               decoration: BoxDecoration(
                 color: scheme.surface,
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(14),
                 border: Border.all(
-                  color: scheme.onSurface.withValues(alpha: 0.12),
+                  color: friendsProvider.hasActiveQuery
+                      ? scheme.primary.withValues(alpha: 0.42)
+                      : scheme.onSurface.withValues(alpha: 0.12),
                 ),
               ),
-              child: TextFormField(
-                initialValue: friendsProvider.lastQuery,
+              child: TextField(
+                controller: _searchController,
                 style: GoogleFonts.inter(color: scheme.onSurface),
                 decoration: InputDecoration(
-                  hintText: 'Search by @username...',
+                  prefixIcon: Icon(
+                    Icons.search_rounded,
+                    color: scheme.onSurface.withValues(alpha: 0.64),
+                  ),
+                  hintText: 'Search username',
                   hintStyle: GoogleFonts.inter(
                     color: scheme.onSurface.withValues(alpha: 0.62),
                   ),
                   border: InputBorder.none,
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 20,
-                    vertical: 16,
-                  ),
-                  suffixIcon: Icon(
-                    Icons.search,
-                    color: scheme.onSurface.withValues(alpha: 0.7),
+                  contentPadding: const EdgeInsets.symmetric(vertical: 16),
+                  suffixIcon: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 160),
+                    child: friendsProvider.isSearching
+                        ? const Padding(
+                            key: ValueKey('searching'),
+                            padding: EdgeInsets.all(14),
+                            child: SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                          )
+                        : friendsProvider.hasActiveQuery
+                        ? IconButton(
+                            key: const ValueKey('clear'),
+                            tooltip: 'Clear search',
+                            icon: const Icon(Icons.close_rounded),
+                            onPressed: () {
+                              _searchController.clear();
+                              context.read<FriendsProvider>().clearSearch();
+                            },
+                          )
+                        : Icon(
+                            key: const ValueKey('idle'),
+                            Icons.person_search_rounded,
+                            color: scheme.onSurface.withValues(alpha: 0.58),
+                          ),
                   ),
                 ),
-                onFieldSubmitted: (val) =>
-                    context.read<FriendsProvider>().searchUsers(val),
+                textInputAction: TextInputAction.search,
+                onChanged: context.read<FriendsProvider>().queueSearch,
+                onSubmitted: (value) =>
+                    context.read<FriendsProvider>().searchUsers(value),
               ),
             ),
             const SizedBox(height: 24),
 
-            if (friendsProvider.isSearching)
-              const Center(child: CircularProgressIndicator())
-            else if (friendsProvider.searchResults.isNotEmpty) ...[
-              Text(
-                'Search Results',
-                style: GoogleFonts.outfit(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w600,
-                ),
+            if (friendsProvider.searchResults.isNotEmpty) ...[
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      friendsProvider.resultTitle,
+                      style: GoogleFonts.outfit(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  if (friendsProvider.hasActiveQuery)
+                    Text(
+                      '${friendsProvider.searchResults.length} found',
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        color: scheme.onSurface.withValues(alpha: 0.58),
+                      ),
+                    ),
+                ],
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 10),
               ...friendsProvider.searchResults.map(
-                (user) => ListTile(
-                  leading: CircleAvatar(
-                    backgroundColor: Theme.of(
-                      context,
-                    ).colorScheme.primary.withValues(alpha: 0.2),
-                    backgroundImage: user.photoUrl != null
-                        ? NetworkImage(user.photoUrl!)
-                        : null,
-                    child: user.photoUrl == null
-                        ? Icon(Icons.person, color: scheme.onPrimary)
-                        : null,
-                  ),
-                  title: Text(
-                    user.displayName,
-                    style: GoogleFonts.inter(fontWeight: FontWeight.bold),
-                  ),
-                  subtitle: Text(
-                    user.username != null ? '@${user.username}' : user.email,
-                    style: GoogleFonts.inter(
-                      fontSize: 12,
-                      color: scheme.onSurface.withValues(alpha: 0.68),
-                    ),
-                  ),
-                  trailing: IconButton(
-                    icon: const Icon(
-                      Icons.person_add_rounded,
-                      color: Color(0xFF00E676),
-                    ),
-                    onPressed: () async {
-                      try {
-                        final result = await social.sendFriendRequest(user.uid);
-                        if (!context.mounted) return;
-
-                        final message = switch (result) {
-                          FriendRequestResult.sent =>
-                            'Friend request sent to ${user.displayName}',
-                          FriendRequestResult.acceptedIncoming =>
-                            'You and ${user.displayName} are now friends.',
-                          FriendRequestResult.alreadyFriends =>
-                            'You are already friends with ${user.displayName}.',
-                          FriendRequestResult.alreadyPending =>
-                            'Friend request is already pending.',
-                          FriendRequestResult.unavailable =>
-                            'Could not send request. Please try again.',
-                        };
-
-                        ScaffoldMessenger.of(
-                          context,
-                        ).showSnackBar(SnackBar(content: Text(message)));
-                      } catch (_) {
-                        if (!context.mounted) return;
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text(
-                              'Could not send request. Please try again.',
-                            ),
-                          ),
-                        );
-                      }
-                    },
-                  ),
-                ),
+                (user) => _FriendSearchTile(user: user),
               ),
               Divider(
                 color: scheme.onSurface.withValues(alpha: 0.12),
                 height: 48,
               ),
             ] else if (friendsProvider.hasSearched &&
-                friendsProvider.lastQuery.isNotEmpty) ...[
+                friendsProvider.lastQuery.trim().isNotEmpty &&
+                !friendsProvider.isSearching) ...[
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
@@ -166,7 +170,7 @@ class FriendsScreen extends StatelessWidget {
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
-                        'No user found with the exact username "${friendsProvider.lastQuery}".',
+                        'No users found for "${friendsProvider.lastQuery.trim()}".',
                         style: GoogleFonts.inter(color: Colors.redAccent),
                       ),
                     ),
@@ -745,6 +749,161 @@ class FriendsScreen extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _FriendSearchTile extends StatelessWidget {
+  final UserProfile user;
+
+  const _FriendSearchTile({required this.user});
+
+  @override
+  Widget build(BuildContext context) {
+    final provider = context.watch<FriendsProvider>();
+    final scheme = Theme.of(context).colorScheme;
+    final status = provider.statusFor(user.uid);
+    final isBusy = provider.isBusy(user.uid);
+    final username = user.username?.trim() ?? '';
+    final subtitle = username.isNotEmpty ? '@$username' : user.email;
+
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+      leading: CircleAvatar(
+        backgroundColor: scheme.primary.withValues(alpha: 0.18),
+        backgroundImage: user.photoUrl != null
+            ? NetworkImage(user.photoUrl!)
+            : null,
+        child: user.photoUrl == null
+            ? Icon(Icons.person_rounded, color: scheme.onPrimary)
+            : null,
+      ),
+      title: Text(
+        user.displayName.trim().isNotEmpty ? user.displayName : 'Trackly user',
+        style: GoogleFonts.inter(fontWeight: FontWeight.w700),
+      ),
+      subtitle: Text(
+        subtitle,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: GoogleFonts.inter(
+          fontSize: 12,
+          color: scheme.onSurface.withValues(alpha: 0.68),
+        ),
+      ),
+      trailing: _FriendSearchAction(
+        isBusy: isBusy,
+        status: status,
+        onPressed:
+            status == FriendRelationshipStatus.friend ||
+                status == FriendRelationshipStatus.outgoingPending ||
+                isBusy
+            ? null
+            : () async {
+                try {
+                  final result = await context
+                      .read<FriendsProvider>()
+                      .sendFriendRequest(user);
+                  if (!context.mounted) return;
+
+                  final message = switch (result) {
+                    FriendRequestResult.sent =>
+                      'Friend request sent to ${_displayName(user)}',
+                    FriendRequestResult.acceptedIncoming =>
+                      'You and ${_displayName(user)} are now friends.',
+                    FriendRequestResult.alreadyFriends =>
+                      'You are already friends with ${_displayName(user)}.',
+                    FriendRequestResult.alreadyPending =>
+                      'Friend request is already pending.',
+                    FriendRequestResult.unavailable =>
+                      'Could not send request. Please try again.',
+                  };
+
+                  ScaffoldMessenger.of(
+                    context,
+                  ).showSnackBar(SnackBar(content: Text(message)));
+                } catch (_) {
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        'Could not send request. Please try again.',
+                      ),
+                    ),
+                  );
+                }
+              },
+      ),
+    );
+  }
+
+  String _displayName(UserProfile user) {
+    final name = user.displayName.trim();
+    if (name.isNotEmpty) return name;
+    final username = user.username?.trim() ?? '';
+    if (username.isNotEmpty) return '@$username';
+    return 'this user';
+  }
+}
+
+class _FriendSearchAction extends StatelessWidget {
+  final FriendRelationshipStatus status;
+  final bool isBusy;
+  final VoidCallback? onPressed;
+
+  const _FriendSearchAction({
+    required this.status,
+    required this.isBusy,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (isBusy) {
+      return const SizedBox.square(
+        dimension: 40,
+        child: Padding(
+          padding: EdgeInsets.all(10),
+          child: CircularProgressIndicator(strokeWidth: 2),
+        ),
+      );
+    }
+
+    final config = switch (status) {
+      FriendRelationshipStatus.friend => (
+        icon: Icons.check_circle_rounded,
+        color: const Color(0xFF00C853),
+        tooltip: 'Friends',
+      ),
+      FriendRelationshipStatus.outgoingPending => (
+        icon: Icons.schedule_rounded,
+        color: Colors.amber,
+        tooltip: 'Request pending',
+      ),
+      FriendRelationshipStatus.incomingPending => (
+        icon: Icons.person_add_alt_1_rounded,
+        color: const Color(0xFF00E676),
+        tooltip: 'Accept request',
+      ),
+      FriendRelationshipStatus.none => (
+        icon: Icons.person_add_rounded,
+        color: const Color(0xFF00E676),
+        tooltip: 'Send request',
+      ),
+    };
+
+    return IconButton(
+      tooltip: config.tooltip,
+      onPressed: onPressed,
+      style: IconButton.styleFrom(
+        backgroundColor: config.color.withValues(alpha: 0.12),
+        disabledBackgroundColor: config.color.withValues(alpha: 0.12),
+        fixedSize: const Size.square(40),
+      ),
+      icon: Icon(
+        config.icon,
+        color: onPressed == null ? config.color : config.color,
       ),
     );
   }
