@@ -42,7 +42,7 @@ class _FriendsScreenState extends State<FriendsScreen> {
   Widget build(BuildContext context) {
     final social = SocialService();
     final db = DatabaseService();
-    final friendsProvider = context.read<FriendsProvider>();
+    // final friendsProvider = context.read<FriendsProvider>();
     final scheme = Theme.of(context).colorScheme;
 
     return Scaffold(

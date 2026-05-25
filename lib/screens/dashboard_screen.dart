@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -15,6 +18,7 @@ import '../providers/habits_provider.dart';
 import '../providers/navigation_provider.dart';
 import '../providers/quantified_log_provider.dart';
 import '../services/group_service.dart';
+import '../services/avatar_cache.dart';
 import '../utils/app_snackbar.dart';
 import '../utils/quantity_format.dart';
 import 'group_challenge_detail_screen.dart';
@@ -1055,8 +1059,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           ),
                         );
                       },
-                      child:
-                          StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+                      child: ValueListenableBuilder<AvatarCacheState>(
+                        valueListenable: AvatarCache.notifier,
+                        builder: (context, cached, _) {
+                          return StreamBuilder<
+                              DocumentSnapshot<Map<String, dynamic>>>(
                             stream: userId.isEmpty
                                 ? null
                                 : FirebaseFirestore.instance
@@ -1068,9 +1075,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               final profile = data != null
                                   ? UserProfile.fromMap(data)
                                   : null;
-                              final photoUrl = profile?.photoUrl?.trim();
+                              final photoUrl = profile?.photoUrl?.trim() ?? '';
+                              if (photoUrl.isNotEmpty) {
+                                unawaited(
+                                  AvatarCache.updateFromNetwork(
+                                    userId,
+                                    photoUrl,
+                                  ),
+                                );
+                              }
 
-                              if (photoUrl != null && photoUrl.isNotEmpty) {
+                              if (cached.bytes != null) {
+                                return CircleAvatar(
+                                  radius: 22,
+                                  backgroundImage: MemoryImage(cached.bytes!),
+                                  backgroundColor: Colors.transparent,
+                                );
+                              }
+
+                              if (photoUrl.isNotEmpty) {
                                 return CircleAvatar(
                                   radius: 22,
                                   backgroundImage: NetworkImage(photoUrl),
@@ -1080,7 +1103,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
                               return const Icon(Icons.person_rounded, size: 34);
                             },
-                          ),
+                          );
+                        },
+                      ),
                     ).animate().scale(delay: 300.ms, curve: Curves.easeOutBack),
                   ),
                 ],

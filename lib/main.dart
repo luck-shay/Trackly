@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -18,6 +20,7 @@ import 'providers/login_provider.dart';
 import 'providers/theme_mode_provider.dart';
 import 'providers/subscription_provider.dart';
 import 'package:trackly/theme/color_scheme.dart';
+import 'services/avatar_cache.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -233,6 +236,7 @@ class _AuthBootstrapGateState extends State<_AuthBootstrapGate> {
 
   void _startBootstrap() {
     _bootstrapFuture = AuthService().syncUserToFirestore(widget.user);
+    unawaited(AvatarCache.initialize(widget.user.uid));
   }
 
   @override
