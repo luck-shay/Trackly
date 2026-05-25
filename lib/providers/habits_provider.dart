@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 // import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/habit.dart';
 import '../models/group.dart';
 import '../models/group_task.dart';
@@ -26,6 +28,10 @@ class HabitsProvider extends ChangeNotifier {
   List<Habit> _baseHabits = [];
   bool _baseLoaded = false;
   bool _groupsLoaded = false;
+  final Set<String> _pendingRemovalIds = <String>{};
+  final Map<String, int> _pendingRemovalTimestamps = <String, int>{};
+  bool _pendingRemovalsLoaded = false;
+  static const Duration _pendingRemovalTtl = Duration(minutes: 15);
 
   List<Habit> _habits = [];
   Map<String, Habit> _habitLookup = <String, Habit>{};
@@ -39,16 +45,18 @@ class HabitsProvider extends ChangeNotifier {
 
   String get userId => _db.userId;
 
+  String get _pendingRemovalPrefsKey => 'pending_removed_habits_$userId';
+
   HabitsProvider() {
     _authSubscription = FirebaseAuth.instance.idTokenChanges().listen((_) {
       unawaited(GroupMigrationService().migrateLegacyGroupsForCurrentUser());
-      _initStream();
+      unawaited(_initStream());
     });
     unawaited(GroupMigrationService().migrateLegacyGroupsForCurrentUser());
-    _initStream();
+    unawaited(_initStream());
   }
 
-  void _initStream() {
+  Future<void> _initStream() async {
     _habitSubscription?.cancel();
     _groupsSubscription?.cancel();
     for (final sub in _groupTaskSubscriptions.values) {
@@ -59,10 +67,15 @@ class HabitsProvider extends ChangeNotifier {
     _baseHabits = [];
     _baseLoaded = false;
     _groupsLoaded = false;
+    _pendingRemovalIds.clear();
+    _pendingRemovalTimestamps.clear();
+    _pendingRemovalsLoaded = false;
 
     _isLoading = true;
     _error = null;
     notifyListeners();
+
+    await _loadPendingRemovals();
 
     _habitSubscription = _db.streamHabits().listen(
       (data) {
@@ -181,8 +194,24 @@ class HabitsProvider extends ChangeNotifier {
       merged.addAll(habits);
     }
 
-    merged.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-    final stabilized = _stabilizeHabitInstances(merged);
+    _prunePendingRemovals();
+
+    if (_pendingRemovalIds.isNotEmpty) {
+      final mergedIds = merged.map((habit) => habit.id).toSet();
+      _pendingRemovalIds.removeWhere((id) => !mergedIds.contains(id));
+      _pendingRemovalTimestamps.removeWhere((id, _) => !mergedIds.contains(id));
+    }
+
+    final filtered = _pendingRemovalIds.isEmpty
+        ? merged
+        : merged
+            .where((habit) => !_pendingRemovalIds.contains(habit.id))
+            .toList();
+
+    final scoped = filtered.where(_isHabitInScope).toList();
+
+    scoped.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    final stabilized = _stabilizeHabitInstances(scoped);
     final nextIsLoading = !(_baseLoaded && _groupsLoaded);
     final didHabitsChange = !_sameHabitIdentityList(_habits, stabilized);
     final didLoadingChange = _isLoading != nextIsLoading;
@@ -619,13 +648,20 @@ class HabitsProvider extends ChangeNotifier {
         throw StateError('Only group members can delete group tasks.');
       }
 
-      await _groupService.deleteGroupTask(groupId, habit.id);
+      _recordPendingRemoval(habit.id);
+      try {
+        await _groupService.deleteGroupTask(groupId, habit.id);
+      } catch (_) {
+        _clearPendingRemoval(habit.id);
+        rethrow;
+      }
       return;
     }
 
     if (habit.participants.length <= 1) {
       // True delete only when this user is the last participant.
       final previousHabits = List<Habit>.from(_habits);
+      _recordPendingRemoval(habit.id);
       _replaceHabits(
         List<Habit>.from(_habits)..removeWhere((h) => h.id == habit.id),
       );
@@ -633,6 +669,7 @@ class HabitsProvider extends ChangeNotifier {
       try {
         await _db.deleteHabit(habit.id);
       } catch (_) {
+        _clearPendingRemoval(habit.id);
         _replaceHabits(previousHabits);
         rethrow;
       }
@@ -667,6 +704,7 @@ class HabitsProvider extends ChangeNotifier {
     // If current user leaves a shared habit, remove it from local list
     // immediately so list items (e.g. Dismissible) do not keep stale keys.
     final previousHabits = List<Habit>.from(_habits);
+    _recordPendingRemoval(habit.id);
     _replaceHabits(
       List<Habit>.from(_habits)..removeWhere((h) => h.id == habit.id),
     );
@@ -674,6 +712,7 @@ class HabitsProvider extends ChangeNotifier {
     try {
       await _db.saveHabit(updatedHabit, ensureCurrentUserParticipant: false);
     } catch (_) {
+      _clearPendingRemoval(habit.id);
       _replaceHabits(previousHabits);
       rethrow;
     }
@@ -684,6 +723,33 @@ class HabitsProvider extends ChangeNotifier {
       habit: habit,
       remainingParticipants: remainingParticipants,
     );
+  }
+
+  Future<void> deleteGroupTask(String groupId, String taskId) async {
+    final uid = _db.userId;
+    final normalizedGroupId = groupId.trim();
+    final normalizedTaskId = taskId.trim();
+    if (normalizedGroupId.isEmpty || normalizedTaskId.isEmpty) {
+      return;
+    }
+
+    final group = await _groupService.getGroupById(normalizedGroupId);
+    if (group == null) {
+      throw StateError('Group not found.');
+    }
+    if (!group.memberIds.contains(uid)) {
+      throw StateError('Only group members can delete group tasks.');
+    }
+
+    _recordPendingRemoval(normalizedTaskId);
+    _publishMergedHabits();
+
+    try {
+      await _groupService.deleteGroupTask(normalizedGroupId, normalizedTaskId);
+    } catch (_) {
+      _clearPendingRemoval(normalizedTaskId);
+      rethrow;
+    }
   }
 
   Future<void> convertToSharedSpace(Habit habit) async {
@@ -783,12 +849,14 @@ class HabitsProvider extends ChangeNotifier {
 
     if (newParticipants.isEmpty) {
       final previousHabits = List<Habit>.from(_habits);
+      _recordPendingRemoval(habit.id);
       _replaceHabits(
         List<Habit>.from(_habits)..removeWhere((h) => h.id == habit.id),
       );
       try {
         await _db.deleteHabit(habit.id);
       } catch (_) {
+        _clearPendingRemoval(habit.id);
         _replaceHabits(previousHabits);
         rethrow;
       }
@@ -807,6 +875,7 @@ class HabitsProvider extends ChangeNotifier {
 
     // User is leaving this group, so optimistically remove from local list.
     final previousHabits = List<Habit>.from(_habits);
+    _recordPendingRemoval(habit.id);
     _replaceHabits(
       List<Habit>.from(_habits)..removeWhere((h) => h.id == habit.id),
     );
@@ -814,6 +883,7 @@ class HabitsProvider extends ChangeNotifier {
     try {
       await _db.saveHabit(updatedHabit, ensureCurrentUserParticipant: false);
     } catch (_) {
+      _clearPendingRemoval(habit.id);
       _replaceHabits(previousHabits);
       rethrow;
     }
@@ -848,7 +918,109 @@ class HabitsProvider extends ChangeNotifier {
     );
 
     await _db.saveHabit(updatedHabit);
+    _clearPendingRemoval(habit.id);
     return true;
+  }
+
+  bool _isHabitInScope(Habit habit) {
+    final uid = userId;
+    if (uid.isEmpty) {
+      return false;
+    }
+
+    if (habit.isGroup) {
+      final groupId = (habit.groupEntityId ?? '').trim();
+      if (groupId.isEmpty) {
+        return false;
+      }
+      if (!_groupHabitsByGroupId.containsKey(groupId)) {
+        return false;
+      }
+      return habit.participants.contains(uid);
+    }
+
+    return habit.participants.contains(uid);
+  }
+
+  Future<void> _loadPendingRemovals() async {
+    final uid = userId;
+    if (uid.isEmpty) {
+      _pendingRemovalsLoaded = true;
+      return;
+    }
+
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_pendingRemovalPrefsKey);
+    if (raw == null || raw.isEmpty) {
+      _pendingRemovalsLoaded = true;
+      return;
+    }
+
+    final decoded = jsonDecode(raw);
+    if (decoded is Map<String, dynamic>) {
+      _pendingRemovalTimestamps
+        ..clear()
+        ..addAll(
+          decoded.map((key, value) => MapEntry(key, value as int)),
+        );
+      _pendingRemovalIds
+        ..clear()
+        ..addAll(_pendingRemovalTimestamps.keys);
+    }
+
+    _pendingRemovalsLoaded = true;
+    _prunePendingRemovals();
+    _publishMergedHabits();
+  }
+
+  void _recordPendingRemoval(String habitId) {
+    final trimmed = habitId.trim();
+    if (trimmed.isEmpty) {
+      return;
+    }
+    _pendingRemovalIds.add(trimmed);
+    _pendingRemovalTimestamps[trimmed] = DateTime.now().millisecondsSinceEpoch;
+    unawaited(_savePendingRemovals());
+  }
+
+  void _clearPendingRemoval(String habitId) {
+    final trimmed = habitId.trim();
+    if (trimmed.isEmpty) {
+      return;
+    }
+    _pendingRemovalIds.remove(trimmed);
+    _pendingRemovalTimestamps.remove(trimmed);
+    unawaited(_savePendingRemovals());
+  }
+
+  void _prunePendingRemovals() {
+    if (!_pendingRemovalsLoaded) {
+      return;
+    }
+    final nowMs = DateTime.now().millisecondsSinceEpoch;
+    final cutoff = nowMs - _pendingRemovalTtl.inMilliseconds;
+    final expired = _pendingRemovalTimestamps.entries
+        .where((entry) => entry.value < cutoff)
+        .map((entry) => entry.key)
+        .toList();
+    if (expired.isEmpty) {
+      return;
+    }
+    for (final id in expired) {
+      _pendingRemovalTimestamps.remove(id);
+      _pendingRemovalIds.remove(id);
+    }
+    unawaited(_savePendingRemovals());
+  }
+
+  Future<void> _savePendingRemovals() async {
+    final uid = userId;
+    if (uid.isEmpty) {
+      return;
+    }
+    final prefs = await SharedPreferences.getInstance();
+    final payload = jsonEncode(_pendingRemovalTimestamps);
+    await prefs.setString(_pendingRemovalPrefsKey, payload);
   }
 
   Future<void> _notifyParticipantDeparture({

@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
 import 'package:table_calendar/table_calendar.dart';
 
 import '../models/group.dart';
 import '../models/group_challenge.dart';
 import '../models/group_task.dart';
 import '../models/user_profile.dart';
+import '../providers/habits_provider.dart';
 import '../services/group_service.dart';
 import '../services/social_service.dart';
 import '../theme/app_layout.dart';
@@ -269,7 +271,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
     GroupTask task,
   ) async {
     try {
-      await GroupService().deleteGroupTask(group.id, task.id);
+      await context.read<HabitsProvider>().deleteGroupTask(group.id, task.id);
       if (!context.mounted) {
         return;
       }

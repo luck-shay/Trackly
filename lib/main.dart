@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'firebase_options.dart';
 import 'screens/login_screen.dart';
 import 'screens/main_layout_screen.dart';
@@ -32,6 +33,13 @@ void main() async {
       options: DefaultFirebaseOptions.currentPlatform,
     );
     if (kDebugMode) debugPrint('Trackly: Firebase Ready.');
+
+    if (!kIsWeb) {
+      FirebaseFirestore.instance.settings = const Settings(
+        persistenceEnabled: true,
+        cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
+      );
+    }
 
     if (!kIsWeb) {
       // NON-BLOCKING notification setup
@@ -232,63 +240,58 @@ class _AuthBootstrapGateState extends State<_AuthBootstrapGate> {
     return FutureBuilder<void>(
       future: _bootstrapFuture,
       builder: (context, snapshot) {
-        if (snapshot.connectionState != ConnectionState.done) {
-          return const Scaffold(
-            backgroundColor: Color(0xFF101010),
-            body: Center(
-              child: CircularProgressIndicator(color: Color(0xFF00E676)),
-            ),
-          );
+        final content = MainLayoutScreen();
+        if (!snapshot.hasError) {
+          return content;
         }
 
-        if (snapshot.hasError) {
-          return Scaffold(
-            backgroundColor: const Color(0xFF101010),
-            body: Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(
-                      Icons.cloud_off_rounded,
-                      color: Colors.redAccent,
-                      size: 56,
+        return Stack(
+          children: [
+            content,
+            SafeArea(
+              child: Align(
+                alignment: Alignment.topCenter,
+                child: Container(
+                  margin: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1C1C1C),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: Colors.redAccent.withValues(alpha: 0.4),
                     ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'Profile setup failed',
-                      textAlign: TextAlign.center,
-                      style: GoogleFonts.outfit(
-                        fontSize: 28,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white,
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.cloud_off_rounded,
+                        color: Colors.redAccent,
                       ),
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      'Signed in with Firebase Auth, but could not create or load the Firestore profile document. Please try again.',
-                      textAlign: TextAlign.center,
-                      style: GoogleFonts.inter(
-                        color: Colors.white70,
-                        height: 1.5,
+                      const SizedBox(width: 12),
+                      Flexible(
+                        child: Text(
+                          'Profile sync failed. Tap retry.',
+                          style: GoogleFonts.inter(color: Colors.white),
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 16),
-                    TextButton(
-                      onPressed: () {
-                        setState(_startBootstrap);
-                      },
-                      child: const Text('Retry'),
-                    ),
-                  ],
+                      const SizedBox(width: 12),
+                      TextButton(
+                        onPressed: () {
+                          setState(_startBootstrap);
+                        },
+                        child: const Text('Retry'),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
-          );
-        }
-
-        return MainLayoutScreen();
+          ],
+        );
       },
     );
   }
