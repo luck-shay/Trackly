@@ -49,16 +49,8 @@ class _HabitLeaderboardView extends StatelessWidget {
 
   String? _subtitleForFriend(UserProfile friend, bool hasDuplicateDisplayName) {
     final username = friend.username?.trim() ?? '';
-    final email = friend.email.trim();
-
-    if (username.isNotEmpty && hasDuplicateDisplayName && email.isNotEmpty) {
-      return '@$username • $email';
-    }
     if (username.isNotEmpty) {
       return '@$username';
-    }
-    if (email.isNotEmpty) {
-      return email;
     }
     if (hasDuplicateDisplayName) {
       return 'ID: ${friend.uid.substring(0, friend.uid.length < 8 ? friend.uid.length : 8)}';
@@ -182,223 +174,215 @@ class _HabitLeaderboardView extends StatelessWidget {
                                   email.contains(searchQuery);
                             }).toList();
 
-                            return Column(
-                              mainAxisSize: MainAxisSize.min,
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Invite members',
-                                  style: GoogleFonts.outfit(
-                                    fontSize: 22,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  'Select friends to invite to ${habit.groupName?.isNotEmpty == true ? habit.groupName : habit.title}.',
-                                  style: GoogleFonts.inter(
-                                    color: Theme.of(context)
-                                        .colorScheme
-                                        .onSurface
-                                        .withValues(alpha: 0.68),
-                                    height: 1.4,
-                                  ),
-                                ),
-                                const SizedBox(height: 12),
-                                Text(
-                                  '${inviteProvider.selected.length} selected',
-                                  style: GoogleFonts.inter(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                    color: Theme.of(context)
-                                        .colorScheme
-                                        .onSurface
-                                        .withValues(alpha: 0.68),
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                TextField(
-                                  controller: searchController,
-                                  onChanged: (value) {
-                                    setSheetState(() {
-                                      searchQuery = value.trim().toLowerCase();
-                                    });
-                                  },
-                                  decoration: InputDecoration(
-                                    hintText:
-                                        'Search by name, username, or email',
-                                    prefixIcon: const Icon(
-                                      Icons.search_rounded,
-                                    ),
-                                    filled: true,
-                                    fillColor: Theme.of(context)
-                                        .colorScheme
-                                        .onSurface
-                                        .withValues(alpha: 0.05),
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(14),
-                                      borderSide: BorderSide(
-                                        color: Theme.of(context)
-                                            .colorScheme
-                                            .onSurface
-                                            .withValues(alpha: 0.12),
-                                      ),
-                                    ),
-                                    enabledBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(14),
-                                      borderSide: BorderSide(
-                                        color: Theme.of(context)
-                                            .colorScheme
-                                            .onSurface
-                                            .withValues(alpha: 0.12),
-                                      ),
-                                    ),
-                                    focusedBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(14),
-                                      borderSide: BorderSide(
-                                        color: Theme.of(
-                                          context,
-                                        ).colorScheme.primary,
-                                        width: 1.2,
-                                      ),
+                            return SizedBox(
+                              height:
+                                  MediaQuery.of(context).size.height * 0.78,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Invite members',
+                                    style: GoogleFonts.outfit(
+                                      fontSize: 22,
+                                      fontWeight: FontWeight.bold,
                                     ),
                                   ),
-                                ),
-                                const SizedBox(height: 12),
-                                if (eligible.isEmpty)
-                                  Padding(
-                                    padding: const EdgeInsets.only(bottom: 8),
-                                    child: Text(
-                                      'All your friends are already part of this group, or you have no friends yet.',
-                                      style: GoogleFonts.inter(
-                                        color: Theme.of(context)
-                                            .colorScheme
-                                            .onSurface
-                                            .withValues(alpha: 0.68),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    'Select friends to invite to ${habit.groupName?.isNotEmpty == true ? habit.groupName : habit.title}.',
+                                    style: GoogleFonts.inter(
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onSurface
+                                          .withValues(alpha: 0.68),
+                                      height: 1.4,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 12),
+                                  Text(
+                                    '${inviteProvider.selected.length} selected',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onSurface
+                                          .withValues(alpha: 0.68),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  TextField(
+                                    controller: searchController,
+                                    onChanged: (value) {
+                                      setSheetState(() {
+                                        searchQuery =
+                                            value.trim().toLowerCase();
+                                      });
+                                    },
+                                    decoration: InputDecoration(
+                                      hintText:
+                                          'Search by name, username, or email',
+                                      prefixIcon: const Icon(
+                                        Icons.search_rounded,
+                                      ),
+                                      filled: true,
+                                      fillColor: Theme.of(context)
+                                          .colorScheme
+                                          .onSurface
+                                          .withValues(alpha: 0.05),
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(14),
+                                        borderSide: BorderSide(
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .onSurface
+                                              .withValues(alpha: 0.12),
+                                        ),
+                                      ),
+                                      enabledBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(14),
+                                        borderSide: BorderSide(
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .onSurface
+                                              .withValues(alpha: 0.12),
+                                        ),
+                                      ),
+                                      focusedBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(14),
+                                        borderSide: BorderSide(
+                                          color: Theme.of(
+                                            context,
+                                          ).colorScheme.primary,
+                                          width: 1.2,
+                                        ),
                                       ),
                                     ),
-                                  )
-                                else if (filtered.isEmpty)
-                                  Padding(
-                                    padding: const EdgeInsets.only(bottom: 8),
-                                    child: Text(
-                                      'No friends match your search.',
-                                      style: GoogleFonts.inter(
-                                        color: Theme.of(context)
-                                            .colorScheme
-                                            .onSurface
-                                            .withValues(alpha: 0.68),
+                                  ),
+                                  const SizedBox(height: 12),
+                                  if (eligible.isEmpty)
+                                    Padding(
+                                      padding: const EdgeInsets.only(bottom: 8),
+                                      child: Text(
+                                        'All your friends are already part of this group, or you have no friends yet.',
+                                        style: GoogleFonts.inter(
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .onSurface
+                                              .withValues(alpha: 0.68),
+                                        ),
                                       ),
-                                    ),
-                                  )
-                                else
-                                  Flexible(
-                                    child: ListView.separated(
-                                      shrinkWrap: true,
-                                      itemCount: filtered.length,
-                                      separatorBuilder: (_, _) => Divider(
-                                        height: 1,
-                                        color: Theme.of(context)
-                                            .colorScheme
-                                            .onSurface
-                                            .withValues(alpha: 0.08),
+                                    )
+                                  else if (filtered.isEmpty)
+                                    Padding(
+                                      padding: const EdgeInsets.only(bottom: 8),
+                                      child: Text(
+                                        'No friends match your search.',
+                                        style: GoogleFonts.inter(
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .onSurface
+                                              .withValues(alpha: 0.68),
+                                        ),
                                       ),
-                                      itemBuilder: (context, index) {
-                                        final friend = filtered[index];
-                                        final isSelected = inviteProvider
-                                            .isSelected(friend.uid);
-                                        final subtitle = _subtitleForFriend(
-                                          friend,
-                                          (nameCounts[_displayName(
-                                                    friend,
-                                                  ).toLowerCase()] ??
-                                                  0) >
-                                              1,
-                                        );
+                                    )
+                                  else
+                                    Expanded(
+                                      child: ListView.separated(
+                                        itemCount: filtered.length,
+                                        separatorBuilder: (_, _) => Divider(
+                                          height: 1,
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .onSurface
+                                              .withValues(alpha: 0.08),
+                                        ),
+                                        itemBuilder: (context, index) {
+                                          final friend = filtered[index];
+                                          final isSelected = inviteProvider
+                                              .isSelected(friend.uid);
+                                          final subtitle = _subtitleForFriend(
+                                            friend,
+                                            (nameCounts[_displayName(
+                                                      friend,
+                                                    ).toLowerCase()] ??
+                                                    0) >
+                                                1,
+                                          );
 
-                                        return ListTile(
-                                          contentPadding: EdgeInsets.zero,
-                                          onTap: inviteProvider.isSending
-                                              ? null
-                                              : () {
-                                                  inviteProvider.toggle(
-                                                    friend.uid,
-                                                    !isSelected,
-                                                  );
-                                                },
-                                          leading: CircleAvatar(
-                                            backgroundColor: Theme.of(context)
-                                                .colorScheme
-                                                .onSurface
-                                                .withValues(alpha: 0.08),
-                                            backgroundImage:
-                                                friend.photoUrl != null &&
-                                                    friend.photoUrl!
-                                                        .trim()
-                                                        .isNotEmpty
-                                                ? NetworkImage(
-                                                    friend.photoUrl!.trim(),
-                                                  )
-                                                : null,
-                                            child:
-                                                friend.photoUrl != null &&
-                                                    friend.photoUrl!
-                                                        .trim()
-                                                        .isNotEmpty
+                                          return ListTile(
+                                            contentPadding: EdgeInsets.zero,
+                                            onTap: inviteProvider.isSending
+                                                ? null
+                                                : () {
+                                                    inviteProvider.toggle(
+                                                      friend.uid,
+                                                      !isSelected,
+                                                    );
+                                                  },
+                                            leading: CircleAvatar(
+                                              backgroundColor:
+                                                  Theme.of(context)
+                                                      .colorScheme
+                                                      .onSurface
+                                                      .withValues(alpha: 0.08),
+                                              backgroundImage:
+                                                  friend.photoUrl != null &&
+                                                          friend.photoUrl!
+                                                              .trim()
+                                                              .isNotEmpty
+                                                      ? NetworkImage(
+                                                          friend.photoUrl!
+                                                              .trim(),
+                                                        )
+                                                      : null,
+                                              child: friend.photoUrl != null &&
+                                                      friend.photoUrl!
+                                                          .trim()
+                                                          .isNotEmpty
+                                                  ? null
+                                                  : Text(
+                                                      (_displayName(
+                                                                friend,
+                                                              ).isEmpty
+                                                              ? '?'
+                                                              : _displayName(
+                                                                  friend,
+                                                                )[0])
+                                                          .toUpperCase(),
+                                                      style: GoogleFonts.inter(
+                                                        fontWeight:
+                                                            FontWeight.w700,
+                                                      ),
+                                                    ),
+                                            ),
+                                            title: Text(
+                                              _displayName(friend),
+                                              style: GoogleFonts.inter(
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
+                                            subtitle: subtitle == null
                                                 ? null
                                                 : Text(
-                                                    (_displayName(
-                                                              friend,
-                                                            ).isEmpty
-                                                            ? '?'
-                                                            : _displayName(
-                                                                friend,
-                                                              )[0])
-                                                        .toUpperCase(),
+                                                    subtitle,
                                                     style: GoogleFonts.inter(
-                                                      fontWeight:
-                                                          FontWeight.w700,
+                                                      color: Theme.of(context)
+                                                          .colorScheme
+                                                          .onSurface
+                                                          .withValues(
+                                                            alpha: 0.62,
+                                                          ),
                                                     ),
                                                   ),
-                                          ),
-                                          title: Text(
-                                            _displayName(friend),
-                                            style: GoogleFonts.inter(
-                                              fontWeight: FontWeight.w600,
-                                            ),
-                                          ),
-                                          subtitle: subtitle == null
-                                              ? null
-                                              : Text(
-                                                  subtitle,
-                                                  style: GoogleFonts.inter(
-                                                    color: Theme.of(context)
-                                                        .colorScheme
-                                                        .onSurface
-                                                        .withValues(
-                                                          alpha: 0.62,
-                                                        ),
-                                                  ),
-                                                ),
-                                          trailing: AnimatedContainer(
-                                            duration: const Duration(
-                                              milliseconds: 140,
-                                            ),
-                                            width: 28,
-                                            height: 28,
-                                            decoration: BoxDecoration(
-                                              shape: BoxShape.circle,
-                                              color: isSelected
-                                                  ? Theme.of(
-                                                      context,
-                                                    ).colorScheme.primary
-                                                  : Theme.of(context)
-                                                        .colorScheme
-                                                        .onSurface
-                                                        .withValues(
-                                                          alpha: 0.08,
-                                                        ),
-                                              border: Border.all(
+                                            trailing: AnimatedContainer(
+                                              duration: const Duration(
+                                                milliseconds: 140,
+                                              ),
+                                              width: 28,
+                                              height: 28,
+                                              decoration: BoxDecoration(
+                                                shape: BoxShape.circle,
                                                 color: isSelected
                                                     ? Theme.of(
                                                         context,
@@ -407,98 +391,110 @@ class _HabitLeaderboardView extends StatelessWidget {
                                                           .colorScheme
                                                           .onSurface
                                                           .withValues(
-                                                            alpha: 0.18,
+                                                            alpha: 0.08,
                                                           ),
+                                                border: Border.all(
+                                                  color: isSelected
+                                                      ? Theme.of(
+                                                          context,
+                                                        ).colorScheme.primary
+                                                      : Theme.of(context)
+                                                            .colorScheme
+                                                            .onSurface
+                                                            .withValues(
+                                                              alpha: 0.18,
+                                                            ),
+                                                ),
+                                              ),
+                                              child: Icon(
+                                                isSelected
+                                                    ? Icons.check_rounded
+                                                    : Icons.add_rounded,
+                                                size: 18,
+                                                color: isSelected
+                                                    ? Colors.black
+                                                    : Theme.of(
+                                                        context,
+                                                      ).colorScheme.onSurface,
                                               ),
                                             ),
-                                            child: Icon(
-                                              isSelected
-                                                  ? Icons.check_rounded
-                                                  : Icons.add_rounded,
-                                              size: 18,
-                                              color: isSelected
-                                                  ? Colors.black
-                                                  : Theme.of(
-                                                      context,
-                                                    ).colorScheme.onSurface,
-                                            ),
-                                          ),
-                                        );
-                                      },
+                                          );
+                                        },
+                                      ),
                                     ),
-                                  ),
-                                const SizedBox(height: 16),
-                                SizedBox(
-                                  width: double.infinity,
-                                  height: 50,
-                                  child: ElevatedButton(
-                                    onPressed:
-                                        inviteProvider.isSending ||
-                                            inviteProvider.selected.isEmpty
-                                        ? null
-                                        : () async {
-                                            inviteProvider.setSending(true);
+                                  const SizedBox(height: 16),
+                                  SizedBox(
+                                    width: double.infinity,
+                                    height: 50,
+                                    child: ElevatedButton(
+                                      onPressed:
+                                          inviteProvider.isSending ||
+                                              inviteProvider.selected.isEmpty
+                                          ? null
+                                          : () async {
+                                              inviteProvider.setSending(true);
 
-                                            for (final uid
-                                                in inviteProvider.selected) {
-                                              if (habit.isGroup) {
-                                                await social.sendGroupInvite(
-                                                  groupId: habit.id,
-                                                  groupName:
-                                                      habit.groupName ??
-                                                      habit.title,
-                                                  toUserId: uid,
-                                                );
-                                              } else {
-                                                await social.sendHabitInvite(
-                                                  habitId: habit.id,
-                                                  toUserId: uid,
+                                              for (final uid
+                                                  in inviteProvider.selected) {
+                                                if (habit.isGroup) {
+                                                  await social.sendGroupInvite(
+                                                    groupId: habit.id,
+                                                    groupName:
+                                                        habit.groupName ??
+                                                        habit.title,
+                                                    toUserId: uid,
+                                                  );
+                                                } else {
+                                                  await social.sendHabitInvite(
+                                                    habitId: habit.id,
+                                                    toUserId: uid,
+                                                  );
+                                                }
+                                              }
+
+                                              if (context.mounted) {
+                                                Navigator.pop(sheetContext);
+                                                final inviteLabel = habit.isGroup
+                                                    ? 'group invite'
+                                                    : 'task invite';
+                                                ScaffoldMessenger.of(
+                                                  context,
+                                                ).showSnackBar(
+                                                  SnackBar(
+                                                    content: Text(
+                                                      'Sent ${inviteProvider.selected.length} $inviteLabel${inviteProvider.selected.length == 1 ? '' : 's'}.',
+                                                    ),
+                                                  ),
                                                 );
                                               }
-                                            }
-
-                                            if (context.mounted) {
-                                              Navigator.pop(sheetContext);
-                                              final inviteLabel = habit.isGroup
-                                                  ? 'group invite'
-                                                  : 'task invite';
-                                              ScaffoldMessenger.of(
-                                                context,
-                                              ).showSnackBar(
-                                                SnackBar(
-                                                  content: Text(
-                                                    'Sent ${inviteProvider.selected.length} $inviteLabel${inviteProvider.selected.length == 1 ? '' : 's'}.',
-                                                  ),
-                                                ),
-                                              );
-                                            }
-                                          },
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Theme.of(
-                                        context,
-                                      ).colorScheme.primary,
-                                      foregroundColor: Colors.black,
+                                            },
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: Theme.of(
+                                          context,
+                                        ).colorScheme.primary,
+                                        foregroundColor: Colors.black,
+                                      ),
+                                      child: inviteProvider.isSending
+                                          ? const SizedBox(
+                                              height: 20,
+                                              width: 20,
+                                              child: CircularProgressIndicator(
+                                                strokeWidth: 2,
+                                                color: Colors.black,
+                                              ),
+                                            )
+                                          : Text(
+                                              inviteProvider.selected.isEmpty
+                                                  ? 'Select friends to invite'
+                                                  : 'Send invites',
+                                              style: GoogleFonts.outfit(
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
                                     ),
-                                    child: inviteProvider.isSending
-                                        ? const SizedBox(
-                                            height: 20,
-                                            width: 20,
-                                            child: CircularProgressIndicator(
-                                              strokeWidth: 2,
-                                              color: Colors.black,
-                                            ),
-                                          )
-                                        : Text(
-                                            inviteProvider.selected.isEmpty
-                                                ? 'Select friends to invite'
-                                                : 'Send invites',
-                                            style: GoogleFonts.outfit(
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
                                   ),
-                                ),
-                              ],
+                                ],
+                              ),
                             );
                           },
                         );
