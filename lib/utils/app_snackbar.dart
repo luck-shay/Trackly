@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 
 ScaffoldFeatureController<SnackBar, SnackBarClosedReason>? showAppSnackBar(
@@ -42,10 +40,6 @@ ScaffoldFeatureController<SnackBar, SnackBarClosedReason>? showAppSnackBar(
       ),
     ),
   );
-
-  Timer(duration + const Duration(milliseconds: 250), () {
-    controller?.close();
-  });
 
   return controller;
 }

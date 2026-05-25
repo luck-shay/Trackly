@@ -35,7 +35,6 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
-
   String _filterLabel(DashboardFilter filter) {
     return switch (filter) {
       DashboardFilter.all => 'All',
@@ -235,7 +234,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
             final quantUnit = habit.quantUnitFor(uid);
 
             if (!isQuantified) {
-              final wasCompleted = habit.isCompletedOnDate(provider.userId, now);
+              final wasCompleted = habit.isCompletedOnDate(
+                provider.userId,
+                now,
+              );
               await provider.toggleHabitCompletion(habit);
               if (!wasCompleted && context.mounted) {
                 await _showCompletionCelebration(context, provider, habit);
@@ -248,7 +250,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
               return;
             }
 
-            final existingValue = habit.completionValueFor(provider.userId, now);
+            final existingValue = habit.completionValueFor(
+              provider.userId,
+              now,
+            );
             final value = await _askQuantifiedValue(
               context,
               habit,
@@ -764,7 +769,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
                 ElevatedButton(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor:  Colors.redAccent.withValues(alpha: 0.9),
+                    backgroundColor: Colors.redAccent.withValues(alpha: 0.9),
                   ),
                   onPressed: () => Navigator.pop(dialogContext, true),
                   child: Text(
@@ -836,10 +841,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 return;
               }
 
-              showAppSnackBar(
-                context,
-                message: 'Rejoined "${habit.title}".',
-              );
+              showAppSnackBar(context, message: 'Rejoined "${habit.title}".');
             } catch (error) {
               if (!context.mounted) {
                 return;
@@ -883,6 +885,28 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+  Future<bool> _runAfterSlidableDismissCancel(
+    BuildContext context,
+    Future<void> Function() action,
+  ) async {
+    Timer.run(() {
+      if (!mounted || !context.mounted) {
+        return;
+      }
+
+      unawaited(
+        action().catchError((Object error) {
+          if (!mounted || !context.mounted) {
+            return;
+          }
+          showAppSnackBar(context, message: error.toString().split('\n').first);
+        }),
+      );
+    });
+
+    return false;
+  }
+
   Widget _buildHabitSlidable(
     BuildContext context,
     HabitsProvider provider,
@@ -914,10 +938,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
             extentRatio: 0.28,
             dismissible: DismissiblePane(
               closeOnCancel: true,
-              confirmDismiss: () async {
-                await onToggleCompletion();
-                return false;
-              },
+              confirmDismiss: () =>
+                  _runAfterSlidableDismissCancel(context, onToggleCompletion),
               onDismissed: () {},
             ),
             children: [
@@ -940,10 +962,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
             extentRatio: 0.28,
             dismissible: DismissiblePane(
               closeOnCancel: true,
-              confirmDismiss: () async {
-                await _deleteHabitWithPermissions(context, provider, habit);
-                return false;
-              },
+              confirmDismiss: () => _runAfterSlidableDismissCancel(
+                context,
+                () => _deleteHabitWithPermissions(context, provider, habit),
+              ),
               onDismissed: () {},
             ),
             children: [
@@ -973,643 +995,679 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final userId = FirebaseAuth.instance.currentUser?.uid ?? '';
 
     return ChangeNotifierProvider<DashboardProvider>(
-      create: (_) =>
-          DashboardProvider(userId: userId)..loadPreferences(),
+      create: (_) => DashboardProvider(userId: userId)..loadPreferences(),
       child: Scaffold(
         body: SafeArea(
           bottom: false,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-            Padding(
-              padding: const EdgeInsets.only(
-                left: 24.0,
-                right: 24.0,
-                top: 20.0,
-                // bottom: 20.0,
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          dateStr.toUpperCase(),
-                          style: GoogleFonts.inter(
-                            color: Theme.of(context).colorScheme.primary,
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 1.2,
-                          ),
-                        ).animate().fade(duration: 400.ms).slideX(begin: -0.1),
-                        const SizedBox(height: 6),
-                        Row(
-                          children: [
-                            Icon(
-                                  Icons.track_changes_rounded,
-                                  size: 32,
+              Padding(
+                padding: const EdgeInsets.only(
+                  left: 24.0,
+                  right: 24.0,
+                  top: 20.0,
+                  // bottom: 20.0,
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                                dateStr.toUpperCase(),
+                                style: GoogleFonts.inter(
                                   color: Theme.of(context).colorScheme.primary,
-                                )
-                                .animate()
-                                .fade(duration: 500.ms, delay: 100.ms)
-                                .scaleXY(begin: 0.8),
-                            const SizedBox(width: 8),
-                            Expanded(
-                                  child: FittedBox(
-                                    fit: BoxFit.scaleDown,
-                                    alignment: Alignment.centerLeft,
-                                    child: Text(
-                                      'Your Habits',
-                                      style: GoogleFonts.outfit(
-                                        fontSize: 38,
-                                        fontWeight: FontWeight.w800,
-                                        letterSpacing: -1,
-                                        height: 1.1,
-                                      ),
-                                    ),
-                                  ),
-                                )
-                                .animate()
-                                .fade(duration: 500.ms, delay: 100.ms)
-                                .slideX(begin: -0.1),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                  SizedBox(
-                    width: 60,
-                    height: 100,
-                    child: FloatingActionButton(
-                      heroTag: 'dashboard_profile_fab',
-                      shape: const CircleBorder(),
-                      elevation: 0,
-                      backgroundColor: Theme.of(
-                        context,
-                      ).colorScheme.primary.withValues(alpha: 0.1),
-                      foregroundColor: Theme.of(context).colorScheme.primary,
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const ProfileScreen(),
-                          ),
-                        );
-                      },
-                      child: ValueListenableBuilder<AvatarCacheState>(
-                        valueListenable: AvatarCache.notifier,
-                        builder: (context, cached, _) {
-                          return StreamBuilder<
-                              DocumentSnapshot<Map<String, dynamic>>>(
-                            stream: userId.isEmpty
-                                ? null
-                                : FirebaseFirestore.instance
-                                      .collection('users')
-                                      .doc(userId)
-                                      .snapshots(),
-                            builder: (context, snapshot) {
-                              final data = snapshot.data?.data();
-                              final profile = data != null
-                                  ? UserProfile.fromMap(data)
-                                  : null;
-                              final photoUrl = profile?.photoUrl?.trim() ?? '';
-                              if (photoUrl.isNotEmpty) {
-                                unawaited(
-                                  AvatarCache.updateFromNetwork(
-                                    userId,
-                                    photoUrl,
-                                  ),
-                                );
-                              }
-
-                              if (cached.bytes != null) {
-                                return CircleAvatar(
-                                  radius: 22,
-                                  backgroundImage: MemoryImage(cached.bytes!),
-                                  backgroundColor: Colors.transparent,
-                                );
-                              }
-
-                              if (photoUrl.isNotEmpty) {
-                                return CircleAvatar(
-                                  radius: 22,
-                                  backgroundImage: NetworkImage(photoUrl),
-                                  backgroundColor: Colors.transparent,
-                                );
-                              }
-
-                              return const Icon(Icons.person_rounded, size: 34);
-                            },
-                          );
-                        },
-                      ),
-                    ).animate().scale(delay: 300.ms, curve: Curves.easeOutBack),
-                  ),
-                ],
-              ),
-            ),
-              Expanded(
-                child: Consumer2<HabitsProvider, DashboardProvider>(
-                  builder: (context, provider, dashboard, child) {
-                  if (provider.isLoading) {
-                    return const Center(
-                      child: CircularProgressIndicator(
-                        color: Color(0xFF00E676),
-                      ),
-                    );
-                  }
-
-                  if (provider.error != null) {
-                    return Center(
-                      child: Text(
-                        'Error: ${provider.error}',
-                        style: const TextStyle(color: Colors.red),
-                      ),
-                    );
-                  }
-
-                  final individualHabits = provider.habits
-                      .where(
-                        (habit) =>
-                            !habit.isGroup &&
-                            habit.spaceType == HabitSpaceType.individual,
-                      )
-                      .toList();
-                  final sharedHabits = provider.habits
-                      .where(
-                        (habit) =>
-                            !habit.isGroup &&
-                            habit.spaceType == HabitSpaceType.sharedTask,
-                      )
-                      .toList();
-                  final groupHabits = provider.habits
-                      .where((habit) => habit.isGroup)
-                      .toList();
-                  final orderedGroupHabits = _applySavedOrder(
-                    groupHabits,
-                    dashboard.groupOrderIds,
-                  );
-                  final personalHabits = [...individualHabits, ...sharedHabits];
-                  final orderedPersonalHabits = _applySavedOrder(
-                    personalHabits,
-                    dashboard.personalOrderIds,
-                  );
-                  final displayGroupHabits = orderedGroupHabits;
-                  final displayPersonalHabits = orderedPersonalHabits;
-                  final displayIndividualHabits = displayPersonalHabits
-                      .where((h) => h.spaceType == HabitSpaceType.individual)
-                      .toList();
-                  final displaySharedHabits = displayPersonalHabits
-                      .where((h) => h.spaceType == HabitSpaceType.sharedTask)
-                      .toList();
-
-                  final individualCount = individualHabits.length;
-                  final sharedCount = sharedHabits.length;
-
-                  final scopeHabits = <Habit>[
-                    ...displayGroupHabits,
-                    ...displayPersonalHabits,
-                  ];
-                  final now = DateTime.now();
-                  final completedCount = scopeHabits
-                      .where(
-                        (habit) =>
-                            habit.isCompletedOnDate(provider.userId, now),
-                      )
-                      .length;
-                  final incompleteCount = scopeHabits.length - completedCount;
-                  final selectedFilter = dashboard.selectedFilter;
-                  final filteredGroupHabits = switch (selectedFilter) {
-                    DashboardFilter.all => displayGroupHabits,
-                    DashboardFilter.challenges => const <Habit>[],
-                    DashboardFilter.group => displayGroupHabits,
-                    DashboardFilter.individual => const <Habit>[],
-                    DashboardFilter.shared => const <Habit>[],
-                    DashboardFilter.incomplete =>
-                      displayGroupHabits
-                          .where(
-                            (habit) =>
-                                !habit.isCompletedOnDate(provider.userId, now),
-                          )
-                          .toList(),
-                    DashboardFilter.completed =>
-                      displayGroupHabits
-                          .where(
-                            (habit) =>
-                                habit.isCompletedOnDate(provider.userId, now),
-                          )
-                          .toList(),
-                  };
-                  final filteredIndividualHabits = switch (selectedFilter) {
-                    DashboardFilter.all => displayIndividualHabits,
-                    DashboardFilter.challenges => const <Habit>[],
-                    DashboardFilter.group => const <Habit>[],
-                    DashboardFilter.individual => displayIndividualHabits,
-                    DashboardFilter.shared => const <Habit>[],
-                    DashboardFilter.incomplete =>
-                      displayIndividualHabits
-                          .where(
-                            (habit) =>
-                                !habit.isCompletedOnDate(provider.userId, now),
-                          )
-                          .toList(),
-                    DashboardFilter.completed =>
-                      displayIndividualHabits
-                          .where(
-                            (habit) =>
-                                habit.isCompletedOnDate(provider.userId, now),
-                          )
-                          .toList(),
-                  };
-                  final filteredSharedHabits = switch (selectedFilter) {
-                    DashboardFilter.all => displaySharedHabits,
-                    DashboardFilter.challenges => const <Habit>[],
-                    DashboardFilter.group => const <Habit>[],
-                    DashboardFilter.individual => const <Habit>[],
-                    DashboardFilter.shared => displaySharedHabits,
-                    DashboardFilter.incomplete =>
-                      displaySharedHabits
-                          .where(
-                            (habit) =>
-                                !habit.isCompletedOnDate(provider.userId, now),
-                          )
-                          .toList(),
-                    DashboardFilter.completed =>
-                      displaySharedHabits
-                          .where(
-                            (habit) =>
-                                habit.isCompletedOnDate(provider.userId, now),
-                          )
-                          .toList(),
-                  };
-
-                  final showGroups = filteredGroupHabits.isNotEmpty;
-                  final showIndividual = filteredIndividualHabits.isNotEmpty;
-                  final showShared = filteredSharedHabits.isNotEmpty;
-
-                  final showPersonal = showIndividual || showShared;
-                  final filteredPersonalHabits = [
-                    ...filteredIndividualHabits,
-                    ...filteredSharedHabits,
-                  ];
-                  final filteredGroupHabitIds = filteredGroupHabits
-                      .map((habit) => habit.id)
-                      .toList(growable: false);
-                  final filteredPersonalHabitIds = filteredPersonalHabits
-                      .map((habit) => habit.id)
-                      .toList(growable: false);
-
-                  if (dashboard.isLoadingPreferences) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
-
-                  return StreamBuilder<List<GroupChallenge>>(
-                    stream: GroupService().streamMyChallenges(),
-                    builder: (context, challengeSnapshot) {
-                      final myChallenges =
-                          challengeSnapshot.data ?? const <GroupChallenge>[];
-                      final challengeCount = myChallenges.length;
-                      final allCount =
-                          groupHabits.length +
-                          personalHabits.length +
-                          challengeCount;
-
-                      final filteredChallenges = switch (selectedFilter) {
-                        DashboardFilter.all => myChallenges,
-                        DashboardFilter.challenges => myChallenges,
-                        DashboardFilter.group => const <GroupChallenge>[],
-                        DashboardFilter.individual => const <GroupChallenge>[],
-                        DashboardFilter.shared => const <GroupChallenge>[],
-                        DashboardFilter.incomplete => const <GroupChallenge>[],
-                        DashboardFilter.completed => const <GroupChallenge>[],
-                      };
-
-                      final availableFilters = <DashboardFilter>{
-                        DashboardFilter.all,
-                        if (challengeCount > 0) DashboardFilter.challenges,
-                        if (groupHabits.isNotEmpty) DashboardFilter.group,
-                        if (individualCount > 0) DashboardFilter.individual,
-                        if (sharedCount > 0) DashboardFilter.shared,
-                        if (incompleteCount > 0) DashboardFilter.incomplete,
-                        if (completedCount > 0) DashboardFilter.completed,
-                      };
-
-                      if (!availableFilters.contains(selectedFilter)) {
-                        WidgetsBinding.instance.addPostFrameCallback((_) {
-                          if (!context.mounted) return;
-                          context.read<DashboardProvider>().ensureSelectedFilter(
-                            availableFilters,
-                          );
-                        });
-                      }
-
-                      final showChallenges = filteredChallenges.isNotEmpty;
-
-                      if (personalHabits.isEmpty &&
-                          groupHabits.isEmpty &&
-                          challengeCount == 0) {
-                        return Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 1.2,
+                                ),
+                              )
+                              .animate()
+                              .fade(duration: 400.ms)
+                              .slideX(begin: -0.1),
+                          const SizedBox(height: 6),
+                          Row(
                             children: [
-                              Container(
-                                    padding: const EdgeInsets.all(24),
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .primary
-                                          .withValues(alpha: 0.05),
-                                    ),
-                                    child: Icon(
-                                      Icons.spa_rounded,
-                                      size: 80,
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .primary
-                                          .withValues(alpha: 0.6),
-                                    ),
+                              Icon(
+                                    Icons.track_changes_rounded,
+                                    size: 32,
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.primary,
                                   )
-                                  .animate(
-                                    onPlay: (controller) =>
-                                        controller.repeat(reverse: true),
-                                  )
-                                  .scaleXY(
-                                    end: 1.05,
-                                    duration: 2.seconds,
-                                    curve: Curves.easeInOut,
-                                  ),
-                              const SizedBox(height: 32),
-                              Text(
-                                    'It\'s mighty quiet here.',
-                                    style: GoogleFonts.outfit(
-                                      fontSize: 24,
-                                      fontWeight: FontWeight.w600,
+                                  .animate()
+                                  .fade(duration: 500.ms, delay: 100.ms)
+                                  .scaleXY(begin: 0.8),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                    child: FittedBox(
+                                      fit: BoxFit.scaleDown,
+                                      alignment: Alignment.centerLeft,
+                                      child: Text(
+                                        'Your Habits',
+                                        style: GoogleFonts.outfit(
+                                          fontSize: 38,
+                                          fontWeight: FontWeight.w800,
+                                          letterSpacing: -1,
+                                          height: 1.1,
+                                        ),
+                                      ),
                                     ),
                                   )
                                   .animate()
-                                  .fade(delay: 300.ms)
-                                  .slideY(begin: 0.1),
-                              const SizedBox(height: 12),
-                              Text(
-                                'Tap the + icon to build better routines.',
-                                style: GoogleFonts.inter(
-                                  color: Colors.grey[500],
-                                  fontSize: 16,
-                                ),
-                              ).animate().fade(delay: 400.ms),
+                                  .fade(duration: 500.ms, delay: 100.ms)
+                                  .slideX(begin: -0.1),
                             ],
                           ),
-                        );
-                      }
-
-                      return RefreshIndicator(
-                        onRefresh: () async {
-                          try {
-                            await context
-                                .read<HabitsProvider>()
-                                .syncHealthDataForStepsHabits();
-                          } catch (error) {
-                            if (context.mounted) {
-                              showAppSnackBar(
+                        ],
+                      ),
+                    ),
+                    SizedBox(
+                      width: 60,
+                      height: 100,
+                      child:
+                          FloatingActionButton(
+                            heroTag: 'dashboard_profile_fab',
+                            shape: const CircleBorder(),
+                            elevation: 0,
+                            backgroundColor: Theme.of(
+                              context,
+                            ).colorScheme.primary.withValues(alpha: 0.1),
+                            foregroundColor: Theme.of(
+                              context,
+                            ).colorScheme.primary,
+                            onPressed: () {
+                              Navigator.push(
                                 context,
-                                message:
-                                    'Refresh failed. ${error.toString().split('\n').first}',
+                                MaterialPageRoute(
+                                  builder: (context) => const ProfileScreen(),
+                                ),
                               );
-                            }
-                          }
-                        },
-                        color: Theme.of(context).colorScheme.primary,
-                        backgroundColor: Theme.of(context).colorScheme.surface,
-                        child: SlidableAutoCloseBehavior(
-                          closeWhenTapped: true,
-                          child: ListView(
-                            physics: const AlwaysScrollableScrollPhysics(
-                              parent: BouncingScrollPhysics(),
+                            },
+                            child: ValueListenableBuilder<AvatarCacheState>(
+                              valueListenable: AvatarCache.notifier,
+                              builder: (context, cached, _) {
+                                return StreamBuilder<
+                                  DocumentSnapshot<Map<String, dynamic>>
+                                >(
+                                  stream: userId.isEmpty
+                                      ? null
+                                      : FirebaseFirestore.instance
+                                            .collection('users')
+                                            .doc(userId)
+                                            .snapshots(),
+                                  builder: (context, snapshot) {
+                                    final data = snapshot.data?.data();
+                                    final profile = data != null
+                                        ? UserProfile.fromMap(data)
+                                        : null;
+                                    final photoUrl =
+                                        profile?.photoUrl?.trim() ?? '';
+                                    if (photoUrl.isNotEmpty) {
+                                      unawaited(
+                                        AvatarCache.updateFromNetwork(
+                                          userId,
+                                          photoUrl,
+                                        ),
+                                      );
+                                    }
+
+                                    if (cached.bytes != null) {
+                                      return CircleAvatar(
+                                        radius: 22,
+                                        backgroundImage: MemoryImage(
+                                          cached.bytes!,
+                                        ),
+                                        backgroundColor: Colors.transparent,
+                                      );
+                                    }
+
+                                    if (photoUrl.isNotEmpty) {
+                                      return CircleAvatar(
+                                        radius: 22,
+                                        backgroundImage: NetworkImage(photoUrl),
+                                        backgroundColor: Colors.transparent,
+                                      );
+                                    }
+
+                                    return const Icon(
+                                      Icons.person_rounded,
+                                      size: 34,
+                                    );
+                                  },
+                                );
+                              },
                             ),
-                            padding: EdgeInsets.zero,
-                            children: [
-                              const SizedBox(height: 8),
-                              _buildFilterPills(
-                                context,
-                                selectedFilter: selectedFilter,
-                                onChanged: dashboard.setSelectedFilter,
-                                allCount: allCount,
-                                challengeCount: challengeCount,
-                                groupCount: groupHabits.length,
-                                individualCount: individualCount,
-                                sharedCount: sharedCount,
-                                incompleteCount: incompleteCount,
-                                completedCount: completedCount,
-                              ),
-                              if (showChallenges)
-                                _buildSectionLabel(
-                                  context,
-                                  title: 'LIVE CHALLENGES',
-                                  count: filteredChallenges.length,
-                                ),
-                              if (showChallenges && filteredChallenges.isNotEmpty)
-                                ...filteredChallenges.map((challenge) {
-                                  final status = !challenge.isReadyToStart
-                                      ? 'Waiting for accepts'
-                                      : challenge.hasEnded
-                                      ? 'Ended'
-                                      : 'Live';
-                                  return Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 24,
-                                      vertical: 8,
-                                    ),
-                                    child: InkWell(
-                                      borderRadius: BorderRadius.circular(20),
-                                      onTap: () => _openChallengeFromDashboard(
-                                        context,
-                                        challenge,
-                                      ),
-                                      child: Container(
-                                        padding: const EdgeInsets.all(16),
-                                        decoration: BoxDecoration(
-                                          color: Theme.of(
-                                            context,
-                                          ).colorScheme.surface,
-                                          borderRadius: BorderRadius.circular(
-                                            20,
-                                          ),
-                                          border: Border.all(
-                                            color: Theme.of(context)
-                                                .colorScheme
-                                                .onSurface
-                                                .withValues(alpha: 0.1),
-                                          ),
-                                        ),
-                                        child: Row(
-                                          children: [
-                                            Expanded(
-                                              child: Column(
-                                                crossAxisAlignment:
-                                                    CrossAxisAlignment.start,
-                                                children: [
-                                                  Text(
-                                                    challenge.title,
-                                                    style: GoogleFonts.outfit(
-                                                      fontSize: 18,
-                                                      fontWeight:
-                                                          FontWeight.w700,
-                                                    ),
-                                                  ),
-                                                  const SizedBox(height: 4),
-                                                  Text(
-                                                    challenge.hasTarget
-                                                        ? 'Target: ${formatQuantity(challenge.targetValue, maxDecimals: 1)} ${challenge.unit}'
-                                                        : 'No target set',
-                                                    style: GoogleFonts.inter(
-                                                      color: Theme.of(context)
-                                                          .colorScheme
-                                                          .onSurface
-                                                          .withValues(
-                                                            alpha: 0.68,
-                                                          ),
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                            ),
-                                            Container(
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                    horizontal: 10,
-                                                    vertical: 6,
-                                                  ),
-                                              decoration: BoxDecoration(
-                                                color: Theme.of(context)
-                                                    .colorScheme
-                                                    .primary
-                                                    .withValues(alpha: 0.14),
-                                                borderRadius:
-                                                    BorderRadius.circular(999),
-                                              ),
-                                              child: Text(
-                                                status,
-                                                style: GoogleFonts.inter(
-                                                  fontSize: 11,
-                                                  fontWeight: FontWeight.w700,
-                                                  color: Theme.of(
-                                                    context,
-                                                  ).colorScheme.primary,
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                  );
-                                }),
-                              if (showGroups &&
-                                  filteredGroupHabits.isNotEmpty) ...[
-                                _buildSectionLabel(
-                                  context,
-                                  title: 'GROUP TASKS',
-                                  count: filteredGroupHabits.length,
-                                ),
-                                Column(
-                                  children: [
-                                    ReorderableListView.builder(
-                                      shrinkWrap: true,
-                                      physics:
-                                          const NeverScrollableScrollPhysics(),
-                                      buildDefaultDragHandles: false,
-                                      proxyDecorator:
-                                          (child, index, animation) {
-                                            return Material(
-                                              color: Colors.transparent,
-                                              shadowColor: Colors.transparent,
-                                              elevation: 0,
-                                              child: child,
-                                            );
-                                          },
-                                      itemCount: filteredGroupHabits.length,
-                                      onReorder: (oldIndex, newIndex) {
-                                        dashboard.reorderGroupIds(
-                                          filteredGroupHabitIds,
-                                          oldIndex,
-                                          newIndex,
-                                        );
-                                      },
-                                      itemBuilder: (context, index) {
-                                        return _buildHabitReorderableItem(
-                                          context: context,
-                                          habitId: filteredGroupHabitIds[index],
-                                          index: index,
-                                          opensGroup: true,
-                                        );
-                                      },
-                                    ),
-                                    const SizedBox(height: 8),
-                                  ],
-                                ),
-                              ],
-                              if (showPersonal &&
-                                  filteredPersonalHabits.isNotEmpty)
-                                _buildSectionLabel(
-                                  context,
-                                  title: 'PERSONAL/SHARED TASKS',
-                                  count: filteredPersonalHabits.length,
-                                ),
-                              if (showPersonal)
-                                Column(
-                                  children: [
-                                    ReorderableListView.builder(
-                                      shrinkWrap: true,
-                                      physics:
-                                          const NeverScrollableScrollPhysics(),
-                                      buildDefaultDragHandles: false,
-                                      proxyDecorator:
-                                          (child, index, animation) {
-                                            return Material(
-                                              color: Colors.transparent,
-                                              shadowColor: Colors.transparent,
-                                              elevation: 0,
-                                              child: child,
-                                            );
-                                          },
-                                      itemCount: filteredPersonalHabits.length,
-                                      onReorder: (oldIndex, newIndex) {
-                                        dashboard.reorderPersonalIds(
-                                          filteredPersonalHabitIds,
-                                          oldIndex,
-                                          newIndex,
-                                        );
-                                      },
-                                      itemBuilder: (context, index) {
-                                        return _buildHabitReorderableItem(
-                                          context: context,
-                                          habitId:
-                                              filteredPersonalHabitIds[index],
-                                          index: index,
-                                          opensGroup: false,
-                                        );
-                                      },
-                                    ),
-                                  ],
-                                ),
-                              const SizedBox(
-                                height: DashboardScreen._bottomNavClearance,
-                              ),
-                            ],
+                          ).animate().scale(
+                            delay: 300.ms,
+                            curve: Curves.easeOutBack,
                           ),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: Consumer2<HabitsProvider, DashboardProvider>(
+                  builder: (context, provider, dashboard, child) {
+                    if (provider.isLoading) {
+                      return const Center(
+                        child: CircularProgressIndicator(
+                          color: Color(0xFF00E676),
                         ),
                       );
-                    },
-                  );
-                },
+                    }
+
+                    if (provider.error != null) {
+                      return Center(
+                        child: Text(
+                          'Error: ${provider.error}',
+                          style: const TextStyle(color: Colors.red),
+                        ),
+                      );
+                    }
+
+                    final individualHabits = provider.habits
+                        .where(
+                          (habit) =>
+                              !habit.isGroup &&
+                              habit.spaceType == HabitSpaceType.individual,
+                        )
+                        .toList();
+                    final sharedHabits = provider.habits
+                        .where(
+                          (habit) =>
+                              !habit.isGroup &&
+                              habit.spaceType == HabitSpaceType.sharedTask,
+                        )
+                        .toList();
+                    final groupHabits = provider.habits
+                        .where((habit) => habit.isGroup)
+                        .toList();
+                    final orderedGroupHabits = _applySavedOrder(
+                      groupHabits,
+                      dashboard.groupOrderIds,
+                    );
+                    final personalHabits = [
+                      ...individualHabits,
+                      ...sharedHabits,
+                    ];
+                    final orderedPersonalHabits = _applySavedOrder(
+                      personalHabits,
+                      dashboard.personalOrderIds,
+                    );
+                    final displayGroupHabits = orderedGroupHabits;
+                    final displayPersonalHabits = orderedPersonalHabits;
+                    final displayIndividualHabits = displayPersonalHabits
+                        .where((h) => h.spaceType == HabitSpaceType.individual)
+                        .toList();
+                    final displaySharedHabits = displayPersonalHabits
+                        .where((h) => h.spaceType == HabitSpaceType.sharedTask)
+                        .toList();
+
+                    final individualCount = individualHabits.length;
+                    final sharedCount = sharedHabits.length;
+
+                    final scopeHabits = <Habit>[
+                      ...displayGroupHabits,
+                      ...displayPersonalHabits,
+                    ];
+                    final now = DateTime.now();
+                    final completedCount = scopeHabits
+                        .where(
+                          (habit) =>
+                              habit.isCompletedOnDate(provider.userId, now),
+                        )
+                        .length;
+                    final incompleteCount = scopeHabits.length - completedCount;
+                    final selectedFilter = dashboard.selectedFilter;
+                    final filteredGroupHabits = switch (selectedFilter) {
+                      DashboardFilter.all => displayGroupHabits,
+                      DashboardFilter.challenges => const <Habit>[],
+                      DashboardFilter.group => displayGroupHabits,
+                      DashboardFilter.individual => const <Habit>[],
+                      DashboardFilter.shared => const <Habit>[],
+                      DashboardFilter.incomplete =>
+                        displayGroupHabits
+                            .where(
+                              (habit) => !habit.isCompletedOnDate(
+                                provider.userId,
+                                now,
+                              ),
+                            )
+                            .toList(),
+                      DashboardFilter.completed =>
+                        displayGroupHabits
+                            .where(
+                              (habit) =>
+                                  habit.isCompletedOnDate(provider.userId, now),
+                            )
+                            .toList(),
+                    };
+                    final filteredIndividualHabits = switch (selectedFilter) {
+                      DashboardFilter.all => displayIndividualHabits,
+                      DashboardFilter.challenges => const <Habit>[],
+                      DashboardFilter.group => const <Habit>[],
+                      DashboardFilter.individual => displayIndividualHabits,
+                      DashboardFilter.shared => const <Habit>[],
+                      DashboardFilter.incomplete =>
+                        displayIndividualHabits
+                            .where(
+                              (habit) => !habit.isCompletedOnDate(
+                                provider.userId,
+                                now,
+                              ),
+                            )
+                            .toList(),
+                      DashboardFilter.completed =>
+                        displayIndividualHabits
+                            .where(
+                              (habit) =>
+                                  habit.isCompletedOnDate(provider.userId, now),
+                            )
+                            .toList(),
+                    };
+                    final filteredSharedHabits = switch (selectedFilter) {
+                      DashboardFilter.all => displaySharedHabits,
+                      DashboardFilter.challenges => const <Habit>[],
+                      DashboardFilter.group => const <Habit>[],
+                      DashboardFilter.individual => const <Habit>[],
+                      DashboardFilter.shared => displaySharedHabits,
+                      DashboardFilter.incomplete =>
+                        displaySharedHabits
+                            .where(
+                              (habit) => !habit.isCompletedOnDate(
+                                provider.userId,
+                                now,
+                              ),
+                            )
+                            .toList(),
+                      DashboardFilter.completed =>
+                        displaySharedHabits
+                            .where(
+                              (habit) =>
+                                  habit.isCompletedOnDate(provider.userId, now),
+                            )
+                            .toList(),
+                    };
+
+                    final showGroups = filteredGroupHabits.isNotEmpty;
+                    final showIndividual = filteredIndividualHabits.isNotEmpty;
+                    final showShared = filteredSharedHabits.isNotEmpty;
+
+                    final showPersonal = showIndividual || showShared;
+                    final filteredPersonalHabits = [
+                      ...filteredIndividualHabits,
+                      ...filteredSharedHabits,
+                    ];
+                    final filteredGroupHabitIds = filteredGroupHabits
+                        .map((habit) => habit.id)
+                        .toList(growable: false);
+                    final filteredPersonalHabitIds = filteredPersonalHabits
+                        .map((habit) => habit.id)
+                        .toList(growable: false);
+
+                    if (dashboard.isLoadingPreferences) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+
+                    return StreamBuilder<List<GroupChallenge>>(
+                      stream: GroupService().streamMyChallenges(),
+                      builder: (context, challengeSnapshot) {
+                        final myChallenges =
+                            challengeSnapshot.data ?? const <GroupChallenge>[];
+                        final challengeCount = myChallenges.length;
+                        final allCount =
+                            groupHabits.length +
+                            personalHabits.length +
+                            challengeCount;
+
+                        final filteredChallenges = switch (selectedFilter) {
+                          DashboardFilter.all => myChallenges,
+                          DashboardFilter.challenges => myChallenges,
+                          DashboardFilter.group => const <GroupChallenge>[],
+                          DashboardFilter.individual =>
+                            const <GroupChallenge>[],
+                          DashboardFilter.shared => const <GroupChallenge>[],
+                          DashboardFilter.incomplete =>
+                            const <GroupChallenge>[],
+                          DashboardFilter.completed => const <GroupChallenge>[],
+                        };
+
+                        final availableFilters = <DashboardFilter>{
+                          DashboardFilter.all,
+                          if (challengeCount > 0) DashboardFilter.challenges,
+                          if (groupHabits.isNotEmpty) DashboardFilter.group,
+                          if (individualCount > 0) DashboardFilter.individual,
+                          if (sharedCount > 0) DashboardFilter.shared,
+                          if (incompleteCount > 0) DashboardFilter.incomplete,
+                          if (completedCount > 0) DashboardFilter.completed,
+                        };
+
+                        if (!availableFilters.contains(selectedFilter)) {
+                          WidgetsBinding.instance.addPostFrameCallback((_) {
+                            if (!context.mounted) return;
+                            context
+                                .read<DashboardProvider>()
+                                .ensureSelectedFilter(availableFilters);
+                          });
+                        }
+
+                        final showChallenges = filteredChallenges.isNotEmpty;
+
+                        if (personalHabits.isEmpty &&
+                            groupHabits.isEmpty &&
+                            challengeCount == 0) {
+                          return Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Container(
+                                      padding: const EdgeInsets.all(24),
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .primary
+                                            .withValues(alpha: 0.05),
+                                      ),
+                                      child: Icon(
+                                        Icons.spa_rounded,
+                                        size: 80,
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .primary
+                                            .withValues(alpha: 0.6),
+                                      ),
+                                    )
+                                    .animate(
+                                      onPlay: (controller) =>
+                                          controller.repeat(reverse: true),
+                                    )
+                                    .scaleXY(
+                                      end: 1.05,
+                                      duration: 2.seconds,
+                                      curve: Curves.easeInOut,
+                                    ),
+                                const SizedBox(height: 32),
+                                Text(
+                                      'It\'s mighty quiet here.',
+                                      style: GoogleFonts.outfit(
+                                        fontSize: 24,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    )
+                                    .animate()
+                                    .fade(delay: 300.ms)
+                                    .slideY(begin: 0.1),
+                                const SizedBox(height: 12),
+                                Text(
+                                  'Tap the + icon to build better routines.',
+                                  style: GoogleFonts.inter(
+                                    color: Colors.grey[500],
+                                    fontSize: 16,
+                                  ),
+                                ).animate().fade(delay: 400.ms),
+                              ],
+                            ),
+                          );
+                        }
+
+                        return RefreshIndicator(
+                          onRefresh: () async {
+                            try {
+                              await context
+                                  .read<HabitsProvider>()
+                                  .syncHealthDataForStepsHabits();
+                            } catch (error) {
+                              if (context.mounted) {
+                                showAppSnackBar(
+                                  context,
+                                  message:
+                                      'Refresh failed. ${error.toString().split('\n').first}',
+                                );
+                              }
+                            }
+                          },
+                          color: Theme.of(context).colorScheme.primary,
+                          backgroundColor: Theme.of(
+                            context,
+                          ).colorScheme.surface,
+                          child: SlidableAutoCloseBehavior(
+                            closeWhenTapped: true,
+                            child: ListView(
+                              physics: const AlwaysScrollableScrollPhysics(
+                                parent: BouncingScrollPhysics(),
+                              ),
+                              padding: EdgeInsets.zero,
+                              children: [
+                                const SizedBox(height: 8),
+                                _buildFilterPills(
+                                  context,
+                                  selectedFilter: selectedFilter,
+                                  onChanged: dashboard.setSelectedFilter,
+                                  allCount: allCount,
+                                  challengeCount: challengeCount,
+                                  groupCount: groupHabits.length,
+                                  individualCount: individualCount,
+                                  sharedCount: sharedCount,
+                                  incompleteCount: incompleteCount,
+                                  completedCount: completedCount,
+                                ),
+                                if (showChallenges)
+                                  _buildSectionLabel(
+                                    context,
+                                    title: 'LIVE CHALLENGES',
+                                    count: filteredChallenges.length,
+                                  ),
+                                if (showChallenges &&
+                                    filteredChallenges.isNotEmpty)
+                                  ...filteredChallenges.map((challenge) {
+                                    final status = !challenge.isReadyToStart
+                                        ? 'Waiting for accepts'
+                                        : challenge.hasEnded
+                                        ? 'Ended'
+                                        : 'Live';
+                                    return Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 24,
+                                        vertical: 8,
+                                      ),
+                                      child: InkWell(
+                                        borderRadius: BorderRadius.circular(20),
+                                        onTap: () =>
+                                            _openChallengeFromDashboard(
+                                              context,
+                                              challenge,
+                                            ),
+                                        child: Container(
+                                          padding: const EdgeInsets.all(16),
+                                          decoration: BoxDecoration(
+                                            color: Theme.of(
+                                              context,
+                                            ).colorScheme.surface,
+                                            borderRadius: BorderRadius.circular(
+                                              20,
+                                            ),
+                                            border: Border.all(
+                                              color: Theme.of(context)
+                                                  .colorScheme
+                                                  .onSurface
+                                                  .withValues(alpha: 0.1),
+                                            ),
+                                          ),
+                                          child: Row(
+                                            children: [
+                                              Expanded(
+                                                child: Column(
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.start,
+                                                  children: [
+                                                    Text(
+                                                      challenge.title,
+                                                      style: GoogleFonts.outfit(
+                                                        fontSize: 18,
+                                                        fontWeight:
+                                                            FontWeight.w700,
+                                                      ),
+                                                    ),
+                                                    const SizedBox(height: 4),
+                                                    Text(
+                                                      challenge.hasTarget
+                                                          ? 'Target: ${formatQuantity(challenge.targetValue, maxDecimals: 1)} ${challenge.unit}'
+                                                          : 'No target set',
+                                                      style: GoogleFonts.inter(
+                                                        color: Theme.of(context)
+                                                            .colorScheme
+                                                            .onSurface
+                                                            .withValues(
+                                                              alpha: 0.68,
+                                                            ),
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                              Container(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                      horizontal: 10,
+                                                      vertical: 6,
+                                                    ),
+                                                decoration: BoxDecoration(
+                                                  color: Theme.of(context)
+                                                      .colorScheme
+                                                      .primary
+                                                      .withValues(alpha: 0.14),
+                                                  borderRadius:
+                                                      BorderRadius.circular(
+                                                        999,
+                                                      ),
+                                                ),
+                                                child: Text(
+                                                  status,
+                                                  style: GoogleFonts.inter(
+                                                    fontSize: 11,
+                                                    fontWeight: FontWeight.w700,
+                                                    color: Theme.of(
+                                                      context,
+                                                    ).colorScheme.primary,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    );
+                                  }),
+                                if (showGroups &&
+                                    filteredGroupHabits.isNotEmpty) ...[
+                                  _buildSectionLabel(
+                                    context,
+                                    title: 'GROUP TASKS',
+                                    count: filteredGroupHabits.length,
+                                  ),
+                                  Column(
+                                    children: [
+                                      ReorderableListView.builder(
+                                        shrinkWrap: true,
+                                        physics:
+                                            const NeverScrollableScrollPhysics(),
+                                        buildDefaultDragHandles: false,
+                                        proxyDecorator:
+                                            (child, index, animation) {
+                                              return Material(
+                                                color: Colors.transparent,
+                                                shadowColor: Colors.transparent,
+                                                elevation: 0,
+                                                child: child,
+                                              );
+                                            },
+                                        itemCount: filteredGroupHabits.length,
+                                        onReorder: (oldIndex, newIndex) {
+                                          dashboard.reorderGroupIds(
+                                            filteredGroupHabitIds,
+                                            oldIndex,
+                                            newIndex,
+                                          );
+                                        },
+                                        itemBuilder: (context, index) {
+                                          return _buildHabitReorderableItem(
+                                            context: context,
+                                            habitId:
+                                                filteredGroupHabitIds[index],
+                                            index: index,
+                                            opensGroup: true,
+                                          );
+                                        },
+                                      ),
+                                      const SizedBox(height: 8),
+                                    ],
+                                  ),
+                                ],
+                                if (showPersonal &&
+                                    filteredPersonalHabits.isNotEmpty)
+                                  _buildSectionLabel(
+                                    context,
+                                    title: 'PERSONAL/SHARED TASKS',
+                                    count: filteredPersonalHabits.length,
+                                  ),
+                                if (showPersonal)
+                                  Column(
+                                    children: [
+                                      ReorderableListView.builder(
+                                        shrinkWrap: true,
+                                        physics:
+                                            const NeverScrollableScrollPhysics(),
+                                        buildDefaultDragHandles: false,
+                                        proxyDecorator:
+                                            (child, index, animation) {
+                                              return Material(
+                                                color: Colors.transparent,
+                                                shadowColor: Colors.transparent,
+                                                elevation: 0,
+                                                child: child,
+                                              );
+                                            },
+                                        itemCount:
+                                            filteredPersonalHabits.length,
+                                        onReorder: (oldIndex, newIndex) {
+                                          dashboard.reorderPersonalIds(
+                                            filteredPersonalHabitIds,
+                                            oldIndex,
+                                            newIndex,
+                                          );
+                                        },
+                                        itemBuilder: (context, index) {
+                                          return _buildHabitReorderableItem(
+                                            context: context,
+                                            habitId:
+                                                filteredPersonalHabitIds[index],
+                                            index: index,
+                                            opensGroup: false,
+                                          );
+                                        },
+                                      ),
+                                    ],
+                                  ),
+                                const SizedBox(
+                                  height: DashboardScreen._bottomNavClearance,
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    );
+                  },
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
-      ),
       ),
     );
   }
