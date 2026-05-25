@@ -78,11 +78,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 4, 24, 12),
+      padding: const EdgeInsets.fromLTRB(0, 4, 0, 12),
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         child: Row(
           children: [
+            const SizedBox(width: 12),
             ...items.map((item) {
               final filter = item.$1;
               final count = item.$2;
