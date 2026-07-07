@@ -22,7 +22,7 @@ enum _CreateEntryAction { individualHabit, sharedHabit, group }
 class MainLayoutScreen extends StatelessWidget {
   MainLayoutScreen({super.key});
 
-  static const double _navShellRadius = 38;
+  static const double _navShellRadius = 36;
   static const double _navItemRadius = 32;
   static const double _addButtonSize = 60;
 
