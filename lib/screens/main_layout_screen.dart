@@ -22,8 +22,8 @@ enum _CreateEntryAction { individualHabit, sharedHabit, group }
 class MainLayoutScreen extends StatelessWidget {
   MainLayoutScreen({super.key});
 
-  static const double _navShellRadius = 32;
-  static const double _navItemRadius = 24;
+  static const double _navShellRadius = 38;
+  static const double _navItemRadius = 32;
   static const double _addButtonSize = 60;
 
   final List<Widget> _screens = [
@@ -219,25 +219,20 @@ class MainLayoutScreen extends StatelessWidget {
                         ),
                         child: LayoutBuilder(
                           builder: (context, constraints) {
-                            final compact = constraints.maxWidth / 4 < 68;
                             return Row(
                               children: [
                                 Expanded(
                                   child: _buildNavItem(
                                     context,
                                     Icons.track_changes_rounded,
-                                    'Habits',
                                     0,
-                                    compact: compact,
                                   ),
                                 ),
                                 Expanded(
                                   child: _buildNavItem(
                                     context,
                                     Icons.calendar_month_rounded,
-                                    'Activity',
                                     1,
-                                    compact: compact,
                                   ),
                                 ),
                                 Expanded(
@@ -249,10 +244,8 @@ class MainLayoutScreen extends StatelessWidget {
                                       return _buildNavItem(
                                         context,
                                         Icons.groups_rounded,
-                                        'Groups',
                                         2,
                                         badgeCount: count,
-                                        compact: compact,
                                       );
                                     },
                                   ),
@@ -288,10 +281,8 @@ class MainLayoutScreen extends StatelessWidget {
                                                   return _buildNavItem(
                                                     context,
                                                     Icons.people_alt_rounded,
-                                                    'Friends',
                                                     3,
                                                     badgeCount: total,
-                                                    compact: compact,
                                                   );
                                                 },
                                           );
@@ -373,10 +364,8 @@ class MainLayoutScreen extends StatelessWidget {
   Widget _buildNavItem(
     BuildContext context,
     IconData icon,
-    String label,
     int index, {
     int badgeCount = 0,
-    required bool compact,
   }) {
     final isSelected =
         context.watch<NavigationProvider>().currentIndex == index;
@@ -396,17 +385,12 @@ class MainLayoutScreen extends StatelessWidget {
         curve: Curves.easeOutCubic,
         width: double.infinity,
         height: double.infinity,
-        margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+        margin: const EdgeInsets.symmetric(horizontal: 2, vertical: 6),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(_navItemRadius),
           color: isSelected
-              ? scheme.primary.withValues(alpha: isDark ? 0.16 : 0.2)
+              ? scheme.primary.withValues(alpha: isDark ? 0.12 : 0.16)
               : Colors.transparent,
-          border: Border.all(
-            color: isSelected
-                ? scheme.primary.withValues(alpha: isDark ? 0.32 : 0.24)
-                : Colors.transparent,
-          ),
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -414,7 +398,7 @@ class MainLayoutScreen extends StatelessWidget {
             Stack(
               clipBehavior: Clip.none,
               children: [
-                Icon(icon, color: iconColor, size: isSelected ? 26 : 24),
+                Icon(icon, color: iconColor, size: isSelected ? 27 : 24),
                 if (badgeCount > 0)
                   Positioned(
                     top: -5,
@@ -442,23 +426,6 @@ class MainLayoutScreen extends StatelessWidget {
                   ),
               ],
             ),
-            if (isSelected && !compact) ...[
-              const SizedBox(height: 4),
-              SizedBox(
-                width: double.infinity,
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: Text(
-                    label,
-                    style: GoogleFonts.inter(
-                      fontSize: 10,
-                      color: iconColor,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ).animate().fade().scaleXY(),
-            ],
           ],
         ),
       ),
