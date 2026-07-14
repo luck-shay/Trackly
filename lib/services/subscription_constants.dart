@@ -5,14 +5,8 @@
 
 // ── RevenueCat Configuration ────────────────────────────────────────────────
 
-const bool kRevenueCatEnabled = bool.fromEnvironment(
-  'ENABLE_REVENUECAT',
-  defaultValue: false,
-);
-const String kRevenueCatApiKey = String.fromEnvironment(
-  'REVENUECAT_API_KEY',
-  defaultValue: '',
-);
+const bool kRevenueCatEnabled = true;
+const String kRevenueCatApiKey = 'test_oLklvWPldIsCPZFZKemzGlKcklT';
 const String kRevenueCatAndroidApiKey = String.fromEnvironment(
   'REVENUECAT_ANDROID_API_KEY',
   defaultValue: '',
@@ -28,12 +22,12 @@ const String kTrialConsumedPrefPrefix = 'trackly_trial_consumed_';
 
 // ── Pricing ─────────────────────────────────────────────────────────────────
 
-const String kPriceCurrency = '₹';
-const int kMonthlyPriceAmount = 199;
-const int kYearlyPriceAmount = 1499;
-const String kMonthlyPriceDisplay = '₹199';
-const String kYearlyPriceDisplay = '₹1,499';
-const String kYearlyPerMonthDisplay = '₹125';
+const String kPriceCurrency = '\$';
+const double kMonthlyPriceAmount = 1.99;
+const double kYearlyPriceAmount = 14.99;
+const String kMonthlyPriceDisplay = '\$1.99';
+const String kYearlyPriceDisplay = '\$14.99';
+const String kYearlyPerMonthDisplay = '\$1.25';
 const int kYearlySavingsPercent = 37;
 
 // ── Free Tier Limits ────────────────────────────────────────────────────────

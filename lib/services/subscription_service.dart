@@ -267,10 +267,6 @@ class SubscriptionService {
       return 'Subscriptions are not configured for this platform yet.';
     }
 
-    if (resolvedKey.startsWith('test_')) {
-      return 'Subscriptions are disabled in this build because it still uses a RevenueCat test API key.';
-    }
-
     return null;
   }
 }
