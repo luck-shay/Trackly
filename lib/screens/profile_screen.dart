@@ -229,6 +229,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
               _usernameController.text = profile.username ?? '';
             }
 
+            final hasProAccess = subscriptionState.hasAccess;
+
             return SingleChildScrollView(
               padding: const EdgeInsets.all(24.0),
               child: SizedBox(
@@ -236,53 +238,106 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    const SizedBox(height: 16),
-                    Stack(
-                      children: [
-                        GestureDetector(
-                          onTap: profileProvider.isUploadingPicture
-                              ? null
-                              : () async {
-                                  if (profileProvider.isEditing) {
-                                    await _changeProfilePhoto(context);
-                                    return;
-                                  }
-                                  final photoUrl = profile.photoUrl?.trim();
-                                  if (photoUrl == null || photoUrl.isEmpty) {
-                                    return;
-                                  }
-                                  await _openProfilePhotoPreview(
-                                    context,
-                                    photoUrl,
-                                  );
-                                },
-                          child: CircleAvatar(
-                            radius: 56,
-                            backgroundColor: Theme.of(
-                              context,
-                            ).colorScheme.primary.withValues(alpha: 0.1),
-                            backgroundImage: profile.photoUrl != null
-                                ? NetworkImage(profile.photoUrl!)
-                                : null,
-                            child: profileProvider.isUploadingPicture
-                                ? const CircularProgressIndicator()
-                                : (profile.photoUrl == null
-                                      ? Icon(
-                                          Icons.person,
-                                          size: 56,
-                                          color: Theme.of(
-                                            context,
-                                          ).colorScheme.primary,
-                                        )
-                                      : null),
-                          ),
-                        ),
-                        if (profileProvider.isEditing)
-                          Positioned(
-                            bottom: 0,
-                            right: 0,
-                            child: Material(
-                              color: Colors.transparent,
+                        const SizedBox(height: 16),
+                        Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            GestureDetector(
+                              onTap: profileProvider.isUploadingPicture
+                                  ? null
+                                  : () async {
+                                      if (profileProvider.isEditing) {
+                                        await _changeProfilePhoto(context);
+                                        return;
+                                      }
+                                      final photoUrl = profile.photoUrl?.trim();
+                                      if (photoUrl == null || photoUrl.isEmpty) {
+                                        return;
+                                      }
+                                      await _openProfilePhotoPreview(
+                                        context,
+                                        photoUrl,
+                                      );
+                                    },
+                              child: hasProAccess
+                                  ? Container(
+                                      padding: const EdgeInsets.all(3.5),
+                                      decoration: const BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        gradient: LinearGradient(
+                                          colors: [
+                                            Color(0xFF00E676),
+                                            Color(0xFF00B0FF),
+                                          ],
+                                          begin: Alignment.topLeft,
+                                          end: Alignment.bottomRight,
+                                        ),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: Color(0x2200E676),
+                                            blurRadius: 12,
+                                            spreadRadius: 2,
+                                          ),
+                                        ],
+                                      ),
+                                      child: Container(
+                                        padding: const EdgeInsets.all(2.5),
+                                        decoration: BoxDecoration(
+                                          shape: BoxShape.circle,
+                                          color: Theme.of(context)
+                                              .scaffoldBackgroundColor,
+                                        ),
+                                        child: CircleAvatar(
+                                          radius: 50,
+                                          backgroundColor: Theme.of(context)
+                                              .colorScheme
+                                              .primary
+                                              .withValues(alpha: 0.1),
+                                          backgroundImage: profile.photoUrl != null
+                                              ? NetworkImage(profile.photoUrl!)
+                                              : null,
+                                          child: profileProvider.isUploadingPicture
+                                              ? const CircularProgressIndicator()
+                                              : (profile.photoUrl == null
+                                                  ? Icon(
+                                                      Icons.person,
+                                                      size: 50,
+                                                      color: Theme.of(context)
+                                                          .colorScheme
+                                                          .primary,
+                                                    )
+                                                  : null),
+                                        ),
+                                      ),
+                                    )
+                                  : CircleAvatar(
+                                      radius: 56,
+                                      backgroundColor: Theme.of(context)
+                                          .colorScheme
+                                          .primary
+                                          .withValues(alpha: 0.1),
+                                      backgroundImage: profile.photoUrl != null
+                                          ? NetworkImage(profile.photoUrl!)
+                                          : null,
+                                      child: profileProvider.isUploadingPicture
+                                          ? const CircularProgressIndicator()
+                                          : (profile.photoUrl == null
+                                              ? Icon(
+                                                  Icons.person,
+                                                  size: 56,
+                                                  color: Theme.of(context)
+                                                      .colorScheme
+                                                      .primary,
+                                                )
+                                              : null),
+                                    ),
+                            ),
+                            if (profileProvider.isEditing)
+                              Positioned(
+                                bottom: 0,
+                                right: 0,
+                                child: Material(
+                                  color: Colors.transparent,
                               child: InkWell(
                                 customBorder: const CircleBorder(),
                                 onTap: profileProvider.isUploadingPicture
@@ -311,6 +366,50 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               ),
                             ),
                           ),
+                            if (hasProAccess && !profileProvider.isEditing)
+                              Positioned(
+                                bottom: -4,
+                                left: 0,
+                                right: 0,
+                                child: Center(
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                      vertical: 4,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      gradient: const LinearGradient(
+                                        colors: [
+                                          Color(0xFF00E676),
+                                          Color(0xFF00B0FF),
+                                        ],
+                                      ),
+                                      borderRadius: BorderRadius.circular(12),
+                                      boxShadow: const [
+                                        BoxShadow(
+                                          color: Colors.black26,
+                                          blurRadius: 4,
+                                          offset: Offset(0, 2),
+                                        ),
+                                      ],
+                                      border: Border.all(
+                                        color: Theme.of(context)
+                                            .scaffoldBackgroundColor,
+                                        width: 2,
+                                      ),
+                                    ),
+                                    child: Text(
+                                      'PRO',
+                                      style: GoogleFonts.outfit(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w900,
+                                        color: Colors.white,
+                                        letterSpacing: 0.8,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
                       ],
                     ),
                     const SizedBox(height: 32),
