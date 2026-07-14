@@ -5,6 +5,7 @@ class UserProfile {
   final String? username;
   final String? photoUrl;
   final List<String> friends;
+  final bool onboardingCompleted;
 
   UserProfile({
     required this.uid,
@@ -13,6 +14,7 @@ class UserProfile {
     this.username,
     this.photoUrl,
     List<String>? friends,
+    this.onboardingCompleted = false,
   }) : friends = friends ?? [];
 
   Map<String, dynamic> toMap() {
@@ -23,6 +25,7 @@ class UserProfile {
       'username': username,
       'photoUrl': photoUrl,
       'friends': friends,
+      'onboardingCompleted': onboardingCompleted,
     };
   }
 
@@ -34,6 +37,7 @@ class UserProfile {
       username: map['username'],
       photoUrl: map['photoUrl'],
       friends: List<String>.from(map['friends'] ?? []),
+      onboardingCompleted: map['onboardingCompleted'] ?? false,
     );
   }
 }

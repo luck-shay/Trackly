@@ -13,12 +13,13 @@ import '../models/habit.dart';
 import '../models/user_profile.dart';
 import '../widgets/habit_card.dart';
 import '../providers/dashboard_provider.dart';
-import '../providers/subscription_provider.dart';
 import '../providers/habits_provider.dart';
 import '../providers/navigation_provider.dart';
 import '../providers/quantified_log_provider.dart';
 import '../services/group_service.dart';
 import '../services/avatar_cache.dart';
+import '../widgets/pro_badge_avatar.dart';
+import '../providers/subscription_provider.dart';
 import '../utils/app_snackbar.dart';
 import '../utils/quantity_format.dart';
 import 'group_challenge_detail_screen.dart';
@@ -994,8 +995,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final today = DateTime.now();
     final dateStr = _formatDate(today);
     final userId = FirebaseAuth.instance.currentUser?.uid ?? '';
-    final subscription = context.watch<SubscriptionProvider>();
-    final hasProAccess = subscription.hasProAccess;
+    final hasProAccess = context.watch<SubscriptionProvider>().hasProAccess;
 
     return ChangeNotifierProvider<DashboardProvider>(
       create: (_) => DashboardProvider(userId: userId)..loadPreferences(),
@@ -1118,33 +1118,33 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                       );
                                     }
 
-                                     Widget avatarWidget;
-                                     if (cached.bytes != null) {
-                                       avatarWidget = CircleAvatar(
-                                         radius: 22,
-                                         backgroundImage: MemoryImage(
-                                           cached.bytes!,
-                                         ),
-                                         backgroundColor: Colors.transparent,
-                                       );
-                                     } else if (photoUrl.isNotEmpty) {
-                                       avatarWidget = CircleAvatar(
-                                         radius: 22,
-                                         backgroundImage: NetworkImage(photoUrl),
-                                         backgroundColor: Colors.transparent,
-                                       );
-                                     } else {
-                                       avatarWidget = const Icon(
-                                         Icons.person_rounded,
-                                         size: 34,
-                                       );
-                                     }
-
-                                     return _buildDashboardAvatar(
-                                       context,
-                                       avatarWidget,
-                                       hasProAccess: hasProAccess,
-                                     );
+                                    Widget avatarWidget;
+                                    if (cached.bytes != null) {
+                                      avatarWidget = CircleAvatar(
+                                        radius: 22,
+                                        backgroundImage: MemoryImage(
+                                          cached.bytes!,
+                                        ),
+                                        backgroundColor: Colors.transparent,
+                                      );
+                                    } else if (photoUrl.isNotEmpty) {
+                                      avatarWidget = CircleAvatar(
+                                        radius: 22,
+                                        backgroundImage: NetworkImage(photoUrl),
+                                        backgroundColor: Colors.transparent,
+                                      );
+                                    } else {
+                                      avatarWidget = const Icon(
+                                        Icons.person_rounded,
+                                        size: 34,
+                                      );
+                                    }
+                                    
+                                    return ProBadgeAvatar(
+                                      isPro: hasProAccess,
+                                      radius: 22,
+                                      child: avatarWidget,
+                                    );
                                   },
                                 );
                               },
@@ -1677,73 +1677,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
         ),
       ),
-    );
-  }
-
-  Widget _buildDashboardAvatar(
-    BuildContext context,
-    Widget child, {
-    required bool hasProAccess,
-  }) {
-    if (!hasProAccess) return child;
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        Container(
-          padding: const EdgeInsets.all(1.5),
-          decoration: const BoxDecoration(
-            shape: BoxShape.circle,
-            gradient: LinearGradient(
-              colors: [
-                Color(0xFF00E676),
-                Color(0xFF00B0FF),
-              ],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-          ),
-          child: Container(
-            padding: const EdgeInsets.all(1.0),
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: Theme.of(context).colorScheme.surface,
-            ),
-            child: child,
-          ),
-        ),
-        Positioned(
-          bottom: -2,
-          left: 0,
-          right: 0,
-          child: Center(
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [
-                    Color(0xFF00E676),
-                    Color(0xFF00B0FF),
-                  ],
-                ),
-                borderRadius: BorderRadius.circular(6),
-                border: Border.all(
-                  color: Theme.of(context).colorScheme.surface,
-                  width: 1,
-                ),
-              ),
-              child: Text(
-                'PRO',
-                style: GoogleFonts.outfit(
-                  fontSize: 6,
-                  fontWeight: FontWeight.w900,
-                  color: Colors.white,
-                  letterSpacing: 0.4,
-                ),
-              ),
-            ),
-          ),
-        ),
-      ],
     );
   }
 }

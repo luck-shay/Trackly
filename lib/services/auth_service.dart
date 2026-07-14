@@ -143,6 +143,13 @@ class AuthService {
     }
   }
 
+  Future<void> completeOnboarding(String userId) async {
+    await FirebaseFirestore.instance
+        .collection('users')
+        .doc(userId)
+        .update({'onboardingCompleted': true});
+  }
+
   Future<void> _syncSubscriptionIdentity(String userId) async {
     try {
       await _subscriptionService.logIn(userId);

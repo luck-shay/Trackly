@@ -7,10 +7,12 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'firebase_options.dart';
-import 'screens/login_screen.dart';
+import 'screens/onboarding_screen.dart';
 import 'screens/main_layout_screen.dart';
 import 'services/notification_service.dart';
 import 'services/auth_service.dart';
+import 'models/user_profile.dart';
+import 'providers/onboarding_provider.dart';
 import 'package:provider/provider.dart';
 import 'providers/navigation_provider.dart';
 import 'providers/habits_provider.dart';
@@ -125,41 +127,62 @@ class MyApp extends StatelessWidget {
           ),
       ],
       child: Consumer<ThemeModeProvider>(
-        builder: (context, themeProvider, _) {
+        builder: (context, themeProvider, child) {
           return MaterialApp(
-            debugShowCheckedModeBanner: false,
             title: 'Trackly',
+            debugShowCheckedModeBanner: false,
+            themeMode: themeProvider.themeMode,
             theme: AppTheme.light(),
             darkTheme: AppTheme.dark(),
-            themeMode: themeProvider.themeMode,
-            home: StreamBuilder<User?>(
-              stream: FirebaseAuth.instance.authStateChanges(),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Scaffold(
-                    backgroundColor: Color(0xFF101010),
-                    body: Center(
-                      child: CircularProgressIndicator(
-                        color: Color(0xFF00E676),
-                      ),
-                    ),
-                  );
-                }
-                if (snapshot.hasData && snapshot.data != null) {
-                  if (kDebugMode) {
-                    debugPrint('Trackly: Session Found. Routing to Main.');
-                  }
-                  return _AuthBootstrapGate(user: snapshot.data!);
-                }
-                if (kDebugMode) {
-                  debugPrint('Trackly: No Session. Routing to Login.');
-                }
-                return const LoginScreen();
-              },
-            ),
+            home: const RootGate(),
           );
         },
       ),
+    );
+  }
+}
+
+class RootGate extends StatefulWidget {
+  const RootGate({super.key});
+
+  @override
+  State<RootGate> createState() => _RootGateState();
+}
+
+class _RootGateState extends State<RootGate> {
+  late Stream<User?> _authStream;
+
+  @override
+  void initState() {
+    super.initState();
+    // Cache the stream so StreamBuilder doesn't reset when MaterialApp rebuilds
+    _authStream = AuthService().user;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<User?>(
+      stream: _authStream,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Scaffold(
+            backgroundColor: Color(0xFF101010),
+            body: Center(
+              child: CircularProgressIndicator(color: Color(0xFF00E676)),
+            ),
+          );
+        }
+        if (snapshot.hasData && snapshot.data != null) {
+          if (kDebugMode) {
+            debugPrint('Trackly: Session Found. Routing to Main.');
+          }
+          return _AuthBootstrapGate(user: snapshot.data!);
+        }
+        if (kDebugMode) {
+          debugPrint('Trackly: No Session. Routing to Onboarding.');
+        }
+        return const OnboardingScreen(startStep: OnboardingStep.welcome);
+      },
     );
   }
 }
@@ -218,7 +241,7 @@ class _AuthBootstrapGate extends StatefulWidget {
 }
 
 class _AuthBootstrapGateState extends State<_AuthBootstrapGate> {
-  Future<void>? _bootstrapFuture;
+  Future<UserProfile>? _bootstrapFuture;
 
   @override
   void initState() {
@@ -235,67 +258,107 @@ class _AuthBootstrapGateState extends State<_AuthBootstrapGate> {
   }
 
   void _startBootstrap() {
-    _bootstrapFuture = AuthService().syncUserToFirestore(widget.user);
+    _bootstrapFuture = _runBootstrap();
+  }
+
+  Future<UserProfile> _runBootstrap() async {
+    await AuthService().syncUserToFirestore(widget.user);
     unawaited(AvatarCache.initialize(widget.user.uid));
+
+    final doc = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(widget.user.uid)
+        .get();
+
+    final data = doc.data() ?? <String, dynamic>{};
+
+    // Auto-complete onboarding for legacy users who already exist
+    // but don't have the onboardingCompleted flag
+    if (!data.containsKey('onboardingCompleted')) {
+      await AuthService().completeOnboarding(widget.user.uid);
+      data['onboardingCompleted'] = true;
+    }
+
+    return UserProfile.fromMap(data);
   }
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<void>(
+    return FutureBuilder<UserProfile>(
       future: _bootstrapFuture,
       builder: (context, snapshot) {
-        final content = MainLayoutScreen();
-        if (!snapshot.hasError) {
-          return content;
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Scaffold(
+            backgroundColor: Color(0xFF101010),
+            body: Center(
+              child: CircularProgressIndicator(color: Color(0xFF00E676)),
+            ),
+          );
         }
 
-        return Stack(
-          children: [
-            content,
-            SafeArea(
-              child: Align(
-                alignment: Alignment.topCenter,
-                child: Container(
-                  margin: const EdgeInsets.all(16),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 12,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF1C1C1C),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: Colors.redAccent.withValues(alpha: 0.4),
+        if (snapshot.hasError) {
+          return Stack(
+            children: [
+              const Scaffold(backgroundColor: Color(0xFF101010)),
+              SafeArea(
+                child: Align(
+                  alignment: Alignment.topCenter,
+                  child: Container(
+                    margin: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
                     ),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(
-                        Icons.cloud_off_rounded,
-                        color: Colors.redAccent,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1C1C1C),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: Colors.redAccent.withValues(alpha: 0.4),
                       ),
-                      const SizedBox(width: 12),
-                      Flexible(
-                        child: Text(
-                          'Profile sync failed. Tap retry.',
-                          style: GoogleFonts.inter(color: Colors.white),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.cloud_off_rounded,
+                          color: Colors.redAccent,
                         ),
-                      ),
-                      const SizedBox(width: 12),
-                      TextButton(
-                        onPressed: () {
-                          setState(_startBootstrap);
-                        },
-                        child: const Text('Retry'),
-                      ),
-                    ],
+                        const SizedBox(width: 12),
+                        Flexible(
+                          child: Text(
+                            'Profile sync failed. Tap retry.',
+                            style: GoogleFonts.inter(color: Colors.white),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        TextButton(
+                          onPressed: () {
+                            setState(_startBootstrap);
+                          },
+                          child: const Text('Retry'),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
-            ),
-          ],
-        );
+            ],
+          );
+        }
+
+        if (snapshot.hasData) {
+          final profile = snapshot.data!;
+          if (profile.onboardingCompleted) {
+            unawaited(NotificationService().initialize());
+            return MainLayoutScreen();
+          } else {
+            return const OnboardingScreen(
+              startStep: OnboardingStep.chooseUsername,
+            );
+          }
+        }
+
+        return const Scaffold(backgroundColor: Color(0xFF101010));
       },
     );
   }
