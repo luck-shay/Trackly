@@ -6,10 +6,13 @@ import '../models/group.dart';
 import '../models/group_invite.dart';
 import '../models/group_task.dart';
 import '../providers/subscription_provider.dart';
+import '../services/feature_gate.dart';
+import '../services/subscription_constants.dart';
 import '../services/subscription_exceptions.dart';
 import '../services/group_service.dart';
 import '../services/social_service.dart';
 import '../theme/app_layout.dart';
+import '../widgets/premium_upgrade_sheet.dart';
 import 'create_group_screen.dart';
 import 'group_detail_screen.dart';
 import 'package:provider/provider.dart';
@@ -37,19 +40,15 @@ class GroupsScreen extends StatelessWidget {
 
   Future<void> _openCreateGroup(BuildContext context) async {
     final subscription = context.read<SubscriptionProvider>();
-    final canUsePremium = await subscription.canUsePremiumFeatures();
-    if (!context.mounted) {
-      return;
-    }
-    if (!canUsePremium) {
-      await subscription.presentPaywall();
-      if (!context.mounted) {
-        return;
-      }
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Trackly Pro is required to create groups.'),
-        ),
+    final hasProAccess = subscription.hasProAccess;
+    if (!FeatureGate.canCreateGroup(
+      hasProAccess: hasProAccess,
+      currentGroupCount: kFreeGroupCreateLimit, // Will exceed limit for free users
+    )) {
+      if (!context.mounted) return;
+      await showPremiumUpgradeSheet(
+        context,
+        feature: PremiumFeature.unlimitedGroups,
       );
       return;
     }
@@ -252,11 +251,10 @@ class GroupsScreen extends StatelessWidget {
                                               if (!context.mounted) {
                                                 return;
                                               }
-                                              try {
-                                                await context
-                                                    .read<SubscriptionProvider>()
-                                                    .presentPaywall();
-                                              } catch (_) {}
+                                              await showPremiumUpgradeSheet(
+                                                context,
+                                                feature: PremiumFeature.unlimitedGroups,
+                                              );
                                               if (!context.mounted) {
                                                 return;
                                               }

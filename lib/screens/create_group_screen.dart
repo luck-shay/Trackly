@@ -4,10 +4,10 @@ import 'package:google_fonts/google_fonts.dart';
 import '../models/user_profile.dart';
 import '../services/group_service.dart';
 import '../services/social_service.dart';
+import '../services/subscription_constants.dart';
 import '../services/subscription_exceptions.dart';
-import '../providers/subscription_provider.dart';
 import '../theme/app_layout.dart';
-import 'package:provider/provider.dart';
+import '../widgets/premium_upgrade_sheet.dart';
 
 class CreateGroupScreen extends StatefulWidget {
   const CreateGroupScreen({super.key});
@@ -35,8 +35,6 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
     if (!_formKey.currentState!.validate()) {
       return;
     }
-
-    final subscriptionProvider = context.read<SubscriptionProvider>();
 
     setState(() {
       _isSaving = true;
@@ -70,9 +68,10 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
       if (!mounted) {
         return;
       }
-      try {
-        await subscriptionProvider.presentPaywall();
-      } catch (_) {}
+      await showPremiumUpgradeSheet(
+        context,
+        feature: PremiumFeature.unlimitedGroups,
+      );
       if (!mounted) {
         return;
       }

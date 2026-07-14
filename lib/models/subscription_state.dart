@@ -10,6 +10,7 @@ class SubscriptionState {
   final Offerings? offerings;
   final DateTime? trialStartAt;
   final bool trialConsumed;
+  final bool isLocalMockPro;
 
   const SubscriptionState({
     this.initialized = false,
@@ -20,9 +21,11 @@ class SubscriptionState {
     this.offerings,
     this.trialStartAt,
     this.trialConsumed = false,
+    this.isLocalMockPro = false,
   });
 
   bool get hasTracklyProEntitlement {
+    if (isLocalMockPro) return true;
     final info = customerInfo;
     if (info == null) return false;
     return info.entitlements.active.containsKey('Trackly Pro');
@@ -50,6 +53,7 @@ class SubscriptionState {
     DateTime? trialStartAt,
     bool clearTrialStartAt = false,
     bool? trialConsumed,
+    bool? isLocalMockPro,
   }) {
     return SubscriptionState(
       initialized: initialized ?? this.initialized,
@@ -61,6 +65,7 @@ class SubscriptionState {
       offerings: clearOfferings ? null : (offerings ?? this.offerings),
       trialStartAt: clearTrialStartAt ? null : (trialStartAt ?? this.trialStartAt),
       trialConsumed: trialConsumed ?? this.trialConsumed,
+      isLocalMockPro: isLocalMockPro ?? this.isLocalMockPro,
     );
   }
 }

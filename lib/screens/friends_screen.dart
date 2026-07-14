@@ -5,11 +5,12 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
 import '../services/social_service.dart';
 import '../services/database_service.dart';
+import '../services/subscription_constants.dart';
 import '../services/subscription_exceptions.dart';
 import '../models/user_profile.dart';
 import '../models/habit.dart';
 import '../providers/friends_provider.dart';
-import '../providers/subscription_provider.dart';
+import '../widgets/premium_upgrade_sheet.dart';
 import 'friend_profile_screen.dart';
 
 class FriendsScreen extends StatefulWidget {
@@ -332,11 +333,10 @@ class _FriendsScreenState extends State<FriendsScreen> {
                                       error
                                     ) {
                                       if (!context.mounted) return;
-                                      try {
-                                        await context
-                                            .read<SubscriptionProvider>()
-                                            .presentPaywall();
-                                      } catch (_) {}
+                                      await showPremiumUpgradeSheet(
+                                        context,
+                                        feature: PremiumFeature.unlimitedSharedHabits,
+                                      );
                                       if (!context.mounted) return;
                                       ScaffoldMessenger.of(
                                         context,

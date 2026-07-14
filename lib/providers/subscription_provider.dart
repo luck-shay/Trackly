@@ -7,6 +7,7 @@ import 'package:purchases_ui_flutter/paywall_result.dart';
 
 import '../models/subscription_state.dart';
 import '../services/subscription_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
  
 class SubscriptionProvider extends ChangeNotifier {
   final SubscriptionService _service;
@@ -28,6 +29,7 @@ class SubscriptionProvider extends ChangeNotifier {
   SubscriptionState get state => _state;
   bool get hasProAccess => _state.hasAccess;
   bool get isPremium => _state.hasTracklyProEntitlement;
+  bool get isEnabled => _service.isEnabled;
 
   Future<void> configure() async {
     if (!_service.isEnabled) {
@@ -62,11 +64,14 @@ class SubscriptionProvider extends ChangeNotifier {
       trialConsumed = await _service.isTrialConsumed(userId);
 
       if (!_service.isEnabled) {
+        final prefs = await SharedPreferences.getInstance();
+        final isMockPro = prefs.getBool('mock_pro_access_$userId') ?? false;
         _state = _state.copyWith(
           initialized: true,
           isLoading: false,
           trialStartAt: trialStartAt,
           trialConsumed: trialConsumed,
+          isLocalMockPro: isMockPro,
           clearError: true,
         );
         notifyListeners();
@@ -150,9 +155,26 @@ class SubscriptionProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> purchase(Package package) async {
+  Future<void> purchase(Package? package) async {
     _state = _state.copyWith(isLoading: true, clearError: true);
     notifyListeners();
+
+    if (!_service.isEnabled || package == null) {
+      await Future.delayed(const Duration(milliseconds: 800));
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      if (uid != null) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool('mock_pro_access_$uid', true);
+      }
+      _state = _state.copyWith(
+        isLoading: false,
+        isLocalMockPro: true,
+        clearError: true,
+      );
+      notifyListeners();
+      return;
+    }
+
     try {
       final result = await _service.purchasePackage(package);
       _state = _state.copyWith(
@@ -174,6 +196,24 @@ class SubscriptionProvider extends ChangeNotifier {
   Future<void> restore() async {
     _state = _state.copyWith(isLoading: true, clearError: true);
     notifyListeners();
+
+    if (!_service.isEnabled) {
+      await Future.delayed(const Duration(milliseconds: 800));
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      bool wasPro = false;
+      if (uid != null) {
+        final prefs = await SharedPreferences.getInstance();
+        wasPro = prefs.getBool('mock_pro_access_$uid') ?? false;
+      }
+      _state = _state.copyWith(
+        isLoading: false,
+        isLocalMockPro: wasPro,
+        clearError: true,
+      );
+      notifyListeners();
+      return;
+    }
+
     try {
       final info = await _service.restorePurchases();
       _state = _state.copyWith(

@@ -133,10 +133,9 @@ class DashboardProvider extends ChangeNotifier {
     required int oldIndex,
     required int newIndex,
   }) {
-    final adjustedNewIndex = newIndex > oldIndex ? newIndex - 1 : newIndex;
     final next = List<String>.from(orderedIds);
     final moved = next.removeAt(oldIndex);
-    next.insert(adjustedNewIndex, moved);
+    next.insert(newIndex, moved);
     return next;
   }
 }

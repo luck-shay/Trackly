@@ -3,7 +3,6 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
-import 'package:purchases_flutter/models/package_wrapper.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/auth_service.dart';
 import '../models/user_profile.dart';
@@ -11,6 +10,9 @@ import '../models/subscription_state.dart';
 import '../providers/profile_provider.dart';
 import '../providers/subscription_provider.dart';
 import '../providers/theme_mode_provider.dart';
+import 'analytics_screen.dart';
+import 'insights_screen.dart';
+import 'paywall_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -508,76 +510,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ),
                       ),
                       const SizedBox(height: 16),
-                      _SubscriptionSection(
+                      _ProSection(
                         state: subscriptionState,
-                        onUpgrade: () async {
-                          try {
-                            await subscriptionProvider.presentPaywall();
-                          } catch (error) {
-                            if (!context.mounted) return;
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  'Could not open upgrade screen. ${error.toString().split('\n').first}',
-                                ),
-                              ),
-                            );
-                          }
-                        },
-                        onRestore: () async {
-                          try {
-                            await subscriptionProvider.restore();
-                            if (!context.mounted) return;
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Purchases restored.'),
-                              ),
-                            );
-                          } catch (error) {
-                            if (!context.mounted) return;
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  'Could not restore purchases. ${error.toString().split('\n').first}',
-                                ),
-                              ),
-                            );
-                          }
-                        },
-                        onManageSubscription: () async {
-                          try {
-                            await subscriptionProvider.openCustomerCenter();
-                          } catch (error) {
-                            if (!context.mounted) return;
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  'Could not open subscription management. ${error.toString().split('\n').first}',
-                                ),
-                              ),
-                            );
-                          }
-                        },
-                        onBuyPackage: (package) async {
-                          try {
-                            await subscriptionProvider.purchase(package);
-                            if (!context.mounted) return;
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Subscription activated.'),
-                              ),
-                            );
-                          } catch (error) {
-                            if (!context.mounted) return;
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  'Purchase failed. ${error.toString().split('\n').first}',
-                                ),
-                              ),
-                            );
-                          }
-                        },
+                        subscriptionProvider: subscriptionProvider,
                       ),
                     ],
                     if (!profileProvider.isEditing) ...[
@@ -672,126 +607,223 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 }
 
-class _SubscriptionSection extends StatelessWidget {
-  final SubscriptionState state;
-  final Future<void> Function() onUpgrade;
-  final Future<void> Function() onRestore;
-  final Future<void> Function() onManageSubscription;
-  final Future<void> Function(Package package) onBuyPackage;
+// ── Pro Section ───────────────────────────────────────────────────────────────
 
-  const _SubscriptionSection({
+class _ProSection extends StatelessWidget {
+  final SubscriptionState state;
+  final SubscriptionProvider subscriptionProvider;
+
+  const _ProSection({
     required this.state,
-    required this.onUpgrade,
-    required this.onRestore,
-    required this.onManageSubscription,
-    required this.onBuyPackage,
+    required this.subscriptionProvider,
   });
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final packages = state.offerings?.current?.availablePackages ?? const [];
-    final statusLabel = state.hasTracklyProEntitlement
-        ? 'Trackly Pro active'
-        : state.isTrialActive
-        ? 'Free trial active'
-        : 'Free tier';
+    final hasProAccess = state.hasAccess;
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: scheme.surface,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: Theme.of(context).dividerColor.withValues(alpha: 0.35),
+          color: hasProAccess
+              ? scheme.primary.withValues(alpha: 0.2)
+              : Theme.of(context).dividerColor.withValues(alpha: 0.3),
         ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // ── Plan badge ───────────────────────────────────────────
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 5,
+                ),
+                decoration: BoxDecoration(
+                  color: hasProAccess
+                      ? scheme.primary.withValues(alpha: 0.12)
+                      : scheme.onSurface.withValues(alpha: 0.06),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  hasProAccess ? 'TRACKLY PRO' : 'FREE',
+                  style: GoogleFonts.outfit(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: hasProAccess
+                        ? scheme.primary
+                        : scheme.onSurface.withValues(alpha: 0.5),
+                    letterSpacing: 1.2,
+                  ),
+                ),
+              ),
+              const Spacer(),
+              if (state.isTrialActive)
+                Text(
+                  'Trial active',
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    color: scheme.primary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          // ── Current plan label ──────────────────────────────────
           Text(
-            'Subscription',
+            hasProAccess ? 'You have full access' : 'Upgrade for more depth',
             style: GoogleFonts.outfit(
               fontSize: 20,
               fontWeight: FontWeight.w700,
+              color: scheme.onSurface,
             ),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 4),
           Text(
-            statusLabel,
+            hasProAccess
+                ? 'Advanced analytics, insights, and unlimited collaboration.'
+                : 'Unlock analytics, insights, unlimited groups, and more.',
             style: GoogleFonts.inter(
-              color: scheme.onSurface.withValues(alpha: 0.72),
-              fontWeight: FontWeight.w600,
+              fontSize: 14,
+              color: scheme.onSurface.withValues(alpha: 0.5),
+              height: 1.4,
             ),
           ),
+          const SizedBox(height: 20),
+
+          // ── Quick access buttons (Pro users) ────────────────────
+          if (hasProAccess) ...[
+            _ProActionTile(
+              icon: Icons.insights_rounded,
+              title: 'Analytics',
+              subtitle: 'View your habit analytics',
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const AnalyticsScreen()),
+                );
+              },
+            ),
+            const SizedBox(height: 8),
+            _ProActionTile(
+              icon: Icons.auto_awesome_rounded,
+              title: 'Insights',
+              subtitle: 'Personalized habit insights',
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const InsightsScreen()),
+                );
+              },
+            ),
+            const SizedBox(height: 16),
+          ],
+
+          // ── Error message ───────────────────────────────────────
           if (state.errorMessage != null &&
               '${state.errorMessage}'.isNotEmpty) ...[
-            const SizedBox(height: 10),
             Text(
               '${state.errorMessage}',
               style: GoogleFonts.inter(color: Colors.redAccent, fontSize: 12),
             ),
+            const SizedBox(height: 12),
           ],
-          const SizedBox(height: 12),
-          if (packages.isNotEmpty)
-            ...packages
-                .where(
-                  (p) =>
-                      _supportedProductIds.contains(p.storeProduct.identifier),
-                )
-                .map(
-                  (package) => ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: Text(
-                      _labelForProduct(package.storeProduct.identifier),
-                      style: GoogleFonts.inter(fontWeight: FontWeight.w600),
-                    ),
-                    subtitle: Text(
-                      package.storeProduct.priceString,
-                      style: GoogleFonts.inter(
-                        color: scheme.onSurface.withValues(alpha: 0.7),
-                      ),
-                    ),
-                    trailing: TextButton(
-                      onPressed: state.isLoading
-                          ? null
-                          : () => onBuyPackage(package),
-                      child: const Text('Buy'),
-                    ),
+
+          // ── Actions ─────────────────────────────────────────────
+          if (!hasProAccess) ...[
+            SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: ElevatedButton(
+                onPressed: state.isLoading
+                    ? null
+                    : () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => const PaywallScreen(),
+                          ),
+                        );
+                      },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: scheme.primary,
+                  foregroundColor: Colors.black,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
                   ),
                 ),
-          if (packages.isEmpty)
-            Text(
-              'Plans are loading...',
-              style: GoogleFonts.inter(
-                color: scheme.onSurface.withValues(alpha: 0.7),
+                child: Text(
+                  'Upgrade to Pro',
+                  style: GoogleFonts.outfit(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
               ),
             ),
+            const SizedBox(height: 12),
+          ],
+
+          if (hasProAccess)
+            _ProActionTile(
+              icon: Icons.credit_card_rounded,
+              title: 'Manage Subscription',
+              subtitle: 'View or cancel your subscription',
+              onTap: () async {
+                try {
+                  await subscriptionProvider.openCustomerCenter();
+                } catch (error) {
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        'Could not open subscription management. ${error.toString().split('\n').first}',
+                      ),
+                    ),
+                  );
+                }
+              },
+            ),
+
           const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: state.isLoading ? null : onUpgrade,
-                  child: const Text('Upgrade'),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: state.isLoading ? null : onRestore,
-                  child: const Text('Restore'),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          SizedBox(
-            width: double.infinity,
+          Center(
             child: TextButton(
-              onPressed: state.isLoading ? null : onManageSubscription,
-              child: const Text('Manage subscription'),
+              onPressed: state.isLoading
+                  ? null
+                  : () async {
+                      try {
+                        await subscriptionProvider.restore();
+                        if (!context.mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Purchases restored.'),
+                          ),
+                        );
+                      } catch (error) {
+                        if (!context.mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              'Could not restore. ${error.toString().split('\n').first}',
+                            ),
+                          ),
+                        );
+                      }
+                    },
+              child: Text(
+                'Restore Purchases',
+                style: GoogleFonts.inter(
+                  fontSize: 14,
+                  color: scheme.onSurface.withValues(alpha: 0.4),
+                ),
+              ),
             ),
           ),
         ],
@@ -800,24 +832,81 @@ class _SubscriptionSection extends StatelessWidget {
   }
 }
 
-const Set<String> _supportedProductIds = {
-  'monthly',
-  'quarterly',
-  'yearly',
-  'lifetime',
-};
+class _ProActionTile extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
 
-String _labelForProduct(String productId) {
-  switch (productId) {
-    case 'monthly':
-      return 'Monthly';
-    case 'quarterly':
-      return 'Quarterly';
-    case 'yearly':
-      return 'Annual';
-    case 'lifetime':
-      return 'Lifetime';
-    default:
-      return productId;
+  const _ProActionTile({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: scheme.onSurface.withValues(alpha: 0.06),
+            ),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: scheme.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(icon, size: 18, color: scheme.primary),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: GoogleFonts.outfit(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: scheme.onSurface,
+                      ),
+                    ),
+                    Text(
+                      subtitle,
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        color: scheme.onSurface.withValues(alpha: 0.45),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(
+                Icons.arrow_forward_ios_rounded,
+                size: 14,
+                color: scheme.onSurface.withValues(alpha: 0.3),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
+
+

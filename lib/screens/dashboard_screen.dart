@@ -1587,7 +1587,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                               );
                                             },
                                         itemCount: filteredGroupHabits.length,
-                                        onReorder: (oldIndex, newIndex) {
+                                        onReorderItem: (oldIndex, newIndex) {
                                           dashboard.reorderGroupIds(
                                             filteredGroupHabitIds,
                                             oldIndex,
@@ -1634,7 +1634,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                             },
                                         itemCount:
                                             filteredPersonalHabits.length,
-                                        onReorder: (oldIndex, newIndex) {
+                                        onReorderItem: (oldIndex, newIndex) {
                                           dashboard.reorderPersonalIds(
                                             filteredPersonalHabitIds,
                                             oldIndex,

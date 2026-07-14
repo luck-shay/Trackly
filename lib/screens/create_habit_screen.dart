@@ -6,11 +6,12 @@ import '../models/user_profile.dart';
 import '../models/habit.dart';
 import '../services/social_service.dart';
 import '../services/notification_service.dart';
+import '../services/subscription_constants.dart';
 import '../providers/create_habit_provider.dart';
-import '../providers/subscription_provider.dart';
 import '../services/subscription_exceptions.dart';
 import '../theme/app_layout.dart';
 import '../utils/quantity_format.dart';
+import '../widgets/premium_upgrade_sheet.dart';
 
 part 'create_habit_friend_selection_sheet.dart';
 
@@ -1040,11 +1041,10 @@ class _CreateHabitViewState extends State<_CreateHabitView> {
                               }
                             } on UpgradeRequiredException catch (error) {
                               if (context.mounted) {
-                                try {
-                                  await context
-                                      .read<SubscriptionProvider>()
-                                      .presentPaywall();
-                                } catch (_) {}
+                                await showPremiumUpgradeSheet(
+                                  context,
+                                  feature: PremiumFeature.unlimitedSharedHabits,
+                                );
                                 if (!context.mounted) {
                                   return;
                                 }
