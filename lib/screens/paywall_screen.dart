@@ -12,6 +12,8 @@ import 'package:provider/provider.dart';
 import '../providers/subscription_provider.dart';
 import '../services/subscription_constants.dart';
 
+import '../theme/color_scheme.dart';
+
 class PaywallScreen extends StatefulWidget {
   const PaywallScreen({super.key});
 
@@ -48,7 +50,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
 
     return Scaffold(
       backgroundColor: isDark
-          ? const Color(0xFF0B0F0C)
+          ? const Color(0xFF090D0A)
           : const Color(0xFFF8FAF9),
       body: SafeArea(
         bottom: false,
@@ -129,67 +131,87 @@ class _PaywallScreenState extends State<PaywallScreen> {
             Expanded(
               child: SingleChildScrollView(
                 physics: const BouncingScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(28, 8, 28, 32),
+                padding: const EdgeInsets.fromLTRB(24, 4, 24, 32),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 8),
 
-                    // ── Pro badge ──────────────────────────────────────
+                    // ── Pro badge header ──────────────────────────────────────
                     Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 14,
-                            vertical: 6,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        gradient: AppTheme.proBadgeGradient,
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppTheme.proAmber.withValues(alpha: 0.3),
+                            blurRadius: 10,
                           ),
-                          decoration: BoxDecoration(
-                            color: scheme.primary.withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(20),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.workspace_premium_rounded,
+                            size: 15,
+                            color: Colors.black,
                           ),
-                          child: Text(
+                          const SizedBox(width: 6),
+                          Text(
                             'TRACKLY PRO',
                             style: GoogleFonts.outfit(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                              color: scheme.primary,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w900,
+                              color: Colors.black,
                               letterSpacing: 1.5,
                             ),
                           ),
-                        )
+                        ],
+                      ),
+                    )
                         .animate()
                         .fadeIn(duration: 500.ms)
                         .moveY(begin: -8, end: 0, duration: 500.ms),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 20),
 
                     // ── Headline ───────────────────────────────────────
                     Text(
-                          'Become the\nperson who\nstays consistent.',
+                          'Elevate your habits.\nUnlock your potential.',
                           style: GoogleFonts.outfit(
-                            fontSize: 38,
+                            fontSize: 34,
                             fontWeight: FontWeight.w800,
-                            height: 1.1,
+                            height: 1.12,
                             color: scheme.onSurface,
                           ),
                         )
                         .animate()
                         .fadeIn(delay: 150.ms, duration: 600.ms)
                         .moveY(begin: 16, end: 0, duration: 600.ms),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 12),
 
                     // ── Subtitle ──────────────────────────────────────
                     Text(
-                      'Trackly Pro helps you build habits that actually last '
-                      'through deeper insights, accountability, and premium collaboration.',
+                      'Trackly Pro gives you full access to AI habit coaching, heatmaps, unlimited group challenges, and custom widgets.',
                       style: GoogleFonts.inter(
-                        fontSize: 16,
-                        color: scheme.onSurface.withValues(alpha: 0.55),
-                        height: 1.55,
+                        fontSize: 15,
+                        color: scheme.onSurface.withValues(alpha: 0.6),
+                        height: 1.5,
                       ),
                     ).animate().fadeIn(delay: 300.ms, duration: 500.ms),
-                    const SizedBox(height: 40),
+                    const SizedBox(height: 28),
 
                     // ── Feature cards ─────────────────────────────────
                     ..._buildFeatureCards(scheme, isDark),
-                    const SizedBox(height: 44),
+                    const SizedBox(height: 28),
+
+                    // ── Free vs Pro Comparison ────────────────────────
+                    _buildComparisonSection(scheme, isDark),
+                    const SizedBox(height: 32),
 
                     // ── Pricing toggle ────────────────────────────────
                     _buildPricingSection(
@@ -199,57 +221,69 @@ class _PaywallScreenState extends State<PaywallScreen> {
                       yearlyPrice: yearlyPrice,
                       yearlyMonthlyEquiv: yearlyMonthlyEquiv,
                     ),
-                    const SizedBox(height: 32),
+                    const SizedBox(height: 28),
 
-                    // ── CTA ────────────────────────────────────────────
-                    SizedBox(
-                          width: double.infinity,
-                          height: 58,
-                          child: ElevatedButton(
-                            onPressed: _isPurchasing
-                                ? null
-                                : () => _handlePurchase(sub, packages),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: scheme.primary,
-                              foregroundColor: Colors.black,
-                              elevation: 0,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                              disabledBackgroundColor: scheme.primary
-                                  .withValues(alpha: 0.5),
-                            ),
-                            child: _isPurchasing
-                                ? const SizedBox(
-                                    width: 24,
-                                    height: 24,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2.5,
-                                      color: Colors.black,
-                                    ),
-                                  )
-                                : Text(
-                                    'Continue',
-                                    style: GoogleFonts.outfit(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
+                    // ── CTA Button ────────────────────────────────────
+                    Container(
+                      width: double.infinity,
+                      height: 58,
+                      decoration: BoxDecoration(
+                        gradient: AppTheme.proBadgeGradient,
+                        borderRadius: BorderRadius.circular(18),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppTheme.proAmber.withValues(alpha: 0.35),
+                            blurRadius: 16,
+                            offset: const Offset(0, 4),
                           ),
-                        )
+                        ],
+                      ),
+                      child: ElevatedButton(
+                        onPressed: _isPurchasing
+                            ? null
+                            : () => _handlePurchase(sub, packages),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.transparent,
+                          foregroundColor: Colors.black,
+                          shadowColor: Colors.transparent,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(18),
+                          ),
+                          disabledBackgroundColor: Colors.grey.withValues(alpha: 0.3),
+                        ),
+                        child: _isPurchasing
+                            ? const SizedBox(
+                                width: 24,
+                                height: 24,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2.5,
+                                  color: Colors.black,
+                                ),
+                              )
+                            : Text(
+                                'Start 7-Day Free Trial',
+                                style: GoogleFonts.outfit(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w800,
+                                  color: Colors.black,
+                                ),
+                              ),
+                      ),
+                    )
                         .animate()
                         .fadeIn(delay: 800.ms, duration: 500.ms)
                         .moveY(begin: 12, end: 0, duration: 500.ms),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 14),
 
                     // ── Fine print ─────────────────────────────────────
                     Center(
                       child: Text(
-                        'Cancel anytime. Payment is charged through your App Store account.',
+                        '7 days free, then $_yearlySelected ? "$yearlyPrice/yr" : "$monthlyPrice/mo". Cancel anytime in App Store settings.',
                         textAlign: TextAlign.center,
                         style: GoogleFonts.inter(
                           fontSize: 12,
-                          color: scheme.onSurface.withValues(alpha: 0.3),
+                          color: scheme.onSurface.withValues(alpha: 0.4),
                           height: 1.5,
                         ),
                       ),
@@ -328,6 +362,127 @@ class _PaywallScreenState extends State<PaywallScreen> {
                 ),
       );
     }).toList();
+  }
+
+  Widget _buildComparisonSection(ColorScheme scheme, bool isDark) {
+    final rows = [
+      ('Track Habits', 'Basic', 'Unlimited'),
+      ('Group Creation', '1 Group', 'Unlimited'),
+      ('AI Habit Coach', '❌', 'Included'),
+      ('Completion Heatmap', '❌', 'Included'),
+      ('Custom Home Widgets', 'Basic', 'Full Suite'),
+    ];
+
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF121816) : Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: scheme.onSurface.withValues(alpha: isDark ? 0.08 : 0.06),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Free vs Trackly Pro',
+            style: GoogleFonts.outfit(
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+              color: scheme.onSurface,
+            ),
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(
+                flex: 3,
+                child: Text(
+                  'Feature',
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: scheme.onSurface.withValues(alpha: 0.4),
+                  ),
+                ),
+              ),
+              Expanded(
+                flex: 2,
+                child: Text(
+                  'Free',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: scheme.onSurface.withValues(alpha: 0.4),
+                  ),
+                ),
+              ),
+              Expanded(
+                flex: 2,
+                child: Text(
+                  'PRO',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.outfit(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w900,
+                    color: AppTheme.proAmber,
+                    letterSpacing: 1,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          const Divider(height: 1),
+          const SizedBox(height: 8),
+          ...rows.map(
+            (r) => Padding(
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              child: Row(
+                children: [
+                  Expanded(
+                    flex: 3,
+                    child: Text(
+                      r.$1,
+                      style: GoogleFonts.inter(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                        color: scheme.onSurface,
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    flex: 2,
+                    child: Text(
+                      r.$2,
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        color: scheme.onSurface.withValues(alpha: 0.45),
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    flex: 2,
+                    child: Text(
+                      r.$3,
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.proAmber,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    ).animate().fadeIn(delay: 600.ms, duration: 400.ms);
   }
 
   // ── Pricing Section ───────────────────────────────────────────────────────

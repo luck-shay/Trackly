@@ -14,6 +14,7 @@ import 'insights_screen.dart';
 import 'paywall_screen.dart';
 import '../widgets/pro_badge_avatar.dart';
 import '../widgets/appearance_selector.dart';
+import '../theme/color_scheme.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -576,19 +577,30 @@ class _ProSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final hasProAccess = state.hasAccess;
 
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: scheme.surface,
-        borderRadius: BorderRadius.circular(16),
+        color: isDark ? const Color(0xFF121816) : Colors.white,
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(
           color: hasProAccess
-              ? scheme.primary.withValues(alpha: 0.2)
-              : Theme.of(context).dividerColor.withValues(alpha: 0.3),
+              ? AppTheme.proAmber.withValues(alpha: 0.4)
+              : scheme.onSurface.withValues(alpha: 0.08),
+          width: hasProAccess ? 1.5 : 1,
         ),
+        boxShadow: hasProAccess
+            ? [
+                BoxShadow(
+                  color: AppTheme.proAmber.withValues(alpha: isDark ? 0.1 : 0.06),
+                  blurRadius: 14,
+                  spreadRadius: 1,
+                ),
+              ]
+            : null,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -602,31 +614,39 @@ class _ProSection extends StatelessWidget {
                   vertical: 5,
                 ),
                 decoration: BoxDecoration(
-                  color: hasProAccess
-                      ? scheme.primary.withValues(alpha: 0.12)
-                      : scheme.onSurface.withValues(alpha: 0.06),
+                  gradient: hasProAccess ? AppTheme.proBadgeGradient : null,
+                  color: hasProAccess ? null : scheme.onSurface.withValues(alpha: 0.06),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Text(
-                  hasProAccess ? 'TRACKLY PRO' : 'FREE',
-                  style: GoogleFonts.outfit(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: hasProAccess
-                        ? scheme.primary
-                        : scheme.onSurface.withValues(alpha: 0.5),
-                    letterSpacing: 1.2,
-                  ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (hasProAccess) ...[
+                      const Icon(Icons.workspace_premium_rounded, size: 14, color: Colors.black),
+                      const SizedBox(width: 4),
+                    ],
+                    Text(
+                      hasProAccess ? 'TRACKLY PRO' : 'FREE TIER',
+                      style: GoogleFonts.outfit(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w900,
+                        color: hasProAccess
+                            ? Colors.black
+                            : scheme.onSurface.withValues(alpha: 0.5),
+                        letterSpacing: 1.2,
+                      ),
+                    ),
+                  ],
                 ),
               ),
               const Spacer(),
               if (state.isTrialActive)
                 Text(
-                  'Trial active',
+                  'Trial Active',
                   style: GoogleFonts.inter(
                     fontSize: 12,
-                    color: scheme.primary,
-                    fontWeight: FontWeight.w600,
+                    color: AppTheme.proAmber,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
             ],
@@ -635,22 +655,22 @@ class _ProSection extends StatelessWidget {
 
           // ── Current plan label ──────────────────────────────────
           Text(
-            hasProAccess ? 'You have full access' : 'Upgrade for more depth',
+            hasProAccess ? 'Pro Membership Unlocked' : 'Supercharge Trackly with Pro',
             style: GoogleFonts.outfit(
               fontSize: 20,
-              fontWeight: FontWeight.w700,
+              fontWeight: FontWeight.w800,
               color: scheme.onSurface,
             ),
           ),
           const SizedBox(height: 4),
           Text(
             hasProAccess
-                ? 'Advanced analytics, insights, and unlimited collaboration.'
-                : 'Unlock analytics, insights, unlimited groups, and more.',
+                ? 'Enjoy unlimited heatmaps, AI coach recommendations, private groups, and priority analytics.'
+                : 'Unlock AI habit coaching, completion heatmaps, unlimited group collaboration, and custom widgets.',
             style: GoogleFonts.inter(
               fontSize: 14,
-              color: scheme.onSurface.withValues(alpha: 0.5),
-              height: 1.4,
+              color: scheme.onSurface.withValues(alpha: 0.6),
+              height: 1.45,
             ),
           ),
           const SizedBox(height: 20),

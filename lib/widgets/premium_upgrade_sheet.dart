@@ -11,6 +11,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../services/subscription_constants.dart';
 import '../screens/paywall_screen.dart';
+import '../theme/color_scheme.dart';
 
 /// Shows a premium upgrade bottom sheet for a specific feature.
 ///
@@ -73,8 +74,8 @@ class _PremiumUpgradeSheetContent extends StatelessWidget {
         borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
         border: Border(
           top: BorderSide(
-            color: scheme.primary.withValues(alpha: 0.2),
-            width: 1,
+            color: AppTheme.proAmber.withValues(alpha: 0.35),
+            width: 1.5,
           ),
         ),
       ),
@@ -94,20 +95,34 @@ class _PremiumUpgradeSheetContent extends StatelessWidget {
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
-              const SizedBox(height: 28),
+              const SizedBox(height: 24),
 
-              // Icon
+              // Icon with Gold Gradient Border
               Container(
-                width: 64,
-                height: 64,
+                width: 68,
+                height: 68,
                 decoration: BoxDecoration(
-                  color: scheme.primary.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(20),
+                  gradient: AppTheme.proBadgeGradient,
+                  borderRadius: BorderRadius.circular(22),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppTheme.proAmber.withValues(alpha: 0.35),
+                      blurRadius: 16,
+                      spreadRadius: 1,
+                    ),
+                  ],
                 ),
-                child: Icon(
-                  Icons.workspace_premium_rounded,
-                  size: 32,
-                  color: scheme.primary,
+                padding: const EdgeInsets.all(2.5),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF121816) : Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: const Icon(
+                    Icons.workspace_premium_rounded,
+                    size: 34,
+                    color: AppTheme.proAmber,
+                  ),
                 ),
               )
                   .animate()
@@ -119,6 +134,26 @@ class _PremiumUpgradeSheetContent extends StatelessWidget {
                     curve: Curves.easeOutBack,
                   ),
               const SizedBox(height: 20),
+
+              // Pro Feature Badge
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppTheme.proAmber.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppTheme.proAmber.withValues(alpha: 0.3)),
+                ),
+                child: Text(
+                  'TRACKLY PRO FEATURE',
+                  style: GoogleFonts.outfit(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    color: AppTheme.proAmber,
+                    letterSpacing: 1.1,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
 
               // Title
               Text(
@@ -140,7 +175,7 @@ class _PremiumUpgradeSheetContent extends StatelessWidget {
                 feature.description,
                 style: GoogleFonts.inter(
                   fontSize: 15,
-                  color: scheme.onSurface.withValues(alpha: 0.6),
+                  color: scheme.onSurface.withValues(alpha: 0.65),
                   height: 1.5,
                 ),
                 textAlign: TextAlign.center,
@@ -153,28 +188,43 @@ class _PremiumUpgradeSheetContent extends StatelessWidget {
               SizedBox(
                 width: double.infinity,
                 height: 54,
-                child: ElevatedButton(
-                  onPressed: () {
-                    Navigator.of(context).pop(true);
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => const PaywallScreen(),
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: AppTheme.proBadgeGradient,
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppTheme.proAmber.withValues(alpha: 0.3),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
                       ),
-                    );
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: scheme.primary,
-                    foregroundColor: Colors.black,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
+                    ],
                   ),
-                  child: Text(
-                    'Unlock with Trackly Pro',
-                    style: GoogleFonts.outfit(
-                      fontSize: 17,
-                      fontWeight: FontWeight.w700,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.of(context).pop(true);
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const PaywallScreen(),
+                        ),
+                      );
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.transparent,
+                      foregroundColor: Colors.black,
+                      shadowColor: Colors.transparent,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                    child: Text(
+                      'Unlock with Trackly Pro',
+                      style: GoogleFonts.outfit(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.black,
+                      ),
                     ),
                   ),
                 ),
@@ -190,7 +240,7 @@ class _PremiumUpgradeSheetContent extends StatelessWidget {
                 child: Text(
                   'Not now',
                   style: GoogleFonts.inter(
-                    color: scheme.onSurface.withValues(alpha: 0.4),
+                    color: scheme.onSurface.withValues(alpha: 0.45),
                     fontSize: 14,
                   ),
                 ),

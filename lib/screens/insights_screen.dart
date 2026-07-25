@@ -15,6 +15,7 @@ import '../services/ai_service.dart';
 import '../services/analytics_service.dart';
 import '../services/insights_service.dart';
 import '../theme/app_layout.dart';
+import '../theme/color_scheme.dart';
 
 class InsightsScreen extends StatefulWidget {
   const InsightsScreen({super.key});
@@ -162,18 +163,20 @@ class _InsightsScreenState extends State<InsightsScreen> {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            scheme.primary.withValues(alpha: 0.16),
-            scheme.primary.withValues(alpha: 0.04),
-          ],
-        ),
-        borderRadius: BorderRadius.circular(20),
+        gradient: isDark ? AppTheme.proBannerGradientDark : AppTheme.proBannerGradientLight,
+        borderRadius: BorderRadius.circular(22),
         border: Border.all(
-          color: scheme.primary.withValues(alpha: 0.25),
+          color: AppTheme.proAmber.withValues(alpha: 0.35),
+          width: 1.5,
         ),
+        boxShadow: [
+          BoxShadow(
+            color: AppTheme.proAmber.withValues(alpha: isDark ? 0.12 : 0.08),
+            blurRadius: 16,
+            spreadRadius: 1,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -183,33 +186,56 @@ class _InsightsScreenState extends State<InsightsScreen> {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: scheme.primary.withValues(alpha: 0.15),
+                  gradient: AppTheme.proBadgeGradient,
                   shape: BoxShape.circle,
                 ),
-                child: Icon(
+                child: const Icon(
                   Icons.auto_awesome_rounded,
-                  size: 20,
-                  color: scheme.primary,
+                  size: 18,
+                  color: Colors.black,
                 ),
               ),
               const SizedBox(width: 10),
-              Text(
-                'AI Habit Coach',
-                style: GoogleFonts.outfit(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                  color: scheme.onSurface,
-                ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Trackly AI Coach',
+                    style: GoogleFonts.outfit(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      color: scheme.onSurface,
+                    ),
+                  ),
+                  Text(
+                    'Personalized Daily Habit Guidance',
+                    style: GoogleFonts.inter(
+                      fontSize: 11,
+                      color: AppTheme.proAmber,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
               ),
               const Spacer(),
               if (_isLoadingAI)
-                SizedBox(
-                  width: 14,
-                  height: 14,
+                const SizedBox(
+                  width: 16,
+                  height: 16,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
-                    color: scheme.primary,
+                    color: AppTheme.proAmber,
                   ),
+                )
+              else
+                IconButton(
+                  onPressed: _loadAICoaching,
+                  icon: const Icon(
+                    Icons.refresh_rounded,
+                    size: 18,
+                    color: AppTheme.proAmber,
+                  ),
+                  tooltip: 'Refresh AI Coaching',
                 ),
             ],
           ),
@@ -220,7 +246,7 @@ class _InsightsScreenState extends State<InsightsScreen> {
             style: GoogleFonts.inter(
               fontSize: 14,
               height: 1.55,
-              color: scheme.onSurface.withValues(alpha: 0.85),
+              color: scheme.onSurface.withValues(alpha: 0.88),
             ),
           ),
         ],

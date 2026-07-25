@@ -14,8 +14,13 @@ import 'package:provider/provider.dart';
 
 import '../models/analytics_data.dart';
 import '../providers/habits_provider.dart';
+import '../providers/subscription_provider.dart';
 import '../services/analytics_service.dart';
+import '../services/subscription_constants.dart';
 import '../theme/app_layout.dart';
+import '../theme/color_scheme.dart';
+import '../widgets/premium_upgrade_sheet.dart';
+import 'paywall_screen.dart';
 
 class AnalyticsScreen extends StatelessWidget {
   const AnalyticsScreen({super.key});
@@ -33,12 +38,39 @@ class AnalyticsScreen extends StatelessWidget {
       userId: userId,
     );
 
+    final sub = context.watch<SubscriptionProvider>();
+    final hasPro = sub.hasProAccess;
+
     return Scaffold(
       appBar: AppBar(
         title: Text(
           'Analytics',
           style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
         ),
+        actions: [
+          if (!hasPro)
+            Padding(
+              padding: const EdgeInsets.only(right: 12),
+              child: TextButton.icon(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const PaywallScreen(),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.workspace_premium_rounded, size: 16, color: AppTheme.proAmber),
+                label: Text(
+                  'Unlock Pro',
+                  style: GoogleFonts.outfit(
+                    fontWeight: FontWeight.w800,
+                    color: AppTheme.proAmber,
+                  ),
+                ),
+              ),
+            ),
+        ],
       ),
       body: analytics.totalHabits == 0
           ? _buildEmptyState(scheme)
@@ -57,16 +89,33 @@ class AnalyticsScreen extends StatelessWidget {
                   const SizedBox(height: 28),
 
                   // ── Heatmap ────────────────────────────────────────
-                  _SectionTitle(title: 'Completion Heatmap'),
+                  Row(
+                    children: [
+                      _SectionTitle(title: 'Completion Heatmap'),
+                      if (!hasPro) ...[
+                        const SizedBox(width: 8),
+                        Icon(Icons.lock_rounded, size: 14, color: AppTheme.proAmber),
+                      ],
+                    ],
+                  ),
                   const SizedBox(height: 12),
-                  _HeatmapCard(
-                    heatmapData: analytics.heatmapData,
-                    scheme: scheme,
-                    isDark: isDark,
-                    totalHabits: analytics.totalHabits,
-                  )
-                      .animate()
-                      .fadeIn(delay: 100.ms, duration: 400.ms),
+                  if (!hasPro)
+                    _ProLockedCard(
+                      title: 'Unlock Completion Heatmap',
+                      subtitle: 'Visual grid mapping your daily consistency across months.',
+                      feature: PremiumFeature.heatmapView,
+                      isDark: isDark,
+                      scheme: scheme,
+                    )
+                  else
+                    _HeatmapCard(
+                      heatmapData: analytics.heatmapData,
+                      scheme: scheme,
+                      isDark: isDark,
+                      totalHabits: analytics.totalHabits,
+                    )
+                        .animate()
+                        .fadeIn(delay: 100.ms, duration: 400.ms),
                   const SizedBox(height: 28),
 
                   // ── Weekday Performance ────────────────────────────
@@ -82,15 +131,32 @@ class AnalyticsScreen extends StatelessWidget {
                   const SizedBox(height: 28),
 
                   // ── Trend ──────────────────────────────────────────
-                  _SectionTitle(title: '30-Day Trend'),
+                  Row(
+                    children: [
+                      _SectionTitle(title: '30-Day Trend'),
+                      if (!hasPro) ...[
+                        const SizedBox(width: 8),
+                        Icon(Icons.lock_rounded, size: 14, color: AppTheme.proAmber),
+                      ],
+                    ],
+                  ),
                   const SizedBox(height: 12),
-                  _TrendCard(
-                    trend: analytics.trend,
-                    scheme: scheme,
-                    isDark: isDark,
-                  )
-                      .animate()
-                      .fadeIn(delay: 300.ms, duration: 400.ms),
+                  if (!hasPro)
+                    _ProLockedCard(
+                      title: 'Unlock 30-Day Trend Graphs',
+                      subtitle: 'Comprehensive trendlines tracking habit completion momentum over time.',
+                      feature: PremiumFeature.trendGraphs,
+                      isDark: isDark,
+                      scheme: scheme,
+                    )
+                  else
+                    _TrendCard(
+                      trend: analytics.trend,
+                      scheme: scheme,
+                      isDark: isDark,
+                    )
+                        .animate()
+                        .fadeIn(delay: 300.ms, duration: 400.ms),
                   const SizedBox(height: 28),
 
                   // ── Per-Habit Breakdown ────────────────────────────
@@ -775,4 +841,95 @@ class _CompletionRingPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _CompletionRingPainter oldDelegate) =>
       progress != oldDelegate.progress || color != oldDelegate.color;
+}
+
+class _ProLockedCard extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final PremiumFeature feature;
+  final bool isDark;
+  final ColorScheme scheme;
+
+  const _ProLockedCard({
+    required this.title,
+    required this.subtitle,
+    required this.feature,
+    required this.isDark,
+    required this.scheme,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF121816) : Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: AppTheme.proAmber.withValues(alpha: 0.3),
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppTheme.proAmber.withValues(alpha: 0.12),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.lock_outline_rounded,
+              color: AppTheme.proAmber,
+              size: 22,
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: GoogleFonts.outfit(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: scheme.onSurface,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    color: scheme.onSurface.withValues(alpha: 0.55),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          ElevatedButton(
+            onPressed: () => showPremiumUpgradeSheet(context, feature: feature),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.proAmber,
+              foregroundColor: Colors.black,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: Text(
+              'Unlock',
+              style: GoogleFonts.outfit(
+                fontSize: 13,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }

@@ -19,12 +19,17 @@ import '../providers/quantified_log_provider.dart';
 import '../services/group_service.dart';
 import '../services/avatar_cache.dart';
 import '../widgets/pro_badge_avatar.dart';
+import '../widgets/trackly_pro_banner.dart';
+import '../widgets/premium_upgrade_sheet.dart';
+import '../services/subscription_constants.dart';
+import '../theme/color_scheme.dart';
 import '../providers/subscription_provider.dart';
 import '../utils/app_snackbar.dart';
 import '../utils/quantity_format.dart';
 import 'group_challenge_detail_screen.dart';
 import 'group_detail_screen.dart';
 import 'habit_leaderboard_screen.dart';
+import 'insights_screen.dart';
 import 'profile_screen.dart';
 import '../providers/achievement_provider.dart';
 import '../providers/mood_provider.dart';
@@ -197,6 +202,63 @@ class _DashboardScreenState extends State<DashboardScreen> {
         physics: const BouncingScrollPhysics(),
         child: Row(
           children: [
+            // AI Coach (Pro)
+            Consumer<SubscriptionProvider>(
+              builder: (context, sub, _) {
+                final hasPro = sub.hasProAccess;
+                return ActionChip(
+                  avatar: Icon(
+                    Icons.auto_awesome_rounded,
+                    size: 16,
+                    color: AppTheme.proAmber,
+                  ),
+                  label: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'AI Coach',
+                        style: GoogleFonts.inter(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 12,
+                        ),
+                      ),
+                      if (!hasPro) ...[
+                        const SizedBox(width: 4),
+                        Icon(
+                          Icons.lock_rounded,
+                          size: 11,
+                          color: AppTheme.proAmber.withValues(alpha: 0.8),
+                        ),
+                      ],
+                    ],
+                  ),
+                  backgroundColor: AppTheme.proAmber.withValues(alpha: isDark ? 0.12 : 0.08),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
+                    side: BorderSide(
+                      color: AppTheme.proAmber.withValues(alpha: 0.4),
+                    ),
+                  ),
+                  onPressed: () async {
+                    if (!hasPro) {
+                      await showPremiumUpgradeSheet(
+                        context,
+                        feature: PremiumFeature.aiCoaching,
+                      );
+                    } else {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const InsightsScreen(),
+                        ),
+                      );
+                    }
+                  },
+                );
+              },
+            ),
+            const SizedBox(width: 8),
+
             // Mood Check-in
             Consumer<MoodProvider>(
               builder: (context, moodProv, _) {
@@ -1621,6 +1683,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               children: [
                                 const SizedBox(height: 8),
                                 _buildQuickActionBar(context),
+                                const SizedBox(height: 4),
+                                const TracklyProBanner(),
                                 const SizedBox(height: 4),
                                 _buildFilterPills(
                                   context,

@@ -3,6 +3,36 @@ import 'package:flutter/material.dart';
 class AppTheme {
   static const _primary = Color(0xFF22C55E);
 
+  // ── Trackly Pro Palette ──────────────────────────────────────────────────
+  static const Color proGold = Color(0xFFFFD700);
+  static const Color proAmber = Color(0xFFF59E0B);
+  static const Color proOrange = Color(0xFFF97316);
+  static const Color proEmerald = Color(0xFF10B981);
+
+  static const LinearGradient proGradient = LinearGradient(
+    colors: [Color(0xFFFFD700), Color(0xFFF59E0B), Color(0xFF10B981)],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
+
+  static const LinearGradient proBadgeGradient = LinearGradient(
+    colors: [Color(0xFFFFD700), Color(0xFFF59E0B)],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
+
+  static const LinearGradient proBannerGradientDark = LinearGradient(
+    colors: [Color(0xFF1A1F1C), Color(0xFF131916), Color(0xFF1C1A14)],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
+
+  static const LinearGradient proBannerGradientLight = LinearGradient(
+    colors: [Color(0xFFFFFBEB), Color(0xFFFEF3C7), Color(0xFFECFDF5)],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
+
   static ThemeData dark() {
     return ThemeData(
       brightness: Brightness.dark,
