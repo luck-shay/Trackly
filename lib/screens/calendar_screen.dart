@@ -6,8 +6,11 @@ import 'package:provider/provider.dart';
 import 'package:table_calendar/table_calendar.dart';
 
 import '../models/habit.dart';
+import '../models/mood_entry.dart';
 import '../providers/calendar_provider.dart';
 import '../providers/habits_provider.dart';
+import '../providers/mood_provider.dart';
+import 'mood_journal_screen.dart';
 
 class CalendarScreen extends StatelessWidget {
   const CalendarScreen({super.key});
@@ -260,15 +263,127 @@ class _CalendarViewState extends State<_CalendarView> {
                     ),
                   ).animate().fade(delay: 300.ms),
                 )
-              else
+              else ...[
+                _buildMoodSection(context, calendarProvider.selectedDay!),
                 _buildEventList(
                   context,
                   _getEventsForDay(calendarProvider.selectedDay!, habits),
                   calendarProvider.selectedDay!,
                 ),
+              ],
             ],
           );
         },
+      ),
+    );
+  }
+
+  Widget _buildMoodSection(BuildContext context, DateTime selectedDay) {
+    final scheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final moodProvider = context.watch<MoodProvider>();
+
+    final dateKey = MoodEntry.dateKey(selectedDay);
+    final moodEntry = moodProvider.recentMoods
+        .where((m) => m.dateKeyValue == dateKey)
+        .firstOrNull;
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: scheme.surface,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: moodEntry != null
+              ? scheme.primary.withValues(alpha: 0.35)
+              : scheme.onSurface.withValues(alpha: 0.08),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text(
+                moodEntry?.moodLevel.emoji ?? '😶',
+                style: const TextStyle(fontSize: 24),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      moodEntry != null
+                          ? 'Mood: ${moodEntry.moodLevel.label}'
+                          : 'No mood logged for this day',
+                      style: GoogleFonts.outfit(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: scheme.onSurface,
+                      ),
+                    ),
+                    if (moodEntry != null && moodEntry.tags.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 2),
+                        child: Text(
+                          moodEntry.tags.join(' • '),
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            color: scheme.primary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              TextButton.icon(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => MoodJournalScreen(date: selectedDay),
+                    ),
+                  );
+                },
+                icon: Icon(
+                  moodEntry != null ? Icons.edit_rounded : Icons.add_rounded,
+                  size: 16,
+                  color: scheme.primary,
+                ),
+                label: Text(
+                  moodEntry != null ? 'Edit' : 'Log Mood',
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: scheme.primary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          if (moodEntry != null && moodEntry.journalText.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.all(12),
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: scheme.onSurface.withValues(alpha: isDark ? 0.04 : 0.03),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                moodEntry.journalText,
+                style: GoogleFonts.inter(
+                  fontSize: 13,
+                  height: 1.45,
+                  color: scheme.onSurface.withValues(alpha: 0.8),
+                ),
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }

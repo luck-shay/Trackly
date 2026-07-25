@@ -1,5 +1,50 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+/// Categories for organizing habits.
+enum HabitCategory {
+  general('General', 'general'),
+  fitness('Fitness', 'fitness'),
+  health('Health', 'health'),
+  learning('Learning', 'learning'),
+  productivity('Productivity', 'productivity'),
+  mindfulness('Mindfulness', 'mindfulness'),
+  social('Social', 'social'),
+  finance('Finance', 'finance'),
+  creativity('Creativity', 'creativity');
+
+  final String label;
+  final String value;
+
+  const HabitCategory(this.label, this.value);
+
+  static HabitCategory fromValue(String? value) {
+    for (final cat in HabitCategory.values) {
+      if (cat.value == value) return cat;
+    }
+    return HabitCategory.general;
+  }
+}
+
+/// Time-of-day blocks for organizing the daily view.
+enum HabitTimeOfDay {
+  anytime('Anytime', 'anytime'),
+  morning('Morning', 'morning'),
+  afternoon('Afternoon', 'afternoon'),
+  evening('Evening', 'evening');
+
+  final String label;
+  final String value;
+
+  const HabitTimeOfDay(this.label, this.value);
+
+  static HabitTimeOfDay fromValue(String? value) {
+    for (final tod in HabitTimeOfDay.values) {
+      if (tod.value == value) return tod;
+    }
+    return HabitTimeOfDay.anytime;
+  }
+}
+
 enum HabitSpaceType { individual, sharedTask, group }
 
 enum GroupTaskMode { shared, memberDefined }
@@ -45,6 +90,44 @@ extension GroupTaskModeX on GroupTaskMode {
   }
 }
 
+class HabitChecklistItem {
+  final String id;
+  final String title;
+  final bool isCompleted;
+
+  const HabitChecklistItem({
+    required this.id,
+    required this.title,
+    this.isCompleted = false,
+  });
+
+  HabitChecklistItem copyWith({
+    String? id,
+    String? title,
+    bool? isCompleted,
+  }) {
+    return HabitChecklistItem(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      isCompleted: isCompleted ?? this.isCompleted,
+    );
+  }
+
+  Map<String, dynamic> toMap() => {
+        'id': id,
+        'title': title,
+        'isCompleted': isCompleted,
+      };
+
+  factory HabitChecklistItem.fromMap(Map<String, dynamic> map) {
+    return HabitChecklistItem(
+      id: map['id'] as String? ?? '',
+      title: map['title'] as String? ?? '',
+      isCompleted: map['isCompleted'] as bool? ?? false,
+    );
+  }
+}
+
 class Habit {
   static const List<int> weekdaysMondayFirst = <int>[
     DateTime.monday,
@@ -79,6 +162,12 @@ class Habit {
   final bool requiresPhotoValidation;
   final String? reminderTime; // HH:mm format
   final List<int> reminderWeekdays;
+  final HabitCategory category;
+  final HabitTimeOfDay timeOfDay;
+  final int? colorValue; // Color as int (Color.value)
+  final int? iconCodePoint; // IconData.codePoint
+  final int sortOrder;
+  final List<HabitChecklistItem> checklist;
 
   Habit({
     required this.id,
@@ -104,6 +193,12 @@ class Habit {
     this.requiresPhotoValidation = false,
     this.reminderTime,
     List<int>? reminderWeekdays,
+    this.category = HabitCategory.general,
+    this.timeOfDay = HabitTimeOfDay.anytime,
+    this.colorValue,
+    this.iconCodePoint,
+    this.sortOrder = 0,
+    this.checklist = const [],
   }) : completions = completions ?? {},
        quantifiedValues = quantifiedValues ?? {},
        participants = participants ?? [],
@@ -140,6 +235,12 @@ class Habit {
     bool? requiresPhotoValidation,
     String? reminderTime,
     List<int>? reminderWeekdays,
+    HabitCategory? category,
+    HabitTimeOfDay? timeOfDay,
+    int? colorValue,
+    int? iconCodePoint,
+    int? sortOrder,
+    List<HabitChecklistItem>? checklist,
   }) {
     return Habit(
       id: id ?? this.id,
@@ -166,6 +267,12 @@ class Habit {
           requiresPhotoValidation ?? this.requiresPhotoValidation,
       reminderTime: reminderTime ?? this.reminderTime,
       reminderWeekdays: reminderWeekdays ?? this.reminderWeekdays,
+      category: category ?? this.category,
+      timeOfDay: timeOfDay ?? this.timeOfDay,
+      colorValue: colorValue ?? this.colorValue,
+      iconCodePoint: iconCodePoint ?? this.iconCodePoint,
+      sortOrder: sortOrder ?? this.sortOrder,
+      checklist: checklist ?? this.checklist,
     );
   }
 
@@ -434,6 +541,12 @@ class Habit {
       'requiresPhotoValidation': requiresPhotoValidation,
       'reminderTime': reminderTime,
       'reminderWeekdays': reminderWeekdays,
+      'category': category.value,
+      'timeOfDay': timeOfDay.value,
+      'colorValue': colorValue,
+      'iconCodePoint': iconCodePoint,
+      'sortOrder': sortOrder,
+      'checklist': checklist.map((item) => item.toMap()).toList(),
     };
   }
 
@@ -536,6 +649,18 @@ class Habit {
       }
     }
 
+    final parsedChecklist = <HabitChecklistItem>[];
+    final rawChecklist = map['checklist'];
+    if (rawChecklist is List) {
+      for (final item in rawChecklist) {
+        if (item is Map) {
+          parsedChecklist.add(
+            HabitChecklistItem.fromMap(Map<String, dynamic>.from(item)),
+          );
+        }
+      }
+    }
+
     return Habit(
       id: id ?? map['id'] ?? '',
       groupEntityId: map['groupEntityId'] as String?,
@@ -560,6 +685,12 @@ class Habit {
       requiresPhotoValidation: map['requiresPhotoValidation'] ?? false,
       reminderTime: map['reminderTime'] as String?,
       reminderWeekdays: parsedReminderWeekdays,
+      category: HabitCategory.fromValue(map['category'] as String?),
+      timeOfDay: HabitTimeOfDay.fromValue(map['timeOfDay'] as String?),
+      colorValue: (map['colorValue'] as num?)?.toInt(),
+      iconCodePoint: (map['iconCodePoint'] as num?)?.toInt(),
+      sortOrder: (map['sortOrder'] as num?)?.toInt() ?? 0,
+      checklist: parsedChecklist,
     );
   }
 }

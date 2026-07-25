@@ -106,6 +106,10 @@ service cloud.firestore {
       allow update: if isCurrentUser(uid) || canUpdateReciprocalFriendList();
 
       allow delete: if false;
+
+      match /{allSubcollections=**} {
+        allow read, write: if isCurrentUser(uid);
+      }
     }
 
     match /habits/{habitId} {

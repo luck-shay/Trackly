@@ -26,6 +26,12 @@ import 'group_challenge_detail_screen.dart';
 import 'group_detail_screen.dart';
 import 'habit_leaderboard_screen.dart';
 import 'profile_screen.dart';
+import '../providers/achievement_provider.dart';
+import '../providers/mood_provider.dart';
+import 'achievements_screen.dart';
+import 'focus_timer_screen.dart';
+import 'mood_journal_screen.dart';
+import 'weekly_report_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -174,6 +180,168 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
               );
             }),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildQuickActionBar(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 4),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
+        child: Row(
+          children: [
+            // Mood Check-in
+            Consumer<MoodProvider>(
+              builder: (context, moodProv, _) {
+                final todayMood = moodProv.todaysMood;
+                final label = todayMood != null
+                    ? '${todayMood.moodLevel.emoji} ${todayMood.moodLevel.label}'
+                    : '😊 Mood';
+
+                return ActionChip(
+                  avatar: Text(
+                    todayMood?.moodLevel.emoji ?? '😊',
+                    style: const TextStyle(fontSize: 14),
+                  ),
+                  label: Text(
+                    label,
+                    style: GoogleFonts.inter(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 12,
+                    ),
+                  ),
+                  backgroundColor: todayMood != null
+                      ? scheme.primary.withValues(alpha: 0.15)
+                      : isDark
+                          ? const Color(0xFF121816)
+                          : Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
+                    side: BorderSide(
+                      color: todayMood != null
+                          ? scheme.primary.withValues(alpha: 0.4)
+                          : scheme.onSurface.withValues(alpha: 0.1),
+                    ),
+                  ),
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const MoodJournalScreen(),
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
+            const SizedBox(width: 8),
+
+            // XP / Level Badge
+            Consumer<AchievementProvider>(
+              builder: (context, achProv, _) {
+                final level = achProv.currentLevel;
+                return ActionChip(
+                  avatar: Text(
+                    level.emoji,
+                    style: const TextStyle(fontSize: 14),
+                  ),
+                  label: Text(
+                    '${level.name} • ${achProv.totalXP} XP',
+                    style: GoogleFonts.inter(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 12,
+                    ),
+                  ),
+                  backgroundColor:
+                      isDark ? const Color(0xFF121816) : Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
+                    side: BorderSide(
+                      color: const Color(0xFFFFD700).withValues(alpha: 0.4),
+                    ),
+                  ),
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const AchievementsScreen(),
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
+            const SizedBox(width: 8),
+
+            // Focus Timer
+            ActionChip(
+              avatar: const Icon(
+                Icons.timer_rounded,
+                size: 16,
+                color: Color(0xFF3B82F6),
+              ),
+              label: Text(
+                'Focus',
+                style: GoogleFonts.inter(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 12,
+                ),
+              ),
+              backgroundColor: isDark ? const Color(0xFF121816) : Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+                side: BorderSide(
+                  color: const Color(0xFF3B82F6).withValues(alpha: 0.3),
+                ),
+              ),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const FocusTimerScreen(),
+                  ),
+                );
+              },
+            ),
+            const SizedBox(width: 8),
+
+            // Weekly Report
+            ActionChip(
+              avatar: const Icon(
+                Icons.bar_chart_rounded,
+                size: 16,
+                color: Color(0xFF8B5CF6),
+              ),
+              label: Text(
+                'Report',
+                style: GoogleFonts.inter(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 12,
+                ),
+              ),
+              backgroundColor: isDark ? const Color(0xFF121816) : Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+                side: BorderSide(
+                  color: const Color(0xFF8B5CF6).withValues(alpha: 0.3),
+                ),
+              ),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const WeeklyReportScreen(),
+                  ),
+                );
+              },
+            ),
           ],
         ),
       ),
@@ -1452,6 +1620,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               padding: EdgeInsets.zero,
                               children: [
                                 const SizedBox(height: 8),
+                                _buildQuickActionBar(context),
+                                const SizedBox(height: 4),
                                 _buildFilterPills(
                                   context,
                                   selectedFilter: selectedFilter,

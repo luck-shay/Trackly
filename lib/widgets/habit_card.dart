@@ -4,7 +4,9 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
 import '../models/habit.dart';
+import '../theme/category_colors.dart';
 import '../utils/quantity_format.dart';
+import 'habit_checklist_sheet.dart';
 
 class HabitCard extends StatefulWidget {
   final Habit habit;
@@ -111,7 +113,10 @@ class _HabitCardState extends State<HabitCard> {
         borderRadius: BorderRadius.circular(widget.borderRadius),
         child: InkWell(
           borderRadius: BorderRadius.circular(widget.borderRadius),
-          onTap: widget.onCardTap,
+          onTap: widget.onCardTap ??
+              (widget.habit.checklist.isNotEmpty
+                  ? () => HabitChecklistSheet.show(context, widget.habit)
+                  : null),
           child: Padding(
             padding: const EdgeInsets.all(20.0),
             child: Column(
@@ -179,6 +184,132 @@ class _HabitCardState extends State<HabitCard> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          if (widget.habit.category != HabitCategory.general ||
+                              widget.habit.timeOfDay != HabitTimeOfDay.anytime) ...[
+                            Row(
+                              children: [
+                                if (widget.habit.category != HabitCategory.general)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 2,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: CategoryColors.forCategory(
+                                        widget.habit.category,
+                                      ).withValues(alpha: 0.12),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          CategoryColors.iconForCategory(
+                                            widget.habit.category,
+                                          ),
+                                          size: 12,
+                                          color: CategoryColors.forCategory(
+                                            widget.habit.category,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          widget.habit.category.label,
+                                          style: GoogleFonts.inter(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w600,
+                                            color: CategoryColors.forCategory(
+                                              widget.habit.category,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                if (widget.habit.category != HabitCategory.general &&
+                                    widget.habit.timeOfDay != HabitTimeOfDay.anytime)
+                                  const SizedBox(width: 6),
+                                if (widget.habit.timeOfDay != HabitTimeOfDay.anytime)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 2,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: CategoryColors.colorForTimeOfDay(
+                                        widget.habit.timeOfDay,
+                                      ).withValues(alpha: 0.12),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          CategoryColors.iconForTimeOfDay(
+                                            widget.habit.timeOfDay,
+                                          ),
+                                          size: 12,
+                                          color: CategoryColors.colorForTimeOfDay(
+                                            widget.habit.timeOfDay,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          widget.habit.timeOfDay.label,
+                                          style: GoogleFonts.inter(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w600,
+                                            color: CategoryColors.colorForTimeOfDay(
+                                              widget.habit.timeOfDay,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                if (widget.habit.checklist.isNotEmpty) ...[
+                                  const SizedBox(width: 6),
+                                  InkWell(
+                                    onTap: () {
+                                      HapticFeedback.selectionClick();
+                                      HabitChecklistSheet.show(context, widget.habit);
+                                    },
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 2,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFF3B82F6).withValues(alpha: 0.14),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          const Icon(
+                                            Icons.checklist_rounded,
+                                            size: 12,
+                                            color: Color(0xFF3B82F6),
+                                          ),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            '${widget.habit.checklist.where((i) => i.isCompleted).length}/${widget.habit.checklist.length}',
+                                            style: GoogleFonts.inter(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w600,
+                                              color: const Color(0xFF3B82F6),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                          ],
                           Row(
                             children: [
                               if (widget.habit.isGroup) ...[

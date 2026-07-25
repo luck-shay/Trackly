@@ -1,6 +1,6 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Trackly Pro — Insights Screen
-// Smart insights feed showing deterministic insights from analytics.
+// AI-powered habit coaching feed and smart analytics insights.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import 'package:flutter/material.dart';
@@ -11,12 +11,57 @@ import 'package:provider/provider.dart';
 
 import '../models/insight.dart';
 import '../providers/habits_provider.dart';
+import '../services/ai_service.dart';
 import '../services/analytics_service.dart';
 import '../services/insights_service.dart';
 import '../theme/app_layout.dart';
 
-class InsightsScreen extends StatelessWidget {
+class InsightsScreen extends StatefulWidget {
   const InsightsScreen({super.key});
+
+  @override
+  State<InsightsScreen> createState() => _InsightsScreenState();
+}
+
+class _InsightsScreenState extends State<InsightsScreen> {
+  String? _aiCoachingMessage;
+  bool _isLoadingAI = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAICoaching();
+  }
+
+  Future<void> _loadAICoaching() async {
+    final userId = FirebaseAuth.instance.currentUser?.uid ?? '';
+    final habits = context.read<HabitsProvider>().habits;
+    if (habits.isEmpty) return;
+
+    setState(() => _isLoadingAI = true);
+
+    const analyticsService = AnalyticsService();
+    final analytics = analyticsService.computeOverall(
+      habits: habits,
+      userId: userId,
+    );
+
+    final msg = await AIService.generateCoachingInsight(
+      currentStreak: analytics.currentLongestStreak,
+      completionRate: analytics.overallCompletionRate,
+      bestDay: analytics.weekdayPerformance.dayName(analytics.weekdayPerformance.bestDay),
+      worstDay: analytics.weekdayPerformance.dayName(analytics.weekdayPerformance.worstDay),
+      totalHabits: analytics.totalHabits,
+      totalCompletions: analytics.totalCompletions,
+    );
+
+    if (mounted) {
+      setState(() {
+        _aiCoachingMessage = msg;
+        _isLoadingAI = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -37,38 +82,47 @@ class InsightsScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          'Insights',
+          'Coach & Insights',
           style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
         ),
       ),
-      body: insights.isEmpty
+      body: habits.isEmpty
           ? _buildEmptyState(scheme)
           : ListView.builder(
               physics: const BouncingScrollPhysics(),
               padding: const EdgeInsets.fromLTRB(
                 AppLayout.lg, 8, AppLayout.lg, 120,
               ),
-              itemCount: insights.length + 1, // +1 for header
+              itemCount: insights.length + 2, // +1 header, +1 AI coach
               itemBuilder: (context, index) {
                 if (index == 0) {
                   return Padding(
-                    padding: const EdgeInsets.only(bottom: 20),
+                    padding: const EdgeInsets.only(bottom: 16),
+                    child: _buildAICoachCard(scheme, isDark),
+                  )
+                      .animate()
+                      .fadeIn(duration: 400.ms);
+                }
+
+                if (index == 1) {
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 16, top: 8),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
                           'Here\'s what we noticed',
                           style: GoogleFonts.outfit(
-                            fontSize: 24,
+                            fontSize: 22,
                             fontWeight: FontWeight.w700,
                             color: scheme.onSurface,
                           ),
                         ),
-                        const SizedBox(height: 6),
+                        const SizedBox(height: 4),
                         Text(
-                          'Based on your habit completion patterns.',
+                          'Pattern analysis derived from your habit history.',
                           style: GoogleFonts.inter(
-                            fontSize: 14,
+                            fontSize: 13,
                             color: scheme.onSurface.withValues(alpha: 0.5),
                           ),
                         ),
@@ -76,10 +130,10 @@ class InsightsScreen extends StatelessWidget {
                     ),
                   )
                       .animate()
-                      .fadeIn(duration: 400.ms);
+                      .fadeIn(delay: 100.ms, duration: 400.ms);
                 }
 
-                final insight = insights[index - 1];
+                final insight = insights[index - 2];
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 10),
                   child: _InsightCard(
@@ -89,18 +143,88 @@ class InsightsScreen extends StatelessWidget {
                   )
                       .animate()
                       .fadeIn(
-                        delay: (100 + (index - 1) * 80).ms,
+                        delay: (150 + (index - 2) * 80).ms,
                         duration: 400.ms,
                       )
                       .moveY(
                         begin: 12,
                         end: 0,
-                        delay: (100 + (index - 1) * 80).ms,
+                        delay: (150 + (index - 2) * 80).ms,
                         duration: 400.ms,
                       ),
                 );
               },
             ),
+    );
+  }
+
+  Widget _buildAICoachCard(ColorScheme scheme, bool isDark) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            scheme.primary.withValues(alpha: 0.16),
+            scheme.primary.withValues(alpha: 0.04),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: scheme.primary.withValues(alpha: 0.25),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: scheme.primary.withValues(alpha: 0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.auto_awesome_rounded,
+                  size: 20,
+                  color: scheme.primary,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Text(
+                'AI Habit Coach',
+                style: GoogleFonts.outfit(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: scheme.onSurface,
+                ),
+              ),
+              const Spacer(),
+              if (_isLoadingAI)
+                SizedBox(
+                  width: 14,
+                  height: 14,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: scheme.primary,
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Text(
+            _aiCoachingMessage ??
+                'Building consistency is a marathon, not a sprint. Focus on completing 1 habit at a time today! 🎯',
+            style: GoogleFonts.inter(
+              fontSize: 14,
+              height: 1.55,
+              color: scheme.onSurface.withValues(alpha: 0.85),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -127,7 +251,7 @@ class InsightsScreen extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              'Complete more habits to unlock personalized insights.',
+              'Complete more habits to unlock personalized AI coaching and insights.',
               textAlign: TextAlign.center,
               style: GoogleFonts.inter(
                 fontSize: 15,

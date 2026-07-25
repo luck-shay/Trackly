@@ -75,6 +75,11 @@ enum PremiumFeature {
   streakHistory,
   categoryInsights,
   unlimitedSharedHabits,
+  aiCoaching,
+  moodCorrelation,
+  focusTimer,
+  habitStacking,
+  advancedAchievements,
 }
 
 /// Human-readable label for each premium feature.
@@ -95,6 +100,11 @@ extension PremiumFeatureLabel on PremiumFeature {
     PremiumFeature.streakHistory => 'Streak History',
     PremiumFeature.categoryInsights => 'Category Insights',
     PremiumFeature.unlimitedSharedHabits => 'Unlimited Shared Habits',
+    PremiumFeature.aiCoaching => 'AI Coach',
+    PremiumFeature.moodCorrelation => 'Mood Correlation',
+    PremiumFeature.focusTimer => 'Focus Timer',
+    PremiumFeature.habitStacking => 'Habit Stacking',
+    PremiumFeature.advancedAchievements => 'Advanced Achievements',
   };
 
   String get description => switch (this) {
@@ -128,5 +138,15 @@ extension PremiumFeatureLabel on PremiumFeature {
       'Performance breakdown by habit category',
     PremiumFeature.unlimitedSharedHabits =>
       'Share unlimited habits with friends',
+    PremiumFeature.aiCoaching =>
+      'Personalized AI coaching and habit recommendations',
+    PremiumFeature.moodCorrelation =>
+      'See how your mood affects habit performance',
+    PremiumFeature.focusTimer =>
+      'Pomodoro timer linked to habits with session history',
+    PremiumFeature.habitStacking =>
+      'Chain habits into sequential routines',
+    PremiumFeature.advancedAchievements =>
+      'Unlock exclusive badges and achievement tiers',
   };
 }

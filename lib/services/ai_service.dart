@@ -268,4 +268,98 @@ class AIService {
     final result = await validateHabitCompletionDetailed(habitTitle, imageFile);
     return result.approved;
   }
+
+  // ── AI Coaching ─────────────────────────────────────────────────────────
+
+  /// Generate a personalized coaching insight based on habit data.
+  static Future<String?> generateCoachingInsight({
+    required int currentStreak,
+    required double completionRate,
+    required String bestDay,
+    required String worstDay,
+    required int totalHabits,
+    required int totalCompletions,
+    String? moodSummary,
+  }) async {
+    final key = _apiKey;
+    if (key.isEmpty) return null;
+
+    try {
+      final model = GenerativeModel(
+        model: _configuredModel,
+        apiKey: key,
+      );
+
+      final prompt = '''You are a supportive, encouraging habit coach for the app "Trackly". 
+Generate a brief, personalized coaching message (2-3 sentences max) based on this user data:
+
+- Current streak: $currentStreak days
+- Completion rate: ${(completionRate * 100).round()}%
+- Best day: $bestDay
+- Worst day: $worstDay
+- Total habits: $totalHabits
+- Total completions: $totalCompletions
+${moodSummary != null ? '- Recent mood: $moodSummary' : ''}
+
+Rules:
+- Be warm, specific, and actionable
+- If streak is strong, celebrate it
+- If completion rate is low, be encouraging not judgmental
+- If there's a weak day, suggest a concrete strategy
+- Use 1-2 relevant emojis
+- Never use generic platitudes like "you got this"
+- Sound like a knowledgeable friend, not a corporate app''';
+
+      final response = await model.generateContent([Content.text(prompt)]);
+      return response.text?.trim();
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('AIService: Coaching insight failed: $e');
+      }
+      return null;
+    }
+  }
+
+  /// Generate a weekly performance summary.
+  static Future<String?> generateWeeklySummary({
+    required double completionRate,
+    required int streakLength,
+    required int completedCount,
+    required int totalPossible,
+    required List<String> topHabits,
+    required List<String> missedHabits,
+  }) async {
+    final key = _apiKey;
+    if (key.isEmpty) return null;
+
+    try {
+      final model = GenerativeModel(
+        model: _configuredModel,
+        apiKey: key,
+      );
+
+      final prompt = '''You are a habit coach for "Trackly". Write a brief weekly summary (3-4 sentences) for this user:
+
+- Weekly completion: ${(completionRate * 100).round()}% ($completedCount/$totalPossible)
+- Current streak: $streakLength days
+- Top habits: ${topHabits.join(', ')}
+- Most missed: ${missedHabits.join(', ')}
+
+Rules:
+- Start with the highlight of the week
+- Mention specific habit names
+- End with one actionable tip for next week
+- Warm, personal tone with 1-2 emojis
+- Keep it under 4 sentences''';
+
+      final response = await model.generateContent([Content.text(prompt)]);
+      return response.text?.trim();
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('AIService: Weekly summary failed: $e');
+      }
+      return null;
+    }
+  }
 }
+

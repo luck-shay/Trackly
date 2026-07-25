@@ -21,6 +21,8 @@ import 'providers/profile_provider.dart';
 import 'providers/login_provider.dart';
 import 'providers/theme_mode_provider.dart';
 import 'providers/subscription_provider.dart';
+import 'providers/mood_provider.dart';
+import 'providers/achievement_provider.dart';
 import 'package:trackly/theme/color_scheme.dart';
 import 'services/avatar_cache.dart';
 
@@ -121,6 +123,8 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => HabitsProvider()),
         ChangeNotifierProvider(create: (_) => ProfileProvider()),
         ChangeNotifierProvider(create: (_) => LoginProvider()),
+        ChangeNotifierProvider(create: (_) => MoodProvider()),
+        ChangeNotifierProvider(create: (_) => AchievementProvider()),
         if (subscriptionProvider != null)
           ChangeNotifierProvider<SubscriptionProvider>.value(
             value: subscriptionProvider!,

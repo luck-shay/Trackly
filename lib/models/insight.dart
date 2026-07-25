@@ -17,6 +17,10 @@ enum InsightType {
   consistency,
   milestone,
   suggestion,
+  aiCoaching,
+  moodCorrelation,
+  habitStacking,
+  weeklyRecap,
 }
 
 /// A single human-readable insight derived from analytics data.

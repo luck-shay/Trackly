@@ -22,6 +22,9 @@ class CreateHabitProvider extends ChangeNotifier {
   final List<int> _reminderWeekdays = <int>[];
   bool _isEditMode = false;
   String? _editingHabitId;
+  HabitCategory _category = HabitCategory.general;
+  HabitTimeOfDay _timeOfDay = HabitTimeOfDay.anytime;
+  final List<String> _checklistItems = <String>[];
   final SubscriptionService _subscriptionService = SubscriptionService();
 
 
@@ -66,6 +69,9 @@ class CreateHabitProvider extends ChangeNotifier {
   String? get reminderTime => _reminderTime;
   List<int> get reminderWeekdays => List<int>.unmodifiable(_reminderWeekdays);
   bool get isEditMode => _isEditMode;
+  HabitCategory get category => _category;
+  HabitTimeOfDay get timeOfDay => _timeOfDay;
+  List<String> get checklistItems => List<String>.unmodifiable(_checklistItems);
 
   double get quantSliderMin => _quantConfig(_quantUnit).min;
   double get quantSliderMax => _quantConfig(_quantUnit).max;
@@ -138,6 +144,32 @@ class CreateHabitProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  void setCategory(HabitCategory value) {
+    if (_category == value) return;
+    _category = value;
+    notifyListeners();
+  }
+
+  void setTimeOfDay(HabitTimeOfDay value) {
+    if (_timeOfDay == value) return;
+    _timeOfDay = value;
+    notifyListeners();
+  }
+
+  void addChecklistItem(String title) {
+    final trimmed = title.trim();
+    if (trimmed.isEmpty) return;
+    _checklistItems.add(trimmed);
+    notifyListeners();
+  }
+
+  void removeChecklistItem(int index) {
+    if (index >= 0 && index < _checklistItems.length) {
+      _checklistItems.removeAt(index);
+      notifyListeners();
+    }
+  }
+
   
   void setReminderTime(String? time) {
     _reminderTime = time;
@@ -189,6 +221,11 @@ class CreateHabitProvider extends ChangeNotifier {
       ..clear()
       ..addAll(habit.effectiveReminderWeekdays);
     _selectedFriends.clear();
+    _category = habit.category;
+    _timeOfDay = habit.timeOfDay;
+    _checklistItems
+      ..clear()
+      ..addAll(habit.checklist.map((item) => item.title));
     notifyListeners();
   }
 
@@ -237,6 +274,18 @@ class CreateHabitProvider extends ChangeNotifier {
         requiresPhotoValidation: false,
         reminderTime: _reminderTime,
         reminderWeekdays: _resolvedReminderWeekdays(),
+        category: _category,
+        timeOfDay: _timeOfDay,
+        checklist: _checklistItems.indexed.map<HabitChecklistItem>((entry) {
+          final idx = entry.$1;
+          final title = entry.$2;
+          final existingItem = existing.checklist.where((c) => c.title == title).firstOrNull;
+          return existingItem ??
+              HabitChecklistItem(
+                id: '${DateTime.now().microsecondsSinceEpoch}_$idx',
+                title: title,
+              );
+        }).toList(),
       );
 
       await databaseService.saveHabit(savedHabit);
@@ -307,6 +356,14 @@ class CreateHabitProvider extends ChangeNotifier {
             : const {},
         reminderTime: _reminderTime,
         reminderWeekdays: _resolvedReminderWeekdays(),
+        category: _category,
+        timeOfDay: _timeOfDay,
+        checklist: _checklistItems.indexed.map<HabitChecklistItem>((entry) {
+          return HabitChecklistItem(
+            id: '${DateTime.now().microsecondsSinceEpoch}_${entry.$1}',
+            title: entry.$2,
+          );
+        }).toList(),
       );
 
       // Save to Database so it automatically streams to Dashboard via HabitsProvider

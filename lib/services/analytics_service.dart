@@ -13,6 +13,7 @@ class AnalyticsService {
   // ── Overall Analytics ───────────────────────────────────────────────────
 
   /// Computes aggregated analytics across all habits for a given user.
+  /// Computes aggregated analytics across all habits for a given user.
   OverallAnalytics computeOverall({
     required List<Habit> habits,
     required String userId,
@@ -56,9 +57,14 @@ class AnalyticsService {
         ? now.difference(_dateOnly(earliest)).inDays + 1
         : 0;
 
-    final overallRate = totalTrackedDays > 0 && habits.isNotEmpty
-        ? (totalCompletions / (totalTrackedDays * habits.length))
-            .clamp(0.0, 1.0)
+    double totalExpectedCompletions = 0;
+    for (final h in habits) {
+      final days = now.difference(_dateOnly(h.createdAt)).inDays + 1;
+      totalExpectedCompletions += (days * (h.targetDaysPerWeek / 7.0)).clamp(1.0, 10000.0);
+    }
+
+    final overallRate = totalExpectedCompletions > 0 && habits.isNotEmpty
+        ? (totalCompletions / totalExpectedCompletions).clamp(0.0, 1.0)
         : 0.0;
 
     return OverallAnalytics(
@@ -73,6 +79,86 @@ class AnalyticsService {
       trend: trend,
       activeDays: activeDays,
       totalTrackedDays: totalTrackedDays,
+    );
+  }
+
+  /// Computes weekly analytics specifically for a 7-day week window (Mon-Sun).
+  OverallAnalytics computeForWeek({
+    required List<Habit> habits,
+    required String userId,
+    required DateTime weekStart,
+  }) {
+    if (habits.isEmpty) return OverallAnalytics.empty;
+
+    final weekStartOnly = _dateOnly(weekStart);
+    final weekEndOnly = weekStartOnly.add(const Duration(days: 6));
+    final nowOnly = _dateOnly(DateTime.now());
+
+    final perHabit = habits
+        .map((h) => computeForHabitInDateRange(
+              habit: h,
+              userId: userId,
+              start: weekStartOnly,
+              end: weekEndOnly,
+            ))
+        .toList();
+
+    final totalCompletions = perHabit.fold<int>(
+      0, (sum, a) => sum + a.totalCompletions,
+    );
+
+    final heatmap = _computeHeatmap(habits: habits, userId: userId);
+    final weekday = _computeWeekdayPerformance(habits: habits, userId: userId);
+    final trend = _computeOverallTrend(habits: habits, userId: userId);
+
+    int allTimeLongest = 0;
+    int currentLongest = 0;
+    for (final ha in perHabit) {
+      if (ha.longestStreak > allTimeLongest) {
+        allTimeLongest = ha.longestStreak;
+      }
+      if (ha.currentStreak > currentLongest) {
+        currentLongest = ha.currentStreak;
+      }
+    }
+
+    final activeDaysThisWeek = heatmap.keys
+        .where((d) => !d.isBefore(weekStartOnly) && !d.isAfter(weekEndOnly))
+        .length;
+
+    double totalExpectedCompletions = 0;
+    for (final h in habits) {
+      final habitStart = _dateOnly(h.createdAt);
+      int daysElapsedThisWeek = 0;
+      for (int i = 0; i < 7; i++) {
+        final d = weekStartOnly.add(Duration(days: i));
+        if (!d.isAfter(nowOnly) && !d.isBefore(habitStart)) {
+          daysElapsedThisWeek++;
+        }
+      }
+      if (daysElapsedThisWeek <= 0 && !nowOnly.isBefore(habitStart)) {
+        daysElapsedThisWeek = 1;
+      }
+      final expectedForHabit = (h.targetDaysPerWeek * (daysElapsedThisWeek / 7.0)).clamp(1.0, 7.0);
+      totalExpectedCompletions += expectedForHabit;
+    }
+
+    final overallRate = totalExpectedCompletions > 0
+        ? (totalCompletions / totalExpectedCompletions).clamp(0.0, 1.0)
+        : 0.0;
+
+    return OverallAnalytics(
+      totalHabits: habits.length,
+      totalCompletions: totalCompletions,
+      overallCompletionRate: overallRate,
+      currentLongestStreak: currentLongest,
+      allTimeLongestStreak: allTimeLongest,
+      weekdayPerformance: weekday,
+      heatmapData: heatmap,
+      perHabitAnalytics: perHabit,
+      trend: trend,
+      activeDays: activeDaysThisWeek,
+      totalTrackedDays: 7,
     );
   }
 
@@ -100,9 +186,59 @@ class AnalyticsService {
     final daysSinceCreation = now
         .difference(_dateOnly(habit.createdAt))
         .inDays + 1;
-    final completionRate = daysSinceCreation > 0
-        ? (totalCompletions / daysSinceCreation).clamp(0.0, 1.0)
-        : 0.0;
+    final expectedCompletions = (daysSinceCreation * (habit.targetDaysPerWeek / 7.0)).clamp(1.0, 10000.0);
+    final completionRate = (totalCompletions / expectedCompletions).clamp(0.0, 1.0);
+
+    return HabitAnalytics(
+      habitId: habit.id,
+      habitTitle: habit.title,
+      totalCompletions: totalCompletions,
+      completionRate: completionRate,
+      currentStreak: currentStreak,
+      longestStreak: longestStreak,
+      streakHistory: streaks,
+      weekdayPerformance: weekday,
+      trend: trend,
+      targetDaysPerWeek: habit.targetDaysPerWeek,
+    );
+  }
+
+  /// Computes analytics for a single habit within a specific date range.
+  HabitAnalytics computeForHabitInDateRange({
+    required Habit habit,
+    required String userId,
+    required DateTime start,
+    required DateTime end,
+  }) {
+    final allCompletions = _userCompletions(habit, userId);
+    final rangeCompletions = allCompletions
+        .where((d) => !_dateOnly(d).isBefore(_dateOnly(start)) && !_dateOnly(d).isAfter(_dateOnly(end)))
+        .toList()
+      ..sort((a, b) => a.compareTo(b));
+
+    final totalCompletions = rangeCompletions.length;
+    final streaks = _computeStreaks(allCompletions);
+    final currentStreak = _currentStreak(allCompletions);
+    final longestStreak = streaks.isEmpty
+        ? 0
+        : streaks.map((s) => s.length).reduce((a, b) => a > b ? a : b);
+    final weekday = _computeWeekdayForDates(allCompletions, habit.createdAt);
+    final trend = _computeTrendForDates(allCompletions, habit.createdAt);
+
+    final nowOnly = _dateOnly(DateTime.now());
+    final habitStart = _dateOnly(habit.createdAt);
+
+    int daysElapsed = 0;
+    for (int i = 0; i < 7; i++) {
+      final d = start.add(Duration(days: i));
+      if (!d.isAfter(nowOnly) && !d.isBefore(habitStart)) {
+        daysElapsed++;
+      }
+    }
+    if (daysElapsed <= 0) daysElapsed = 1;
+
+    final expected = (habit.targetDaysPerWeek * (daysElapsed / 7.0)).clamp(1.0, 7.0);
+    final completionRate = (totalCompletions / expected).clamp(0.0, 1.0);
 
     return HabitAnalytics(
       habitId: habit.id,

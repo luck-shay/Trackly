@@ -258,6 +258,42 @@ class HabitsProvider extends ChangeNotifier {
     return logHabitCompletion(habit);
   }
 
+  Future<void> toggleChecklistItem(Habit habit, String itemId) async {
+    final updatedChecklist = habit.checklist.map((item) {
+      if (item.id == itemId) {
+        return item.copyWith(isCompleted: !item.isCompleted);
+      }
+      return item;
+    }).toList();
+
+    final updatedHabit = habit.copyWith(checklist: updatedChecklist);
+    
+    // Auto-trigger completion if all items checked
+    final allCompleted = updatedChecklist.isNotEmpty &&
+        updatedChecklist.every((item) => item.isCompleted);
+    final now = DateTime.now();
+    if (allCompleted && !habit.isCompletedOnDate(_db.userId, now)) {
+      await logHabitCompletion(updatedHabit);
+    } else {
+      await _db.saveHabit(updatedHabit);
+    }
+  }
+
+  Future<void> markAllChecklistDone(Habit habit) async {
+    final updatedChecklist = habit.checklist.map((item) {
+      return item.copyWith(isCompleted: true);
+    }).toList();
+
+    final updatedHabit = habit.copyWith(checklist: updatedChecklist);
+
+    final now = DateTime.now();
+    if (!habit.isCompletedOnDate(_db.userId, now)) {
+      await logHabitCompletion(updatedHabit);
+    } else {
+      await _db.saveHabit(updatedHabit);
+    }
+  }
+
   Future<void> logHabitCompletion(
     Habit habit, {
     double? quantifiedValue,

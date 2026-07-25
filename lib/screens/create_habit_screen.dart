@@ -10,6 +10,7 @@ import '../services/subscription_constants.dart';
 import '../providers/create_habit_provider.dart';
 import '../services/subscription_exceptions.dart';
 import '../theme/app_layout.dart';
+import '../theme/category_colors.dart';
 import '../utils/quantity_format.dart';
 import '../widgets/premium_upgrade_sheet.dart';
 
@@ -117,11 +118,14 @@ class _CreateHabitViewState extends State<_CreateHabitView> {
     });
   }
 
+  final TextEditingController _checklistItemController = TextEditingController();
+
   @override
   void dispose() {
     _titleController.dispose();
     _descriptionController.dispose();
     _groupNameController.dispose();
+    _checklistItemController.dispose();
     super.dispose();
   }
 
@@ -251,6 +255,224 @@ class _CreateHabitViewState extends State<_CreateHabitView> {
               const VGap(AppLayout.xxl),
 
               Text(
+                'CATEGORY',
+                style: GoogleFonts.inter(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey[500],
+                  letterSpacing: 1.2,
+                ),
+              ).animate().fade(delay: 255.ms),
+              const VGap(AppLayout.sm),
+              Consumer<CreateHabitProvider>(
+                builder: (context, provider, child) {
+                  return Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: HabitCategory.values.map((cat) {
+                      final isSelected = provider.category == cat;
+                      final catColor = CategoryColors.forCategory(cat);
+                      return ChoiceChip(
+                        avatar: Icon(
+                          CategoryColors.iconForCategory(cat),
+                          size: 16,
+                          color: isSelected ? Colors.black : catColor,
+                        ),
+                        label: Text(cat.label),
+                        selected: isSelected,
+                        onSelected: (_) => provider.setCategory(cat),
+                        selectedColor: catColor,
+                        backgroundColor: Theme.of(context).colorScheme.surface,
+                        labelStyle: GoogleFonts.inter(
+                          color: isSelected
+                              ? Colors.black
+                              : Theme.of(context).colorScheme.onSurface,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      );
+                    }).toList(),
+                  );
+                },
+              ).animate().fade(delay: 260.ms),
+
+              const VGap(AppLayout.xxl),
+
+              Text(
+                'TIME OF DAY',
+                style: GoogleFonts.inter(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey[500],
+                  letterSpacing: 1.2,
+                ),
+              ).animate().fade(delay: 265.ms),
+              const VGap(AppLayout.sm),
+              Consumer<CreateHabitProvider>(
+                builder: (context, provider, child) {
+                  return Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: HabitTimeOfDay.values.map((tod) {
+                      final isSelected = provider.timeOfDay == tod;
+                      final todColor = CategoryColors.colorForTimeOfDay(tod);
+                      return ChoiceChip(
+                        avatar: Icon(
+                          CategoryColors.iconForTimeOfDay(tod),
+                          size: 16,
+                          color: isSelected ? Colors.black : todColor,
+                        ),
+                        label: Text(tod.label),
+                        selected: isSelected,
+                        onSelected: (_) => provider.setTimeOfDay(tod),
+                        selectedColor: todColor,
+                        backgroundColor: Theme.of(context).colorScheme.surface,
+                        labelStyle: GoogleFonts.inter(
+                          color: isSelected
+                              ? Colors.black
+                              : Theme.of(context).colorScheme.onSurface,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      );
+                    }).toList(),
+                  );
+                },
+              ).animate().fade(delay: 270.ms),
+
+              const VGap(AppLayout.xxl),
+
+              Text(
+                'ROUTINE CHECKLIST (OPTIONAL)',
+                style: GoogleFonts.inter(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey[500],
+                  letterSpacing: 1.2,
+                ),
+              ).animate().fade(delay: 272.ms),
+              const VGap(AppLayout.xs),
+              Text(
+                'Break your habit down into multi-step checklist items.',
+                style: GoogleFonts.inter(fontSize: 12, color: Colors.grey[500]),
+              ),
+              const VGap(AppLayout.sm),
+              Consumer<CreateHabitProvider>(
+                builder: (context, provider, child) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: _checklistItemController,
+                              style: GoogleFonts.inter(fontSize: 14),
+                              decoration: InputDecoration(
+                                hintText: 'e.g. 5-min warm-up',
+                                hintStyle: TextStyle(color: Colors.grey[700]),
+                                filled: true,
+                                fillColor: Theme.of(context).colorScheme.surface,
+                                isDense: true,
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 12,
+                                ),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                  borderSide: BorderSide.none,
+                                ),
+                              ),
+                              onSubmitted: (val) {
+                                if (val.trim().isNotEmpty) {
+                                  provider.addChecklistItem(val);
+                                  _checklistItemController.clear();
+                                }
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Theme.of(context).colorScheme.primary,
+                              foregroundColor: Colors.black,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 12,
+                              ),
+                            ),
+                            onPressed: () {
+                              final text = _checklistItemController.text;
+                              if (text.trim().isNotEmpty) {
+                                provider.addChecklistItem(text);
+                                _checklistItemController.clear();
+                              }
+                            },
+                            child: const Text('Add'),
+                          ),
+                        ],
+                      ),
+                      if (provider.checklistItems.isNotEmpty) ...[
+                        const VGap(AppLayout.sm),
+                        ListView.builder(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemCount: provider.checklistItems.length,
+                          itemBuilder: (context, idx) {
+                            final item = provider.checklistItems[idx];
+                            return Container(
+                              margin: const EdgeInsets.only(bottom: 6),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 8,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Theme.of(context).colorScheme.surface,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: Colors.white.withValues(alpha: 0.05),
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    Icons.check_circle_outline_rounded,
+                                    size: 18,
+                                    color: Theme.of(context).colorScheme.primary,
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Text(
+                                      item,
+                                      style: GoogleFonts.inter(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(
+                                      Icons.remove_circle_outline_rounded,
+                                      size: 18,
+                                      color: Colors.redAccent,
+                                    ),
+                                    onPressed: () => provider.removeChecklistItem(idx),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+                      ],
+                    ],
+                  );
+                },
+              ).animate().fade(delay: 274.ms),
+
+              const VGap(AppLayout.xxl),
+
+              Text(
                 'TRACKING TYPE',
                 style: GoogleFonts.inter(
                   fontSize: 12,
@@ -258,7 +480,7 @@ class _CreateHabitViewState extends State<_CreateHabitView> {
                   color: Colors.grey[500],
                   letterSpacing: 1.2,
                 ),
-              ).animate().fade(delay: 260.ms),
+              ).animate().fade(delay: 275.ms),
               const VGap(AppLayout.sm),
               Consumer<CreateHabitProvider>(
                 builder: (context, provider, child) {

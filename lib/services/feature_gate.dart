@@ -132,6 +132,46 @@ class FeatureGate {
         'Category breakdowns are available with Trackly Pro.',
       PremiumFeature.unlimitedSharedHabits =>
         'Share unlimited habits with Trackly Pro.',
+      PremiumFeature.aiCoaching =>
+        'Get personalized AI coaching to build better habits with Trackly Pro.',
+      PremiumFeature.moodCorrelation =>
+        'See how your mood affects your habit performance with Trackly Pro.',
+      PremiumFeature.focusTimer =>
+        'Link a Pomodoro timer to your habits with Trackly Pro.',
+      PremiumFeature.habitStacking =>
+        'Chain habits into sequential routines with Trackly Pro.',
+      PremiumFeature.advancedAchievements =>
+        'Unlock exclusive badges and achievement tiers with Trackly Pro.',
     };
   }
+
+  // ── New Feature Gates ──────────────────────────────────────────────────
+
+  /// Whether the user can use AI coaching features.
+  static bool canAccessAICoaching({required bool hasProAccess}) {
+    return hasProAccess;
+  }
+
+  /// Whether the user can see mood-habit correlation analytics.
+  /// Basic mood logging is free; correlation insights are Pro.
+  static bool canAccessMoodCorrelation({required bool hasProAccess}) {
+    return hasProAccess;
+  }
+
+  /// Whether the user can use the focus timer.
+  static bool canAccessFocusTimer({required bool hasProAccess}) {
+    return hasProAccess;
+  }
+
+  /// Whether the user can create habit stacks.
+  static bool canCreateHabitStack({required bool hasProAccess}) {
+    return hasProAccess;
+  }
+
+  /// Whether the user can access advanced achievements.
+  /// Basic achievements are free; advanced tiers are Pro.
+  static bool canAccessAdvancedAchievements({required bool hasProAccess}) {
+    return hasProAccess;
+  }
 }
+
