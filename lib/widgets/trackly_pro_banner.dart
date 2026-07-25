@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
 import '../providers/subscription_provider.dart';
+import '../screens/insights_screen.dart';
 import '../screens/paywall_screen.dart';
 import '../theme/color_scheme.dart';
 
@@ -25,6 +26,10 @@ class TracklyProBanner extends StatelessWidget {
         onTap: () {
           if (onTap != null) {
             onTap!();
+          } else if (hasPro) {
+            Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const InsightsScreen()),
+            );
           } else {
             Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => const PaywallScreen()),
@@ -80,7 +85,7 @@ class TracklyProBanner extends StatelessWidget {
                         ),
                         const SizedBox(width: 4),
                         Text(
-                          hasPro ? 'PRO MEMBER' : 'TRACKLY PRO',
+                          hasPro ? 'PRO MEMBER ACTIVE ✦' : 'TRACKLY PRO',
                           style: GoogleFonts.outfit(
                             fontSize: 11,
                             fontWeight: FontWeight.w900,
@@ -102,7 +107,7 @@ class TracklyProBanner extends StatelessWidget {
               const SizedBox(height: 12),
               Text(
                 hasPro
-                    ? 'Your Pro features are unlocked!'
+                    ? 'Trackly Pro Membership Active'
                     : 'Supercharge your consistency',
                 style: GoogleFonts.outfit(
                   fontSize: 19,
@@ -114,7 +119,7 @@ class TracklyProBanner extends StatelessWidget {
               const SizedBox(height: 4),
               Text(
                 hasPro
-                    ? 'Unlimited heatmaps, AI coach, private groups, and priority analytics active.'
+                    ? 'Tap to open your personalized AI Habit Coach & daily recommendations.'
                     : 'Get AI habit coaching, completion heatmaps, and unlimited group collaboration.',
                 style: GoogleFonts.inter(
                   fontSize: 13,
@@ -129,13 +134,13 @@ class TracklyProBanner extends StatelessWidget {
                   children: [
                     _FeaturePill(
                       icon: Icons.auto_awesome_rounded,
-                      label: 'AI Coach',
+                      label: hasPro ? 'AI Coach Active' : 'AI Coach',
                       isDark: isDark,
                     ),
                     const SizedBox(width: 8),
                     _FeaturePill(
                       icon: Icons.grid_on_rounded,
-                      label: 'Heatmaps',
+                      label: hasPro ? 'Heatmaps Unlocked' : 'Heatmaps',
                       isDark: isDark,
                     ),
                     const SizedBox(width: 8),

@@ -19,10 +19,10 @@ import '../providers/quantified_log_provider.dart';
 import '../services/group_service.dart';
 import '../services/avatar_cache.dart';
 import '../widgets/pro_badge_avatar.dart';
-import '../widgets/trackly_pro_banner.dart';
 import '../widgets/premium_upgrade_sheet.dart';
 import '../services/subscription_constants.dart';
 import '../theme/color_scheme.dart';
+import 'paywall_screen.dart';
 import '../providers/subscription_provider.dart';
 import '../utils/app_snackbar.dart';
 import '../utils/quantity_format.dart';
@@ -1249,7 +1249,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
+                          Row(
+                            children: [
+                              Text(
                                 dateStr.toUpperCase(),
                                 style: GoogleFonts.inter(
                                   color: Theme.of(context).colorScheme.primary,
@@ -1257,7 +1259,60 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                   fontWeight: FontWeight.bold,
                                   letterSpacing: 1.2,
                                 ),
-                              )
+                              ),
+                              if (!hasProAccess) ...[
+                                const SizedBox(width: 8),
+                                GestureDetector(
+                                  onTap: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => const PaywallScreen(),
+                                      ),
+                                    );
+                                  },
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 9,
+                                      vertical: 3,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      gradient: AppTheme.proBadgeGradient,
+                                      borderRadius: BorderRadius.circular(12),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: AppTheme.proAmber.withValues(
+                                            alpha: 0.35,
+                                          ),
+                                          blurRadius: 6,
+                                        ),
+                                      ],
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        const Icon(
+                                          Icons.workspace_premium_rounded,
+                                          size: 12,
+                                          color: Colors.black,
+                                        ),
+                                        const SizedBox(width: 3),
+                                        Text(
+                                          'GO PRO',
+                                          style: GoogleFonts.outfit(
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.w900,
+                                            color: Colors.black,
+                                            letterSpacing: 0.8,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          )
                               .animate()
                               .fade(duration: 400.ms)
                               .slideX(begin: -0.1),
@@ -1683,8 +1738,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               children: [
                                 const SizedBox(height: 8),
                                 _buildQuickActionBar(context),
-                                const SizedBox(height: 4),
-                                const TracklyProBanner(),
                                 const SizedBox(height: 4),
                                 _buildFilterPills(
                                   context,

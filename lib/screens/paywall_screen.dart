@@ -686,13 +686,20 @@ class _PaywallScreenState extends State<PaywallScreen> {
       }
     } catch (e) {
       if (!context.mounted) return;
-      scaffoldMessenger.showSnackBar(
-        SnackBar(
-          content: Text(
-            'Purchase could not be completed. ${e.toString().split('\n').first}',
+      final err = e.toString();
+      final isCancelled = err.contains('PURCHASE_CANCELLED') ||
+          err.contains('userCancelled') ||
+          err.contains('Purchase was cancelled') ||
+          err.contains('userCancelled: true');
+      if (!isCancelled) {
+        scaffoldMessenger.showSnackBar(
+          SnackBar(
+            content: Text(
+              'Purchase could not be completed. ${err.split('\n').first}',
+            ),
           ),
-        ),
-      );
+        );
+      }
     } finally {
       if (mounted) setState(() => _isPurchasing = false);
     }
