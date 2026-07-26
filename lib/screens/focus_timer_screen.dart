@@ -17,6 +17,7 @@ import 'package:provider/provider.dart';
 import '../models/focus_session.dart';
 import '../models/habit.dart';
 import '../providers/habits_provider.dart';
+import '../theme/category_colors.dart';
 
 class FocusTimerScreen extends StatefulWidget {
   final Habit? linkedHabit;
@@ -569,11 +570,8 @@ class _HabitPickerSheet extends StatelessWidget {
               final isSelected = selected?.id == habit.id;
               return ListTile(
                 leading: Icon(
-                  habit.iconCodePoint != null
-                      // ignore: non_const_argument_for_const_parameter
-                      ? IconData(habit.iconCodePoint!,
-                          fontFamily: 'MaterialIcons')
-                      : Icons.check_circle_outline_rounded,
+                  CategoryColors.iconForCategory(habit.category),
+                  color: CategoryColors.forCategory(habit.category),
                 ),
                 title: Text(
                   habit.title,
