@@ -25,7 +25,8 @@ class AnalyticsService {
         .toList();
 
     final totalCompletions = perHabit.fold<int>(
-      0, (sum, a) => sum + a.totalCompletions,
+      0,
+      (sum, a) => sum + a.totalCompletions,
     );
 
     final heatmap = _computeHeatmap(habits: habits, userId: userId);
@@ -60,7 +61,10 @@ class AnalyticsService {
     double totalExpectedCompletions = 0;
     for (final h in habits) {
       final days = now.difference(_dateOnly(h.createdAt)).inDays + 1;
-      totalExpectedCompletions += (days * (h.targetDaysPerWeek / 7.0)).clamp(1.0, 10000.0);
+      totalExpectedCompletions += (days * (h.targetDaysPerWeek / 7.0)).clamp(
+        1.0,
+        10000.0,
+      );
     }
 
     final overallRate = totalExpectedCompletions > 0 && habits.isNotEmpty
@@ -95,16 +99,19 @@ class AnalyticsService {
     final nowOnly = _dateOnly(DateTime.now());
 
     final perHabit = habits
-        .map((h) => computeForHabitInDateRange(
-              habit: h,
-              userId: userId,
-              start: weekStartOnly,
-              end: weekEndOnly,
-            ))
+        .map(
+          (h) => computeForHabitInDateRange(
+            habit: h,
+            userId: userId,
+            start: weekStartOnly,
+            end: weekEndOnly,
+          ),
+        )
         .toList();
 
     final totalCompletions = perHabit.fold<int>(
-      0, (sum, a) => sum + a.totalCompletions,
+      0,
+      (sum, a) => sum + a.totalCompletions,
     );
 
     final heatmap = _computeHeatmap(habits: habits, userId: userId);
@@ -139,7 +146,8 @@ class AnalyticsService {
       if (daysElapsedThisWeek <= 0 && !nowOnly.isBefore(habitStart)) {
         daysElapsedThisWeek = 1;
       }
-      final expectedForHabit = (h.targetDaysPerWeek * (daysElapsedThisWeek / 7.0)).clamp(1.0, 7.0);
+      final expectedForHabit =
+          (h.targetDaysPerWeek * (daysElapsedThisWeek / 7.0)).clamp(1.0, 7.0);
       totalExpectedCompletions += expectedForHabit;
     }
 
@@ -170,8 +178,7 @@ class AnalyticsService {
     required String userId,
   }) {
     final completions = _userCompletions(habit, userId);
-    final sorted = completions.toList()
-      ..sort((a, b) => a.compareTo(b));
+    final sorted = completions.toList()..sort((a, b) => a.compareTo(b));
 
     final totalCompletions = sorted.length;
     final streaks = _computeStreaks(sorted);
@@ -183,11 +190,17 @@ class AnalyticsService {
     final trend = _computeTrendForDates(sorted, habit.createdAt);
 
     final now = DateTime.now();
-    final daysSinceCreation = now
-        .difference(_dateOnly(habit.createdAt))
-        .inDays + 1;
-    final expectedCompletions = (daysSinceCreation * (habit.targetDaysPerWeek / 7.0)).clamp(1.0, 10000.0);
-    final completionRate = (totalCompletions / expectedCompletions).clamp(0.0, 1.0);
+    final daysSinceCreation =
+        now.difference(_dateOnly(habit.createdAt)).inDays + 1;
+    final expectedCompletions =
+        (daysSinceCreation * (habit.targetDaysPerWeek / 7.0)).clamp(
+          1.0,
+          10000.0,
+        );
+    final completionRate = (totalCompletions / expectedCompletions).clamp(
+      0.0,
+      1.0,
+    );
 
     return HabitAnalytics(
       habitId: habit.id,
@@ -211,10 +224,15 @@ class AnalyticsService {
     required DateTime end,
   }) {
     final allCompletions = _userCompletions(habit, userId);
-    final rangeCompletions = allCompletions
-        .where((d) => !_dateOnly(d).isBefore(_dateOnly(start)) && !_dateOnly(d).isAfter(_dateOnly(end)))
-        .toList()
-      ..sort((a, b) => a.compareTo(b));
+    final rangeCompletions =
+        allCompletions
+            .where(
+              (d) =>
+                  !_dateOnly(d).isBefore(_dateOnly(start)) &&
+                  !_dateOnly(d).isAfter(_dateOnly(end)),
+            )
+            .toList()
+          ..sort((a, b) => a.compareTo(b));
 
     final totalCompletions = rangeCompletions.length;
     final streaks = _computeStreaks(allCompletions);
@@ -237,7 +255,10 @@ class AnalyticsService {
     }
     if (daysElapsed <= 0) daysElapsed = 1;
 
-    final expected = (habit.targetDaysPerWeek * (daysElapsed / 7.0)).clamp(1.0, 7.0);
+    final expected = (habit.targetDaysPerWeek * (daysElapsed / 7.0)).clamp(
+      1.0,
+      7.0,
+    );
     final completionRate = (totalCompletions / expected).clamp(0.0, 1.0);
 
     return HabitAnalytics(
@@ -292,12 +313,8 @@ class AnalyticsService {
     List<DateTime> dates,
     DateTime since,
   ) {
-    final counts = <int, int>{
-      for (int d = 1; d <= 7; d++) d: 0,
-    };
-    final totalWeeks = <int, int>{
-      for (int d = 1; d <= 7; d++) d: 0,
-    };
+    final counts = <int, int>{for (int d = 1; d <= 7; d++) d: 0};
+    final totalWeeks = <int, int>{for (int d = 1; d <= 7; d++) d: 0};
 
     for (final date in dates) {
       counts[date.weekday] = (counts[date.weekday] ?? 0) + 1;
@@ -306,18 +323,14 @@ class AnalyticsService {
     // Count how many of each weekday have occurred since the start date.
     final now = DateTime.now();
     final start = _dateOnly(since);
-    for (var d = start;
-        !d.isAfter(now);
-        d = d.add(const Duration(days: 1))) {
+    for (var d = start; !d.isAfter(now); d = d.add(const Duration(days: 1))) {
       totalWeeks[d.weekday] = (totalWeeks[d.weekday] ?? 0) + 1;
     }
 
     final rates = <int, double>{};
     for (int d = 1; d <= 7; d++) {
       final total = totalWeeks[d] ?? 1;
-      rates[d] = total > 0
-          ? ((counts[d] ?? 0) / total).clamp(0.0, 1.0)
-          : 0.0;
+      rates[d] = total > 0 ? ((counts[d] ?? 0) / total).clamp(0.0, 1.0) : 0.0;
     }
 
     int bestDay = 1;
@@ -353,11 +366,13 @@ class AnalyticsService {
         streakEnd = uniqueDates[i];
       } else {
         final length = streakEnd.difference(streakStart).inDays + 1;
-        streaks.add(StreakRecord(
-          startDate: streakStart,
-          endDate: streakEnd,
-          length: length,
-        ));
+        streaks.add(
+          StreakRecord(
+            startDate: streakStart,
+            endDate: streakEnd,
+            length: length,
+          ),
+        );
         streakStart = uniqueDates[i];
         streakEnd = uniqueDates[i];
       }
@@ -365,11 +380,9 @@ class AnalyticsService {
 
     // Add the last streak.
     final length = streakEnd.difference(streakStart).inDays + 1;
-    streaks.add(StreakRecord(
-      startDate: streakStart,
-      endDate: streakEnd,
-      length: length,
-    ));
+    streaks.add(
+      StreakRecord(startDate: streakStart, endDate: streakEnd, length: length),
+    );
 
     return streaks;
   }
@@ -435,7 +448,7 @@ class AnalyticsService {
     final recentAvg = recentDays.isEmpty
         ? 0.0
         : recentDays.map((d) => d.rate).reduce((a, b) => a + b) /
-            recentDays.length;
+              recentDays.length;
 
     // Previous average (7–14 days ago).
     final prevDays = dailyRates.length >= 14
@@ -443,8 +456,7 @@ class AnalyticsService {
         : <DailyCompletion>[];
     final prevAvg = prevDays.isEmpty
         ? 0.0
-        : prevDays.map((d) => d.rate).reduce((a, b) => a + b) /
-            prevDays.length;
+        : prevDays.map((d) => d.rate).reduce((a, b) => a + b) / prevDays.length;
 
     final change = prevAvg > 0
         ? ((recentAvg - prevAvg) / prevAvg * 100)
