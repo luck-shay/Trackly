@@ -10,7 +10,7 @@ class DatabaseService {
 
   String createHabitId() => _db.collection('habits').doc().id;
 
-  // Stream of habits directly from Firestore
+  // Stream of active habits directly from Firestore
   Stream<List<Habit>> streamHabits() {
     final currentUserId = userId;
     if (currentUserId.isEmpty) {
@@ -24,7 +24,26 @@ class DatabaseService {
         .map(
         (snapshot) => snapshot.docs
           .map((doc) => Habit.fromMap(doc.data(), id: doc.id))
-          .where((habit) => !habit.isGroup)
+          .where((habit) => !habit.isGroup && !habit.isArchived)
+          .toList(),
+        );
+  }
+
+  // Stream of archived habits directly from Firestore
+  Stream<List<Habit>> streamArchivedHabits() {
+    final currentUserId = userId;
+    if (currentUserId.isEmpty) {
+      return Stream.value(const <Habit>[]);
+    }
+
+    return _db
+        .collection('habits')
+        .where('participants', arrayContains: currentUserId)
+        .snapshots()
+        .map(
+        (snapshot) => snapshot.docs
+          .map((doc) => Habit.fromMap(doc.data(), id: doc.id))
+          .where((habit) => !habit.isGroup && habit.isArchived)
           .toList(),
         );
   }

@@ -35,12 +35,15 @@ class _CalendarView extends StatefulWidget {
 
 class _CalendarViewState extends State<_CalendarView> {
   _CalendarScope _scope = _CalendarScope.mine;
+  String? _selectedHabitId;
 
-  bool _isCompletedForDay(
-    Habit habit,
-    String userId,
-    DateTime day,
-  ) {
+  IconData _getHabitIcon(int? codePoint) {
+    if (codePoint == null) return Icons.check_circle_outline_rounded;
+    // ignore: non_const_argument_for_const_parameter
+    return IconData(codePoint, fontFamily: 'MaterialIcons');
+  }
+
+  bool _isCompletedForDay(Habit habit, String userId, DateTime day) {
     if (userId.isEmpty) {
       return false;
     }
@@ -49,7 +52,11 @@ class _CalendarViewState extends State<_CalendarView> {
 
   List<Habit> _getEventsForDay(DateTime day, List<Habit> habits) {
     final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
-    return habits.where((habit) {
+    final targetHabits = _selectedHabitId == null
+        ? habits
+        : habits.where((h) => h.id == _selectedHabitId).toList();
+
+    return targetHabits.where((habit) {
       if (_scope == _CalendarScope.mine) {
         return _isCompletedForDay(habit, uid, day);
       }
@@ -101,12 +108,29 @@ class _CalendarViewState extends State<_CalendarView> {
             return Center(
               child: Text(
                 'Error: ${habitsProvider.error}',
-                style: GoogleFonts.inter(color: Theme.of(context).colorScheme.error),
+                style: GoogleFonts.inter(
+                  color: Theme.of(context).colorScheme.error,
+                ),
               ),
             );
           }
 
           final habits = habitsProvider.habits;
+
+          // Deduplicate habits by ID to avoid duplicate DropdownMenuItem keys
+          final uniqueHabitsMap = <String, Habit>{};
+          for (final h in habits) {
+            uniqueHabitsMap[h.id] = h;
+          }
+          final uniqueHabits = uniqueHabitsMap.values.toList();
+
+          // Ensure selected habit ID exists in current habits list to prevent assertion crash
+          final bool selectedHabitExists =
+              _selectedHabitId != null &&
+              uniqueHabitsMap.containsKey(_selectedHabitId);
+          final activeSelectedHabitId = selectedHabitExists
+              ? _selectedHabitId
+              : null;
 
           final calendarProvider = context.watch<CalendarProvider>();
 
@@ -115,24 +139,122 @@ class _CalendarViewState extends State<_CalendarView> {
             children: [
               Padding(
                 padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
-                child: Row(
-                  children: [
-                    ChoiceChip(
-                      label: const Text('My activity'),
-                      selected: _scope == _CalendarScope.mine,
-                      onSelected: (_) {
-                        setState(() => _scope = _CalendarScope.mine);
-                      },
-                    ),
-                    const SizedBox(width: 8),
-                    ChoiceChip(
-                      label: const Text('Shared activity'),
-                      selected: _scope == _CalendarScope.team,
-                      onSelected: (_) {
-                        setState(() => _scope = _CalendarScope.team);
-                      },
-                    ),
-                  ],
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  physics: const BouncingScrollPhysics(),
+                  child: Row(
+                    children: [
+                      Container(
+                        height: 38,
+                        padding: const EdgeInsets.symmetric(horizontal: 14),
+                        decoration: BoxDecoration(
+                          color: activeSelectedHabitId != null
+                              ? scheme.primary.withValues(alpha: 0.15)
+                              : scheme.surface,
+                          borderRadius: BorderRadius.circular(30),
+                          border: Border.all(
+                            color: activeSelectedHabitId != null
+                                ? scheme.primary
+                                : scheme.onSurface.withValues(alpha: 0.15),
+                            width: 1.2,
+                          ),
+                        ),
+                        child: DropdownButtonHideUnderline(
+                          child: DropdownButton<String?>(
+                            value: activeSelectedHabitId,
+                            isDense: true,
+                            borderRadius: BorderRadius.circular(20),
+                            dropdownColor: scheme.surface,
+                            icon: Padding(
+                              padding: const EdgeInsets.only(left: 6),
+                              child: Icon(
+                                Icons.keyboard_arrow_down_rounded,
+                                color: activeSelectedHabitId != null
+                                    ? scheme.primary
+                                    : scheme.onSurface.withValues(alpha: 0.7),
+                                size: 18,
+                              ),
+                            ),
+                            items: [
+                              DropdownMenuItem<String?>(
+                                value: null,
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.all_inclusive_rounded,
+                                      size: 16,
+                                      color: scheme.primary,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      'All Habits',
+                                      style: GoogleFonts.outfit(
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              ...uniqueHabits.map((habit) {
+                                return DropdownMenuItem<String?>(
+                                  value: habit.id,
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        _getHabitIcon(habit.iconCodePoint),
+                                        size: 16,
+                                        color: habit.colorValue != null
+                                            ? Color(habit.colorValue!)
+                                            : scheme.primary,
+                                      ),
+                                      const SizedBox(width: 8),
+                                      ConstrainedBox(
+                                        constraints: const BoxConstraints(
+                                          maxWidth: 160,
+                                        ),
+                                        child: Text(
+                                          habit.displayTitle,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: GoogleFonts.outfit(
+                                            fontWeight: FontWeight.w600,
+                                            fontSize: 14,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              }),
+                            ],
+                            onChanged: (val) {
+                              setState(() {
+                                _selectedHabitId = val;
+                              });
+                            },
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      _FilterPill(
+                        label: 'My activity',
+                        isSelected: _scope == _CalendarScope.mine,
+                        onTap: () {
+                          setState(() => _scope = _CalendarScope.mine);
+                        },
+                      ),
+                      const SizedBox(width: 8),
+                      _FilterPill(
+                        label: 'Shared activity',
+                        isSelected: _scope == _CalendarScope.team,
+                        onTap: () {
+                          setState(() => _scope = _CalendarScope.team);
+                        },
+                      ),
+                    ],
+                  ),
                 ),
               ),
               Container(
@@ -253,7 +375,7 @@ class _CalendarViewState extends State<_CalendarView> {
               ),
               if (calendarProvider.selectedDay == null)
                 Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 48),
+                  padding: const EdgeInsets.fromLTRB(16, 48, 16, 140),
                   child: Center(
                     child: Text(
                       'Select a day to view your progress.',
@@ -271,6 +393,7 @@ class _CalendarViewState extends State<_CalendarView> {
                   calendarProvider.selectedDay!,
                 ),
               ],
+              const SizedBox(height: 140),
             ],
           );
         },
@@ -396,7 +519,7 @@ class _CalendarViewState extends State<_CalendarView> {
     final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
     if (completedHabits.isEmpty) {
       return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 48),
+        padding: const EdgeInsets.fromLTRB(16, 32, 16, 0),
         child: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -493,6 +616,58 @@ class _CalendarViewState extends State<_CalendarView> {
             ),
           ).animate().fade(delay: (100 * index).ms).slideX(begin: 0.1);
         }),
+      ),
+    );
+  }
+}
+
+// ── Filter Pill Widget ────────────────────────────────────────────────────────
+
+class _FilterPill extends StatelessWidget {
+  final String label;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _FilterPill({
+    required this.label,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        height: 38,
+        padding: const EdgeInsets.symmetric(horizontal: 14),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? scheme.primary.withValues(alpha: 0.15)
+              : scheme.surface,
+          borderRadius: BorderRadius.circular(30),
+          border: Border.all(
+            color: isSelected
+                ? scheme.primary
+                : scheme.onSurface.withValues(alpha: 0.15),
+            width: 1.2,
+          ),
+        ),
+        child: Center(
+          child: Text(
+            label,
+            style: GoogleFonts.outfit(
+              fontWeight: FontWeight.w600,
+              fontSize: 14,
+              color: isSelected
+                  ? scheme.onSurface
+                  : scheme.onSurface.withValues(alpha: 0.7),
+            ),
+          ),
+        ),
       ),
     );
   }

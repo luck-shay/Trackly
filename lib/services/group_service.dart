@@ -115,9 +115,59 @@ class GroupService {
               .map((doc) => Group.fromMap(doc.data(), id: doc.id))
               .where((group) => !hiddenGroupIds.contains(group.id))
               .where((group) => !group.leftMemberIds.contains(userId))
+              .where((group) => !group.archivedMemberIds.contains(userId))
               .toList()
             ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
         });
+  }
+
+  Stream<List<Group>> streamArchivedGroupsForCurrentUser() {
+    if (userId.isEmpty) {
+      return Stream.value(const <Group>[]);
+    }
+
+    return _db
+        .collection('groups')
+        .where('memberIds', arrayContains: userId)
+        .snapshots()
+        .map((snapshot) {
+          return snapshot.docs
+              .map((doc) => Group.fromMap(doc.data(), id: doc.id))
+              .where((group) => group.archivedMemberIds.contains(userId))
+              .toList()
+            ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        });
+  }
+
+  Future<void> archiveGroup(String groupId) async {
+    if (userId.isEmpty) return;
+    await _db.collection('groups').doc(groupId).update({
+      'archivedMemberIds': FieldValue.arrayUnion([userId]),
+    });
+  }
+
+  Future<void> restoreGroup(String groupId) async {
+    if (userId.isEmpty) return;
+    await _db.collection('groups').doc(groupId).update({
+      'archivedMemberIds': FieldValue.arrayRemove([userId]),
+    });
+  }
+
+  Future<void> permanentlyDeleteGroup(String groupId) async {
+    if (userId.isEmpty) return;
+    final group = await getGroupById(groupId);
+    if (group == null) return;
+    if (group.ownerId == userId || group.memberIds.length <= 1) {
+      final tasksSnapshot = await _db.collection('groups').doc(groupId).collection('tasks').get();
+      final batch = _db.batch();
+      for (final doc in tasksSnapshot.docs) {
+        batch.delete(doc.reference);
+      }
+      batch.delete(_db.collection('groups').doc(groupId));
+      await batch.commit();
+    } else {
+      await leaveGroup(groupId);
+    }
   }
 
   Future<Group?> getGroupById(String groupId) async {

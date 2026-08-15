@@ -109,13 +109,13 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
   }
 
   Future<void> _confirmLeaveGroup(BuildContext context, Group group) async {
-    final shouldLeave = await showDialog<bool>(
+    final shouldArchive = await showDialog<bool>(
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
-          title: const Text('Leave group?'),
+          title: const Text('Archive group?'),
           content: const Text(
-            'You will stop receiving group updates. Your group tasks history will remain in the group record.',
+            'The group will be moved to Archive. You can restore it anytime with all data from Profile > Archived Habits & Groups.',
           ),
           actions: [
             TextButton(
@@ -127,14 +127,14 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                 backgroundColor: Colors.redAccent.withValues(alpha: 0.9),
               ),
               onPressed: () => Navigator.pop(dialogContext, true),
-              child: const Text('Leave', style: TextStyle(color: Colors.white)),
+              child: const Text('Archive', style: TextStyle(color: Colors.white)),
             ),
           ],
         );
       },
     );
 
-    if (shouldLeave != true || !context.mounted) {
+    if (shouldArchive != true || !context.mounted) {
       return;
     }
 
@@ -145,13 +145,13 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
     final navigator = Navigator.of(context);
 
     try {
-      await GroupService().leaveGroup(group.id);
+      await GroupService().archiveGroup(group.id);
       if (!context.mounted) {
         return;
       }
       navigator.pop();
       messenger.showSnackBar(
-        const SnackBar(content: Text('You left the group.')),
+        const SnackBar(content: Text('Group moved to Archive.')),
       );
     } catch (error) {
       if (!context.mounted) {

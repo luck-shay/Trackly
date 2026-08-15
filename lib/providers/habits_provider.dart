@@ -19,6 +19,8 @@ class HabitsProvider extends ChangeNotifier {
   final GroupService _groupService = GroupService();
   StreamSubscription<List<Habit>>? _habitSubscription;
   StreamSubscription<List<Group>>? _groupsSubscription;
+  StreamSubscription<List<Habit>>? _archivedHabitsSubscription;
+  StreamSubscription<List<Group>>? _archivedGroupsSubscription;
   StreamSubscription<User?>? _authSubscription;
   final Map<String, StreamSubscription<List<GroupTask>>>
   _groupTaskSubscriptions = <String, StreamSubscription<List<GroupTask>>>{};
@@ -26,6 +28,8 @@ class HabitsProvider extends ChangeNotifier {
       <String, List<Habit>>{};
   bool _permissionRetryScheduled = false;
   List<Habit> _baseHabits = [];
+  List<Habit> _archivedHabits = [];
+  List<Group> _archivedGroups = [];
   bool _baseLoaded = false;
   bool _groupsLoaded = false;
   final Set<String> _pendingRemovalIds = <String>{};
@@ -39,6 +43,8 @@ class HabitsProvider extends ChangeNotifier {
   String? _error;
 
   List<Habit> get habits => _habits;
+  List<Habit> get archivedHabits => _archivedHabits;
+  List<Group> get archivedGroups => _archivedGroups;
   bool get isLoading => _isLoading;
   String? get error => _error;
   Habit? habitById(String id) => _habitLookup[id];
@@ -59,12 +65,16 @@ class HabitsProvider extends ChangeNotifier {
   Future<void> _initStream() async {
     _habitSubscription?.cancel();
     _groupsSubscription?.cancel();
+    _archivedHabitsSubscription?.cancel();
+    _archivedGroupsSubscription?.cancel();
     for (final sub in _groupTaskSubscriptions.values) {
       sub.cancel();
     }
     _groupTaskSubscriptions.clear();
     _groupHabitsByGroupId.clear();
     _baseHabits = [];
+    _archivedHabits = [];
+    _archivedGroups = [];
     _baseLoaded = false;
     _groupsLoaded = false;
     _pendingRemovalIds.clear();
@@ -90,6 +100,14 @@ class HabitsProvider extends ChangeNotifier {
       },
     );
 
+    _archivedHabitsSubscription = _db.streamArchivedHabits().listen(
+      (archived) {
+        _archivedHabits = archived;
+        notifyListeners();
+      },
+      onError: (_) {},
+    );
+
     _groupsSubscription = _groupService.streamGroupsForCurrentUser().listen(
       (groups) {
         _groupsLoaded = true;
@@ -101,6 +119,16 @@ class HabitsProvider extends ChangeNotifier {
         _handleStreamError(err);
       },
     );
+
+    _archivedGroupsSubscription = _groupService
+        .streamArchivedGroupsForCurrentUser()
+        .listen(
+          (archivedGroups) {
+            _archivedGroups = archivedGroups;
+            notifyListeners();
+          },
+          onError: (_) {},
+        );
   }
 
   void _handleStreamError(Object err) {
@@ -694,51 +722,6 @@ class HabitsProvider extends ChangeNotifier {
       return;
     }
 
-    if (habit.participants.length <= 1) {
-      // True delete only when this user is the last participant.
-      final previousHabits = List<Habit>.from(_habits);
-      _recordPendingRemoval(habit.id);
-      _replaceHabits(
-        List<Habit>.from(_habits)..removeWhere((h) => h.id == habit.id),
-      );
-
-      try {
-        await _db.deleteHabit(habit.id);
-      } catch (_) {
-        _clearPendingRemoval(habit.id);
-        _replaceHabits(previousHabits);
-        rethrow;
-      }
-      _refreshReminderSchedule(reason: 'habit_deleted');
-      return;
-    }
-
-    if (!habit.participants.contains(uid)) {
-      return;
-    }
-
-    final remainingParticipants = List<String>.from(habit.participants)
-      ..remove(uid);
-    final newSpaceType = (remainingParticipants.length <= 1 && habit.spaceType == HabitSpaceType.sharedTask) ? HabitSpaceType.individual : habit.spaceType;
-    final updatedHabit = habit.copyWith(
-      spaceType: newSpaceType,
-      participants: remainingParticipants,
-      completions: Map<String, List<DateTime>>.from(habit.completions)
-        ..remove(uid),
-      quantifiedValues: Map<String, Map<String, double>>.from(
-        habit.quantifiedValues,
-      )..remove(uid),
-      memberTasks: Map<String, String>.from(habit.memberTasks)..remove(uid),
-      memberIsQuantified: Map<String, bool>.from(habit.memberIsQuantified)
-        ..remove(uid),
-      memberQuantUnits: Map<String, String>.from(habit.memberQuantUnits)
-        ..remove(uid),
-      memberQuantMax: Map<String, double>.from(habit.memberQuantMax)
-        ..remove(uid),
-    );
-
-    // If current user leaves a shared habit, remove it from local list
-    // immediately so list items (e.g. Dismissible) do not keep stale keys.
     final previousHabits = List<Habit>.from(_habits);
     _recordPendingRemoval(habit.id);
     _replaceHabits(
@@ -746,19 +729,48 @@ class HabitsProvider extends ChangeNotifier {
     );
 
     try {
-      await _db.saveHabit(updatedHabit, ensureCurrentUserParticipant: false);
+      final archivedHabit = habit.copyWith(isArchived: true);
+      await _db.saveHabit(archivedHabit, ensureCurrentUserParticipant: false);
     } catch (_) {
       _clearPendingRemoval(habit.id);
       _replaceHabits(previousHabits);
       rethrow;
     }
+    _refreshReminderSchedule(reason: 'habit_archived');
+  }
 
-    _refreshReminderSchedule(reason: 'shared_habit_left');
+  Future<void> restoreHabit(Habit habit) async {
+    _clearPendingRemoval(habit.id);
+    final restoredHabit = habit.copyWith(isArchived: false);
+    await _db.saveHabit(restoredHabit, ensureCurrentUserParticipant: false);
+    _refreshReminderSchedule(reason: 'habit_restored');
+  }
 
-    await _notifyParticipantDeparture(
-      habit: habit,
-      remainingParticipants: remainingParticipants,
-    );
+  Future<void> deleteHabitPermanently(Habit habit) async {
+    _recordPendingRemoval(habit.id);
+    try {
+      if (habit.isGroup && (habit.groupEntityId ?? '').trim().isNotEmpty) {
+        await _groupService.deleteGroupTask(habit.groupEntityId!.trim(), habit.id);
+      } else {
+        await _db.deleteHabit(habit.id);
+      }
+    } catch (_) {
+      _clearPendingRemoval(habit.id);
+      rethrow;
+    }
+    _refreshReminderSchedule(reason: 'habit_deleted_permanently');
+  }
+
+  Future<void> archiveGroup(Group group) async {
+    await _groupService.archiveGroup(group.id);
+  }
+
+  Future<void> restoreGroup(Group group) async {
+    await _groupService.restoreGroup(group.id);
+  }
+
+  Future<void> deleteGroupPermanently(Group group) async {
+    await _groupService.permanentlyDeleteGroup(group.id);
   }
 
   Future<void> deleteGroupTask(String groupId, String taskId) async {
@@ -1084,6 +1096,8 @@ class HabitsProvider extends ChangeNotifier {
   void dispose() {
     _habitSubscription?.cancel();
     _groupsSubscription?.cancel();
+    _archivedHabitsSubscription?.cancel();
+    _archivedGroupsSubscription?.cancel();
     for (final sub in _groupTaskSubscriptions.values) {
       sub.cancel();
     }

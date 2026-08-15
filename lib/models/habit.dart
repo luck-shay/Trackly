@@ -168,6 +168,7 @@ class Habit {
   final int? iconCodePoint; // IconData.codePoint
   final int sortOrder;
   final List<HabitChecklistItem> checklist;
+  final bool isArchived;
 
   Habit({
     required this.id,
@@ -199,6 +200,7 @@ class Habit {
     this.iconCodePoint,
     this.sortOrder = 0,
     this.checklist = const [],
+    this.isArchived = false,
   }) : completions = completions ?? {},
        quantifiedValues = quantifiedValues ?? {},
        participants = participants ?? [],
@@ -241,6 +243,7 @@ class Habit {
     int? iconCodePoint,
     int? sortOrder,
     List<HabitChecklistItem>? checklist,
+    bool? isArchived,
   }) {
     return Habit(
       id: id ?? this.id,
@@ -273,6 +276,7 @@ class Habit {
       iconCodePoint: iconCodePoint ?? this.iconCodePoint,
       sortOrder: sortOrder ?? this.sortOrder,
       checklist: checklist ?? this.checklist,
+      isArchived: isArchived ?? this.isArchived,
     );
   }
 
@@ -547,6 +551,7 @@ class Habit {
       'iconCodePoint': iconCodePoint,
       'sortOrder': sortOrder,
       'checklist': checklist.map((item) => item.toMap()).toList(),
+      'isArchived': isArchived,
     };
   }
 
@@ -691,6 +696,7 @@ class Habit {
       iconCodePoint: (map['iconCodePoint'] as num?)?.toInt(),
       sortOrder: (map['sortOrder'] as num?)?.toInt() ?? 0,
       checklist: parsedChecklist,
+      isArchived: map['isArchived'] as bool? ?? false,
     );
   }
 }

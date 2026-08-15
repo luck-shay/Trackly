@@ -980,13 +980,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Future<bool> _confirmDeleteHabit(BuildContext context, Habit habit) async {
     final isGroupTask = habit.isGroup;
     final isShared = !isGroupTask && habit.participants.length > 1;
-    final title = isShared ? 'Leave shared habit?' : 'Delete habit?';
+    final title = isShared ? 'Leave shared habit?' : 'Archive habit?';
     final message = isShared
         ? 'You will be removed from "${habit.title}". Others will keep it and be notified that you left.'
-        : isGroupTask
-        ? 'This will delete "${habit.title}" for the whole group. This cannot be undone.'
-        : 'Are you sure you want to delete "${habit.title}"? This cannot be undone.';
-    final actionLabel = isShared ? 'Leave' : 'Delete';
+        : 'Are you sure you want to archive "${habit.title}"? You can restore it anytime with all data from Profile > Archived Habits & Groups.';
+    final actionLabel = isShared ? 'Leave' : 'Archive';
 
     return await showDialog<bool>(
           context: context,
@@ -1052,41 +1050,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
         return;
       }
 
-      final canJoinBack = !habit.isGroup && habit.participants.length > 1;
-      if (canJoinBack) {
-        showAppSnackBar(
-          context,
-          message: 'You left "${habit.title}".',
-          actionLabel: 'Join back',
-          onAction: () async {
-            try {
-              final rejoined = await provider.rejoinSharedHabit(habit);
-              if (!context.mounted) {
-                return;
-              }
-              if (!rejoined) {
-                showAppSnackBar(
-                  context,
-                  message:
-                      'Could not join back. Ask a participant to invite you.',
-                );
-                return;
-              }
-
-              showAppSnackBar(context, message: 'Rejoined "${habit.title}".');
-            } catch (error) {
-              if (!context.mounted) {
-                return;
-              }
-              showAppSnackBar(
-                context,
-                message:
-                    'Could not join back. ${error.toString().split('\n').first}',
-              );
-            }
-          },
-        );
-      }
+      showAppSnackBar(
+        context,
+        message: '"${habit.title}" moved to Archive.',
+        actionLabel: 'Undo',
+        onAction: () async {
+          try {
+            await provider.restoreHabit(habit);
+          } catch (_) {}
+        },
+      );
     } catch (error) {
       if (!context.mounted) {
         return;

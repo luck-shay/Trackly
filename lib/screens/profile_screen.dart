@@ -9,9 +9,11 @@ import '../models/subscription_state.dart';
 import '../providers/profile_provider.dart';
 import '../providers/subscription_provider.dart';
 import '../providers/theme_mode_provider.dart';
+import '../providers/habits_provider.dart';
 import 'analytics_screen.dart';
 import 'insights_screen.dart';
 import 'paywall_screen.dart';
+import 'archived_items_screen.dart';
 import '../widgets/pro_badge_avatar.dart';
 import '../widgets/appearance_selector.dart';
 import '../theme/color_scheme.dart';
@@ -465,6 +467,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             backgroundColor: Colors.transparent,
                             elevation: 0,
                             builder: (_) => const AppearanceSelector(isBottomSheet: true),
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      Consumer<HabitsProvider>(
+                        builder: (context, habitsProvider, _) {
+                          final count = habitsProvider.archivedHabits.length +
+                              habitsProvider.archivedGroups.length;
+                          return _ActionTile(
+                            icon: Icons.archive_rounded,
+                            title: 'Archived Habits & Groups',
+                            subtitle: count > 0
+                                ? '$count archived items'
+                                : 'View or restore deleted habits & groups',
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const ArchivedItemsScreen(),
+                                ),
+                              );
+                            },
                           );
                         },
                       ),
