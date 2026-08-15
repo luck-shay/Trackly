@@ -360,156 +360,234 @@ class NotificationService with WidgetsBindingObserver {
       if (enableLocalFallback) {
         final db = FirebaseFirestore.instance;
 
-        _friendInviteSubscription = db
-            .collection('friendRequests')
-            .where('to', isEqualTo: user.uid)
-            .where('status', isEqualTo: 'pending')
-            .snapshots()
-            .listen(
-              (s) => _processInviteSnapshot(s, 'friendRequest'),
-              onError: (e) => debugPrint('Friend invite stream error: $e'),
-            );
+        _friendInviteSubscription = _listenWithInitialSeeding(
+          query: db
+              .collection('friendRequests')
+              .where('to', isEqualTo: user.uid)
+              .where('status', isEqualTo: 'pending'),
+          logName: 'Friend invite',
+          handler: (s, {required isInitialSnapshot}) =>
+              _processInviteSnapshot(s, 'friendRequest', isInitialSnapshot: isInitialSnapshot),
+        );
 
-        _habitInviteSubscription = db
-            .collection('habitInvites')
-            .where('to', isEqualTo: user.uid)
-            .where('status', isEqualTo: 'pending')
-            .snapshots()
-            .listen(
-              (s) => _processInviteSnapshot(s, 'habitInvite'),
-              onError: (e) => debugPrint('Habit invite stream error: $e'),
-            );
+        _habitInviteSubscription = _listenWithInitialSeeding(
+          query: db
+              .collection('habitInvites')
+              .where('to', isEqualTo: user.uid)
+              .where('status', isEqualTo: 'pending'),
+          logName: 'Habit invite',
+          handler: (s, {required isInitialSnapshot}) =>
+              _processInviteSnapshot(s, 'habitInvite', isInitialSnapshot: isInitialSnapshot),
+        );
 
-        _groupInviteSubscription = db
-            .collection('groupInvites')
-            .where('to', isEqualTo: user.uid)
-            .where('status', isEqualTo: 'pending')
-            .snapshots()
-            .listen(
-              (s) => _processInviteSnapshot(s, 'groupInvite'),
-              onError: (e) => debugPrint('Group invite stream error: $e'),
-            );
+        _groupInviteSubscription = _listenWithInitialSeeding(
+          query: db
+              .collection('groupInvites')
+              .where('to', isEqualTo: user.uid)
+              .where('status', isEqualTo: 'pending'),
+          logName: 'Group invite',
+          handler: (s, {required isInitialSnapshot}) =>
+              _processInviteSnapshot(s, 'groupInvite', isInitialSnapshot: isInitialSnapshot),
+        );
 
-        _challengeInviteSubscription = db
-            .collection('challengeInvites')
-            .where('to', isEqualTo: user.uid)
-            .where('status', isEqualTo: 'pending')
-            .snapshots()
-            .listen(
-              (s) => _processInviteSnapshot(s, 'challengeInvite'),
-              onError: (e) => debugPrint('Challenge invite stream error: $e'),
-            );
+        _challengeInviteSubscription = _listenWithInitialSeeding(
+          query: db
+              .collection('challengeInvites')
+              .where('to', isEqualTo: user.uid)
+              .where('status', isEqualTo: 'pending'),
+          logName: 'Challenge invite',
+          handler: (s, {required isInitialSnapshot}) =>
+              _processInviteSnapshot(s, 'challengeInvite', isInitialSnapshot: isInitialSnapshot),
+        );
 
         // Notify sender when outgoing invites are accepted or declined.
-        _friendInviteResponseSubscription = db
-            .collection('friendRequests')
-            .where('from', isEqualTo: user.uid)
-            .snapshots()
-            .listen(
-              (s) => _processInviteResponseSnapshot(s, 'friendRequest'),
-              onError: (e) => debugPrint('Friend invite response stream error: $e'),
-            );
+        _friendInviteResponseSubscription = _listenWithInitialSeeding(
+          query: db
+              .collection('friendRequests')
+              .where('from', isEqualTo: user.uid),
+          logName: 'Friend invite response',
+          handler: (s, {required isInitialSnapshot}) =>
+              _processInviteResponseSnapshot(s, 'friendRequest', isInitialSnapshot: isInitialSnapshot),
+        );
 
-        _habitInviteResponseSubscription = db
-            .collection('habitInvites')
-            .where('from', isEqualTo: user.uid)
-            .snapshots()
-            .listen(
-              (s) => _processInviteResponseSnapshot(s, 'habitInvite'),
-              onError: (e) => debugPrint('Habit invite response stream error: $e'),
-            );
+        _habitInviteResponseSubscription = _listenWithInitialSeeding(
+          query: db
+              .collection('habitInvites')
+              .where('from', isEqualTo: user.uid),
+          logName: 'Habit invite response',
+          handler: (s, {required isInitialSnapshot}) =>
+              _processInviteResponseSnapshot(s, 'habitInvite', isInitialSnapshot: isInitialSnapshot),
+        );
 
-        _groupInviteResponseSubscription = db
-            .collection('groupInvites')
-            .where('from', isEqualTo: user.uid)
-            .snapshots()
-            .listen(
-              (s) => _processInviteResponseSnapshot(s, 'groupInvite'),
-              onError: (e) => debugPrint('Group invite response stream error: $e'),
-            );
+        _groupInviteResponseSubscription = _listenWithInitialSeeding(
+          query: db
+              .collection('groupInvites')
+              .where('from', isEqualTo: user.uid),
+          logName: 'Group invite response',
+          handler: (s, {required isInitialSnapshot}) =>
+              _processInviteResponseSnapshot(s, 'groupInvite', isInitialSnapshot: isInitialSnapshot),
+        );
 
-        _challengeInviteResponseSubscription = db
-            .collection('challengeInvites')
-            .where('from', isEqualTo: user.uid)
-            .snapshots()
-            .listen(
-              (s) => _processInviteResponseSnapshot(s, 'challengeInvite'),
-              onError: (e) => debugPrint('Challenge invite response stream error: $e'),
-            );
+        _challengeInviteResponseSubscription = _listenWithInitialSeeding(
+          query: db
+              .collection('challengeInvites')
+              .where('from', isEqualTo: user.uid),
+          logName: 'Challenge invite response',
+          handler: (s, {required isInitialSnapshot}) =>
+              _processInviteResponseSnapshot(s, 'challengeInvite', isInitialSnapshot: isInitialSnapshot),
+        );
 
-        _habitNoticeSubscription = db
-            .collection('habitNotices')
-            .where('to', isEqualTo: user.uid)
-            .where('status', isEqualTo: 'unread')
-            .snapshots()
-            .listen(
-              _processHabitNoticeSnapshot,
-              onError: (e) => debugPrint('Habit notice stream error: $e'),
-            );
+        _habitNoticeSubscription = _listenWithInitialSeeding(
+          query: db
+              .collection('habitNotices')
+              .where('to', isEqualTo: user.uid)
+              .where('status', isEqualTo: 'unread'),
+          logName: 'Habit notice',
+          handler: (s, {required isInitialSnapshot}) =>
+              _processHabitNoticeSnapshot(s, isInitialSnapshot: isInitialSnapshot),
+        );
       }
     });
   }
 
-    Future<void> _processHabitNoticeSnapshot(QuerySnapshot snapshot) async {
+  StreamSubscription<QuerySnapshot> _listenWithInitialSeeding({
+    required Query query,
+    required String logName,
+    required Future<void> Function(QuerySnapshot snapshot, {required bool isInitialSnapshot}) handler,
+  }) {
+    bool isFirstSnapshot = true;
+    return query.snapshots().listen(
+      (snapshot) async {
+        final isInitial = isFirstSnapshot;
+        isFirstSnapshot = false;
+        await handler(snapshot, isInitialSnapshot: isInitial);
+      },
+      onError: (e) => debugPrint('$logName stream error: $e'),
+    );
+  }
+
+  bool _isRecentEvent(Map<String, dynamic> data, {Duration maxAge = const Duration(minutes: 30)}) {
+    DateTime? eventTime;
+    final keys = ['updatedAt', 'respondedAt', 'timestamp', 'createdAt', 'notifiedAt'];
+    for (final key in keys) {
+      final val = data[key];
+      if (val is Timestamp) {
+        eventTime = val.toDate();
+        break;
+      } else if (val is String) {
+        eventTime = DateTime.tryParse(val);
+        if (eventTime != null) break;
+      }
+    }
+    if (eventTime == null) {
+      return false;
+    }
+    return DateTime.now().difference(eventTime).abs() <= maxAge;
+  }
+
+  Future<void> _processHabitNoticeSnapshot(
+    QuerySnapshot snapshot, {
+    required bool isInitialSnapshot,
+  }) async {
+    if (isInitialSnapshot) {
       for (final doc in snapshot.docs) {
         final eventKey = 'habitNotice:${doc.id}';
-        if (_notifiedInviteIds.contains(eventKey)) {
-          continue;
-        }
+        _notifiedInviteIds.add(eventKey);
+      }
+      await _persistNotifiedEventIdsForCurrentUser();
+      return;
+    }
 
-        final data = doc.data() as Map<String, dynamic>;
-        final message = (data['message'] as String?)?.trim();
-        final fallbackTitle = (data['groupName'] as String?)?.trim();
-        final habitTitle = (data['habitTitle'] as String?)?.trim();
-        final displayTitle = (fallbackTitle != null && fallbackTitle.isNotEmpty)
-            ? fallbackTitle
-            : ((habitTitle != null && habitTitle.isNotEmpty) ? habitTitle : 'Shared habit');
+    final changes = snapshot.docChanges;
+    for (final change in changes) {
+      if (change.type == DocumentChangeType.removed) continue;
+      final doc = change.doc;
+      final eventKey = 'habitNotice:${doc.id}';
+      if (_notifiedInviteIds.contains(eventKey)) {
+        continue;
+      }
 
-        try {
-          await _localNotifications.show(
-            id: eventKey.hashCode,
-            title: 'Participant Left',
-            body: message ?? 'A participant left "$displayTitle".',
-            notificationDetails: const NotificationDetails(
-              android: AndroidNotificationDetails(
-                'social_alerts_channel',
-                'Social Alerts',
-                importance: Importance.high,
-                priority: Priority.high,
-                icon: _androidNotificationIcon,
-              ),
-              iOS: DarwinNotificationDetails(),
+      final data = doc.data() as Map<String, dynamic>?;
+      if (data == null) continue;
+
+      if (!_isRecentEvent(data, maxAge: const Duration(minutes: 30))) {
+        await _markEventNotified(eventKey);
+        continue;
+      }
+
+      final message = (data['message'] as String?)?.trim();
+      final fallbackTitle = (data['groupName'] as String?)?.trim();
+      final habitTitle = (data['habitTitle'] as String?)?.trim();
+      final displayTitle = (fallbackTitle != null && fallbackTitle.isNotEmpty)
+          ? fallbackTitle
+          : ((habitTitle != null && habitTitle.isNotEmpty) ? habitTitle : 'Shared habit');
+
+      try {
+        await _localNotifications.show(
+          id: eventKey.hashCode,
+          title: 'Participant Left',
+          body: message ?? 'A participant left "$displayTitle".',
+          notificationDetails: const NotificationDetails(
+            android: AndroidNotificationDetails(
+              'social_alerts_channel',
+              'Social Alerts',
+              importance: Importance.high,
+              priority: Priority.high,
+              icon: _androidNotificationIcon,
             ),
-          );
+            iOS: DarwinNotificationDetails(),
+          ),
+        );
 
-            await _markEventNotified(eventKey);
-          await FirebaseFirestore.instance
-              .collection('habitNotices')
-              .doc(doc.id)
-              .update({
-                'status': 'notified',
-                'notifiedAt': FieldValue.serverTimestamp(),
-              });
-        } catch (e) {
-          if (kDebugMode) {
-            debugPrint('Error processing habit notice notification: $e');
-          }
+        await _markEventNotified(eventKey);
+        await FirebaseFirestore.instance
+            .collection('habitNotices')
+            .doc(doc.id)
+            .update({
+              'status': 'notified',
+              'notifiedAt': FieldValue.serverTimestamp(),
+            });
+      } catch (e) {
+        if (kDebugMode) {
+          debugPrint('Error processing habit notice notification: $e');
         }
       }
     }
+  }
 
-  Future<void> _processInviteSnapshot(QuerySnapshot snapshot, String type) async {
-    for (var doc in snapshot.docs) {
+  Future<void> _processInviteSnapshot(
+    QuerySnapshot snapshot,
+    String type, {
+    required bool isInitialSnapshot,
+  }) async {
+    if (isInitialSnapshot) {
+      for (final doc in snapshot.docs) {
+        final eventKey = '$type:${doc.id}:pending';
+        _notifiedInviteIds.add(eventKey);
+      }
+      await _persistNotifiedEventIdsForCurrentUser();
+      return;
+    }
+
+    final changes = snapshot.docChanges;
+    for (final change in changes) {
+      if (change.type == DocumentChangeType.removed) continue;
+      final doc = change.doc;
       final eventKey = '$type:${doc.id}:pending';
       if (_notifiedInviteIds.contains(eventKey)) continue;
 
-      final data = doc.data() as Map<String, dynamic>;
+      final data = doc.data() as Map<String, dynamic>?;
+      if (data == null) continue;
+
+      if (!_isRecentEvent(data, maxAge: const Duration(minutes: 30))) {
+        await _markEventNotified(eventKey);
+        continue;
+      }
+
       final fromUserId = data['from'] as String?;
-      
       if (fromUserId == null) continue;
 
       try {
-        // 1. Fetch Sender Name (with timeout)
         final sender = await SocialService().getUserProfile(fromUserId).timeout(const Duration(seconds: 3));
         final senderName = sender?.displayName ?? 'A user';
 
@@ -557,9 +635,32 @@ class NotificationService with WidgetsBindingObserver {
     }
   }
 
-  Future<void> _processInviteResponseSnapshot(QuerySnapshot snapshot, String type) async {
-    for (var doc in snapshot.docs) {
-      final data = doc.data() as Map<String, dynamic>;
+  Future<void> _processInviteResponseSnapshot(
+    QuerySnapshot snapshot,
+    String type, {
+    required bool isInitialSnapshot,
+  }) async {
+    if (isInitialSnapshot) {
+      for (final doc in snapshot.docs) {
+        final data = doc.data() as Map<String, dynamic>?;
+        if (data == null) continue;
+        final status = (data['status'] as String?) ?? '';
+        if (status == 'accepted' || status == 'declined') {
+          final eventKey = '$type:${doc.id}:$status';
+          _notifiedInviteIds.add(eventKey);
+        }
+      }
+      await _persistNotifiedEventIdsForCurrentUser();
+      return;
+    }
+
+    final changes = snapshot.docChanges;
+    for (final change in changes) {
+      if (change.type == DocumentChangeType.removed) continue;
+      final doc = change.doc;
+      final data = doc.data() as Map<String, dynamic>?;
+      if (data == null) continue;
+
       final status = (data['status'] as String?) ?? '';
       if (status != 'accepted' && status != 'declined') {
         continue;
@@ -567,6 +668,11 @@ class NotificationService with WidgetsBindingObserver {
 
       final eventKey = '$type:${doc.id}:$status';
       if (_notifiedInviteIds.contains(eventKey)) {
+        continue;
+      }
+
+      if (!_isRecentEvent(data, maxAge: const Duration(minutes: 30))) {
+        await _markEventNotified(eventKey);
         continue;
       }
 
