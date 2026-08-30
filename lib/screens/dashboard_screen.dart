@@ -18,8 +18,8 @@ import '../providers/navigation_provider.dart';
 import '../providers/quantified_log_provider.dart';
 import '../services/group_service.dart';
 import '../services/avatar_cache.dart';
+import '../services/premium_feature_guard.dart';
 import '../widgets/pro_badge_avatar.dart';
-import '../widgets/premium_upgrade_sheet.dart';
 import '../services/subscription_constants.dart';
 import '../theme/color_scheme.dart';
 import 'paywall_screen.dart';
@@ -240,19 +240,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ),
                   ),
                   onPressed: () async {
-                    if (!hasPro) {
-                      await showPremiumUpgradeSheet(
-                        context,
-                        feature: PremiumFeature.aiCoaching,
-                      );
-                    } else {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const InsightsScreen(),
-                        ),
-                      );
-                    }
+                    final canOpen = await requirePremiumFeatureAccess(
+                      context,
+                      feature: PremiumFeature.aiCoaching,
+                    );
+                    if (!context.mounted || !canOpen) return;
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const InsightsScreen(),
+                      ),
+                    );
                   },
                 );
               },

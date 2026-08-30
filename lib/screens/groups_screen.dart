@@ -5,17 +5,15 @@ import 'package:google_fonts/google_fonts.dart';
 import '../models/group.dart';
 import '../models/group_invite.dart';
 import '../models/group_task.dart';
-import '../providers/subscription_provider.dart';
-import '../services/feature_gate.dart';
 import '../services/subscription_constants.dart';
 import '../services/subscription_exceptions.dart';
 import '../services/group_service.dart';
+import '../services/premium_feature_guard.dart';
 import '../services/social_service.dart';
 import '../theme/app_layout.dart';
 import '../widgets/premium_upgrade_sheet.dart';
 import 'create_group_screen.dart';
 import 'group_detail_screen.dart';
-import 'package:provider/provider.dart';
 
 class GroupsScreen extends StatelessWidget {
   const GroupsScreen({super.key});
@@ -39,17 +37,11 @@ class GroupsScreen extends StatelessWidget {
   }
 
   Future<void> _openCreateGroup(BuildContext context) async {
-    final subscription = context.read<SubscriptionProvider>();
-    final hasProAccess = subscription.hasProAccess;
-    if (!FeatureGate.canCreateGroup(
-      hasProAccess: hasProAccess,
-      currentGroupCount: kFreeGroupCreateLimit, // Will exceed limit for free users
-    )) {
-      if (!context.mounted) return;
-      await showPremiumUpgradeSheet(
-        context,
-        feature: PremiumFeature.unlimitedGroups,
-      );
+    final canCreate = await requirePremiumFeatureAccess(
+      context,
+      feature: PremiumFeature.unlimitedGroups,
+    );
+    if (!context.mounted || !canCreate) {
       return;
     }
 

@@ -8,11 +8,9 @@ import 'package:provider/provider.dart';
 
 import '../models/habit.dart';
 import '../providers/navigation_provider.dart';
-import '../providers/subscription_provider.dart';
-import '../services/feature_gate.dart';
+import '../services/premium_feature_guard.dart';
 import '../services/subscription_constants.dart';
 import '../services/social_service.dart';
-import '../widgets/premium_upgrade_sheet.dart';
 import 'calendar_screen.dart';
 import 'create_group_screen.dart';
 import 'create_habit_screen.dart';
@@ -111,17 +109,11 @@ class MainLayoutScreen extends StatelessWidget {
     }
 
     if (action == _CreateEntryAction.group) {
-      final subscription = context.read<SubscriptionProvider>();
-      final hasProAccess = subscription.hasProAccess;
-      if (!FeatureGate.canCreateGroup(
-        hasProAccess: hasProAccess,
-        currentGroupCount: kFreeGroupCreateLimit,
-      )) {
-        if (!context.mounted) return null;
-        await showPremiumUpgradeSheet(
-          context,
-          feature: PremiumFeature.unlimitedGroups,
-        );
+      final canCreate = await requirePremiumFeatureAccess(
+        context,
+        feature: PremiumFeature.unlimitedGroups,
+      );
+      if (!context.mounted || !canCreate) {
         return null;
       }
     }

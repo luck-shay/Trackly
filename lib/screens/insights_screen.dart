@@ -14,6 +14,8 @@ import '../providers/habits_provider.dart';
 import '../services/ai_service.dart';
 import '../services/analytics_service.dart';
 import '../services/insights_service.dart';
+import '../services/premium_feature_guard.dart';
+import '../services/subscription_constants.dart';
 import '../theme/app_layout.dart';
 import '../theme/color_scheme.dart';
 
@@ -27,11 +29,26 @@ class InsightsScreen extends StatefulWidget {
 class _InsightsScreenState extends State<InsightsScreen> {
   String? _aiCoachingMessage;
   bool _isLoadingAI = false;
+  bool _accessChecked = false;
 
   @override
   void initState() {
     super.initState();
-    _loadAICoaching();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _checkAccess());
+  }
+
+  Future<void> _checkAccess() async {
+    final canOpen = await requirePremiumFeatureAccess(
+      context,
+      feature: PremiumFeature.aiCoaching,
+    );
+    if (!mounted) return;
+    if (!canOpen) {
+      Navigator.of(context).pop();
+      return;
+    }
+    setState(() => _accessChecked = true);
+    await _loadAICoaching();
   }
 
   Future<void> _loadAICoaching() async {
@@ -79,6 +96,12 @@ class _InsightsScreenState extends State<InsightsScreen> {
       userId: userId,
     );
     final insights = insightsService.generate(analytics);
+
+    if (!_accessChecked) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
 
     return Scaffold(
       appBar: AppBar(

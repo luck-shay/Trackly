@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../models/user_profile.dart';
 import '../services/group_service.dart';
+import '../services/premium_feature_guard.dart';
 import '../services/social_service.dart';
 import '../services/subscription_constants.dart';
 import '../services/subscription_exceptions.dart';
@@ -23,6 +24,26 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
   final Set<String> _selectedFriendIds = <String>{};
 
   bool _isSaving = false;
+  bool _accessChecked = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _checkAccess());
+  }
+
+  Future<void> _checkAccess() async {
+    final canCreate = await requirePremiumFeatureAccess(
+      context,
+      feature: PremiumFeature.unlimitedGroups,
+    );
+    if (!mounted) return;
+    if (!canCreate) {
+      Navigator.of(context).pop();
+      return;
+    }
+    setState(() => _accessChecked = true);
+  }
 
   @override
   void dispose() {
@@ -102,6 +123,12 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+
+    if (!_accessChecked) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
 
     return Scaffold(
       appBar: AppBar(
