@@ -323,11 +323,28 @@ class SocialService {
 
       final profiles = <UserProfile>[];
       for (final ids in _chunk(profile.friends, 10)) {
-        final friendsDocs = await _db
-            .collection('users')
-            .where(FieldPath.documentId, whereIn: ids)
-            .get();
-        profiles.addAll(friendsDocs.docs.map(_profileFromDoc));
+        final loadedIds = <String>{};
+        try {
+          final friendsDocs = await _db
+              .collection('users')
+              .where(FieldPath.documentId, whereIn: ids)
+              .get();
+          for (final friendDoc in friendsDocs.docs) {
+            profiles.add(_profileFromDoc(friendDoc));
+            loadedIds.add(friendDoc.id);
+          }
+        } catch (_) {
+          // Fall back to individual reads for browser query compatibility.
+        }
+
+        // Also recover IDs omitted by a successful but incomplete batch read.
+        for (final id in ids) {
+          if (loadedIds.contains(id)) continue;
+          final friendDoc = await _db.collection('users').doc(id).get();
+          if (friendDoc.exists && friendDoc.data() != null) {
+            profiles.add(_profileFromDoc(friendDoc));
+          }
+        }
       }
 
       profiles.sort((a, b) => a.displayName.compareTo(b.displayName));

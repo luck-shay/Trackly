@@ -151,392 +151,415 @@ class _ProfileScreenState extends State<ProfileScreen> {
         body: userId.isEmpty
             ? const Center(child: CircularProgressIndicator())
             : StreamBuilder<DocumentSnapshot>(
-          stream: FirebaseFirestore.instance
-              .collection('users')
-              .doc(userId)
-              .snapshots(),
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
-            }
-            if (!snapshot.hasData ||
-                !snapshot.data!.exists ||
-                snapshot.data!.data() == null) {
-              _profileBootstrapFuture ??= _ensureProfileDocumentExists();
-
-              return FutureBuilder<void>(
-                future: _profileBootstrapFuture,
-                builder: (context, bootstrapSnapshot) {
-                  if (bootstrapSnapshot.connectionState !=
-                      ConnectionState.done) {
+                stream: FirebaseFirestore.instance
+                    .collection('users')
+                    .doc(userId)
+                    .snapshots(),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
                     return const Center(child: CircularProgressIndicator());
                   }
+                  if (!snapshot.hasData ||
+                      !snapshot.data!.exists ||
+                      snapshot.data!.data() == null) {
+                    _profileBootstrapFuture ??= _ensureProfileDocumentExists();
 
-                  if (bootstrapSnapshot.hasError) {
-                    return Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(24.0),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.person_off_rounded,
-                              size: 56,
-                              color: Colors.grey[500],
+                    return FutureBuilder<void>(
+                      future: _profileBootstrapFuture,
+                      builder: (context, bootstrapSnapshot) {
+                        if (bootstrapSnapshot.connectionState !=
+                            ConnectionState.done) {
+                          return const Center(
+                            child: CircularProgressIndicator(),
+                          );
+                        }
+
+                        if (bootstrapSnapshot.hasError) {
+                          return Center(
+                            child: Padding(
+                              padding: const EdgeInsets.all(24.0),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.person_off_rounded,
+                                    size: 56,
+                                    color: Colors.grey[500],
+                                  ),
+                                  const SizedBox(height: 12),
+                                  Text(
+                                    'Setting up your profile is taking a moment.',
+                                    textAlign: TextAlign.center,
+                                    style: GoogleFonts.inter(fontSize: 16),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  TextButton(
+                                    onPressed: () {
+                                      setState(() {
+                                        _profileBootstrapFuture = null;
+                                      });
+                                    },
+                                    child: const Text('Try again'),
+                                  ),
+                                ],
+                              ),
                             ),
-                            const SizedBox(height: 12),
-                            Text(
-                              'Setting up your profile is taking a moment.',
-                              textAlign: TextAlign.center,
-                              style: GoogleFonts.inter(fontSize: 16),
-                            ),
-                            const SizedBox(height: 8),
-                            TextButton(
-                              onPressed: () {
-                                setState(() {
-                                  _profileBootstrapFuture = null;
-                                });
-                              },
-                              child: const Text('Try again'),
-                            ),
-                          ],
-                        ),
-                      ),
+                          );
+                        }
+
+                        return const Center(child: CircularProgressIndicator());
+                      },
                     );
                   }
 
-                  return const Center(child: CircularProgressIndicator());
-                },
-              );
-            }
+                  final profile = UserProfile.fromMap(
+                    snapshot.data!.data() as Map<String, dynamic>,
+                  );
+                  final storedPhotoUrl = profile.photoUrl?.trim() ?? '';
+                  final authPhotoUrl =
+                      FirebaseAuth.instance.currentUser?.photoURL?.trim() ?? '';
+                  final avatarUrl = storedPhotoUrl.isNotEmpty
+                      ? storedPhotoUrl
+                      : authPhotoUrl;
 
-            final profile = UserProfile.fromMap(
-              snapshot.data!.data() as Map<String, dynamic>,
-            );
+                  if (!profileProvider.isEditing) {
+                    _nameController.text = profile.displayName;
+                    _usernameController.text = profile.username ?? '';
+                  }
 
-            if (!profileProvider.isEditing) {
-              _nameController.text = profile.displayName;
-              _usernameController.text = profile.username ?? '';
-            }
-
-            return SingleChildScrollView(
-              padding: const EdgeInsets.all(24.0),
-              child: SizedBox(
-                width: double.infinity,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    const SizedBox(height: 16),
-                    Stack(
-                      children: [
-                        GestureDetector(
-                          onTap: profileProvider.isUploadingPicture
-                              ? null
-                              : () async {
-                                  if (profileProvider.isEditing) {
-                                    await _changeProfilePhoto(context);
-                                    return;
-                                  }
-                                  final photoUrl = profile.photoUrl?.trim();
-                                  if (photoUrl == null || photoUrl.isEmpty) {
-                                    return;
-                                  }
-                                  await _openProfilePhotoPreview(
-                                    context,
-                                    photoUrl,
-                                  );
-                                },
-                          child: ProBadgeAvatar(
-                            isPro: subscriptionProvider.hasProAccess,
-                            radius: 56,
-                            child: CircleAvatar(
-                              radius: 56,
-                              backgroundColor: Theme.of(
-                                context,
-                              ).colorScheme.primary.withValues(alpha: 0.1),
-                              backgroundImage: profile.photoUrl != null
-                                  ? NetworkImage(profile.photoUrl!)
-                                  : null,
-                              child: profileProvider.isUploadingPicture
-                                  ? const CircularProgressIndicator()
-                                  : (profile.photoUrl == null
-                                        ? Icon(
-                                            Icons.person,
-                                            size: 56,
-                                            color: Theme.of(
-                                              context,
-                                            ).colorScheme.primary,
-                                          )
-                                        : null),
-                            ),
-                          ),
-                        ),
-                        if (profileProvider.isEditing)
-                          Positioned(
-                            bottom: 0,
-                            right: 0,
-                            child: Material(
-                              color: Colors.transparent,
-                              child: InkWell(
-                                customBorder: const CircleBorder(),
+                  return SingleChildScrollView(
+                    padding: const EdgeInsets.all(24.0),
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          const SizedBox(height: 16),
+                          Stack(
+                            children: [
+                              GestureDetector(
                                 onTap: profileProvider.isUploadingPicture
                                     ? null
-                                    : () => _changeProfilePhoto(context),
-                                child: Container(
-                                  padding: const EdgeInsets.all(8),
-                                  decoration: BoxDecoration(
-                                    color: Theme.of(
-                                      context,
-                                    ).colorScheme.primary,
-                                    shape: BoxShape.circle,
-                                    border: Border.all(
-                                      color: Theme.of(
-                                        context,
-                                      ).colorScheme.surface,
-                                      width: 3,
+                                    : () async {
+                                        if (profileProvider.isEditing) {
+                                          await _changeProfilePhoto(context);
+                                          return;
+                                        }
+                                        if (avatarUrl.isEmpty) {
+                                          return;
+                                        }
+                                        await _openProfilePhotoPreview(
+                                          context,
+                                          avatarUrl,
+                                        );
+                                      },
+                                child: ProBadgeAvatar(
+                                  isPro: subscriptionProvider.hasProAccess,
+                                  radius: 56,
+                                  child: CircleAvatar(
+                                    radius: 56,
+                                    backgroundColor: Theme.of(context)
+                                        .colorScheme
+                                        .primary
+                                        .withValues(alpha: 0.1),
+                                    backgroundImage: avatarUrl.isNotEmpty
+                                        ? NetworkImage(avatarUrl)
+                                        : null,
+                                    child: profileProvider.isUploadingPicture
+                                        ? const CircularProgressIndicator()
+                                        : (avatarUrl.isEmpty
+                                              ? Icon(
+                                                  Icons.person,
+                                                  size: 56,
+                                                  color: Theme.of(
+                                                    context,
+                                                  ).colorScheme.primary,
+                                                )
+                                              : null),
+                                  ),
+                                ),
+                              ),
+                              if (profileProvider.isEditing)
+                                Positioned(
+                                  bottom: 0,
+                                  right: 0,
+                                  child: Material(
+                                    color: Colors.transparent,
+                                    child: InkWell(
+                                      customBorder: const CircleBorder(),
+                                      onTap: profileProvider.isUploadingPicture
+                                          ? null
+                                          : () => _changeProfilePhoto(context),
+                                      child: Container(
+                                        padding: const EdgeInsets.all(8),
+                                        decoration: BoxDecoration(
+                                          color: Theme.of(
+                                            context,
+                                          ).colorScheme.primary,
+                                          shape: BoxShape.circle,
+                                          border: Border.all(
+                                            color: Theme.of(
+                                              context,
+                                            ).colorScheme.surface,
+                                            width: 3,
+                                          ),
+                                        ),
+                                        child: const Icon(
+                                          Icons.edit_rounded,
+                                          size: 16,
+                                          color: Colors.black,
+                                        ),
+                                      ),
                                     ),
                                   ),
-                                  child: const Icon(
-                                    Icons.edit_rounded,
-                                    size: 16,
-                                    color: Colors.black,
-                                  ),
                                 ),
-                              ),
-                            ),
+                            ],
                           ),
-                      ],
-                    ),
-                    const SizedBox(height: 32),
+                          const SizedBox(height: 32),
 
-                    if (!profileProvider.isEditing) ...[
-                      Text(
-                        profile.displayName,
-                        style: GoogleFonts.outfit(
-                          fontSize: 32,
-                          fontWeight: FontWeight.bold,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        profile.username != null
-                            ? '@${profile.username}'
-                            : 'No username set',
-                        style: GoogleFonts.inter(
-                          fontSize: 18,
-                          color: Theme.of(context).colorScheme.primary,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        profile.email,
-                        style: GoogleFonts.inter(
-                          fontSize: 14,
-                          color: Colors.grey[500],
-                        ),
-                      ),
-                      const SizedBox(height: 32),
-                      ElevatedButton.icon(
-                        icon: const Icon(Icons.edit, size: 20),
-                        label: const Text('Edit Profile'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Theme.of(
-                            context,
-                          ).colorScheme.surface,
-                          foregroundColor: Theme.of(
-                            context,
-                          ).colorScheme.onSurface,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 24,
-                            vertical: 12,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          side: BorderSide(
-                            color: Theme.of(
-                              context,
-                            ).dividerColor.withValues(alpha: 0.5),
-                          ),
-                        ),
-                        onPressed: () {
-                          context.read<ProfileProvider>().startEditing();
-                        },
-                      ),
-                    ] else ...[
-                      _buildTextField(
-                        context,
-                        'Display Name',
-                        _nameController,
-                        Icons.badge_rounded,
-                      ),
-                      const SizedBox(height: 16),
-                      _buildTextField(
-                        context,
-                        'Username',
-                        _usernameController,
-                        Icons.alternate_email_rounded,
-                      ),
-                      if (profileProvider.usernameError != null)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 8.0),
-                          child: Text(
-                            profileProvider.usernameError!,
-                            style: GoogleFonts.inter(
-                              color: Colors.redAccent,
-                              fontSize: 13,
+                          if (!profileProvider.isEditing) ...[
+                            Text(
+                              profile.displayName,
+                              style: GoogleFonts.outfit(
+                                fontSize: 32,
+                                fontWeight: FontWeight.bold,
+                              ),
+                              textAlign: TextAlign.center,
                             ),
-                          ),
-                        ),
-                      const SizedBox(height: 32),
-                      if (profileProvider.isCheckingUsername)
-                        const CircularProgressIndicator()
-                      else
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            TextButton(
-                              onPressed: () {
-                                context.read<ProfileProvider>().cancelEditing();
-                              },
-                              child: Text(
-                                'Cancel',
-                                style: GoogleFonts.inter(
-                                  color: Theme.of(context).colorScheme.onSurface
-                                      .withValues(alpha: 0.7),
-                                ),
+                            const SizedBox(height: 8),
+                            Text(
+                              profile.username != null
+                                  ? '@${profile.username}'
+                                  : 'No username set',
+                              style: GoogleFonts.inter(
+                                fontSize: 18,
+                                color: Theme.of(context).colorScheme.primary,
                               ),
                             ),
-                            const SizedBox(width: 16),
-                            ElevatedButton(
+                            const SizedBox(height: 8),
+                            Text(
+                              profile.email,
+                              style: GoogleFonts.inter(
+                                fontSize: 14,
+                                color: Colors.grey[500],
+                              ),
+                            ),
+                            const SizedBox(height: 32),
+                            ElevatedButton.icon(
+                              icon: const Icon(Icons.edit, size: 20),
+                              label: const Text('Edit Profile'),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: Theme.of(
                                   context,
-                                ).colorScheme.primary,
-                                foregroundColor: Colors.black,
+                                ).colorScheme.surface,
+                                foregroundColor: Theme.of(
+                                  context,
+                                ).colorScheme.onSurface,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 24,
+                                  vertical: 12,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                side: BorderSide(
+                                  color: Theme.of(
+                                    context,
+                                  ).dividerColor.withValues(alpha: 0.5),
+                                ),
+                              ),
+                              onPressed: () {
+                                context.read<ProfileProvider>().startEditing();
+                              },
+                            ),
+                          ] else ...[
+                            _buildTextField(
+                              context,
+                              'Display Name',
+                              _nameController,
+                              Icons.badge_rounded,
+                            ),
+                            const SizedBox(height: 16),
+                            _buildTextField(
+                              context,
+                              'Username',
+                              _usernameController,
+                              Icons.alternate_email_rounded,
+                            ),
+                            if (profileProvider.usernameError != null)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 8.0),
+                                child: Text(
+                                  profileProvider.usernameError!,
+                                  style: GoogleFonts.inter(
+                                    color: Colors.redAccent,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ),
+                            const SizedBox(height: 32),
+                            if (profileProvider.isCheckingUsername)
+                              const CircularProgressIndicator()
+                            else
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  TextButton(
+                                    onPressed: () {
+                                      context
+                                          .read<ProfileProvider>()
+                                          .cancelEditing();
+                                    },
+                                    child: Text(
+                                      'Cancel',
+                                      style: GoogleFonts.inter(
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .onSurface
+                                            .withValues(alpha: 0.7),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 16),
+                                  ElevatedButton(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Theme.of(
+                                        context,
+                                      ).colorScheme.primary,
+                                      foregroundColor: Colors.black,
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 32,
+                                        vertical: 12,
+                                      ),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(16),
+                                      ),
+                                    ),
+                                    onPressed: () async {
+                                      final success = await context
+                                          .read<ProfileProvider>()
+                                          .saveProfile(
+                                            _nameController.text,
+                                            _usernameController.text,
+                                          );
+                                      if (success && context.mounted) {
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
+                                          const SnackBar(
+                                            content: Text(
+                                              'Profile updated successfully!',
+                                            ),
+                                            backgroundColor: Colors.green,
+                                          ),
+                                        );
+                                      }
+                                    },
+                                    child: Text(
+                                      'Save',
+                                      style: GoogleFonts.outfit(
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                          ],
+
+                          if (!profileProvider.isEditing) ...[
+                            const SizedBox(height: 24),
+                            _ActionTile(
+                              icon: Icons.palette_rounded,
+                              title: 'Appearance',
+                              subtitle:
+                                  themeModeProvider.themeMode ==
+                                      ThemeMode.system
+                                  ? 'Matches your device'
+                                  : (themeModeProvider.themeMode ==
+                                            ThemeMode.dark
+                                        ? 'Dark'
+                                        : 'Light'),
+                              onTap: () {
+                                showModalBottomSheet(
+                                  context: context,
+                                  isScrollControlled: true,
+                                  backgroundColor: Colors.transparent,
+                                  elevation: 0,
+                                  builder: (_) => const AppearanceSelector(
+                                    isBottomSheet: true,
+                                  ),
+                                );
+                              },
+                            ),
+                            const SizedBox(height: 16),
+                            Consumer<HabitsProvider>(
+                              builder: (context, habitsProvider, _) {
+                                final count =
+                                    habitsProvider.archivedHabits.length +
+                                    habitsProvider.archivedGroups.length;
+                                return _ActionTile(
+                                  icon: Icons.archive_rounded,
+                                  title: 'Archived Habits & Groups',
+                                  subtitle: count > 0
+                                      ? '$count archived items'
+                                      : 'View or restore deleted habits & groups',
+                                  onTap: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) =>
+                                            const ArchivedItemsScreen(),
+                                      ),
+                                    );
+                                  },
+                                );
+                              },
+                            ),
+                            const SizedBox(height: 24),
+                            _ProSection(
+                              state: subscriptionState,
+                              subscriptionProvider: subscriptionProvider,
+                            ),
+                          ],
+                          if (!profileProvider.isEditing) ...[
+                            const SizedBox(height: 48),
+                          ],
+                          if (!profileProvider.isEditing) ...[
+                            const SizedBox(height: 24),
+                            ElevatedButton.icon(
+                              icon: const Icon(Icons.logout),
+                              label: const Text('Sign Out'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.red.shade900.withValues(
+                                  alpha: 0.3,
+                                ),
+                                foregroundColor: Colors.redAccent,
+                                elevation: 0,
                                 padding: const EdgeInsets.symmetric(
                                   horizontal: 32,
-                                  vertical: 12,
+                                  vertical: 16,
                                 ),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(16),
                                 ),
                               ),
                               onPressed: () async {
-                                final success = await context
-                                    .read<ProfileProvider>()
-                                    .saveProfile(
-                                      _nameController.text,
-                                      _usernameController.text,
-                                    );
-                                if (success && context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text(
-                                        'Profile updated successfully!',
-                                      ),
-                                      backgroundColor: Colors.green,
-                                    ),
-                                  );
+                                await AuthService().signOut();
+                                if (context.mounted) {
+                                  Navigator.of(
+                                    context,
+                                  ).popUntil((route) => route.isFirst);
                                 }
                               },
-                              child: Text(
-                                'Save',
-                                style: GoogleFonts.outfit(
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
                             ),
                           ],
-                        ),
-                    ],
-
-                    if (!profileProvider.isEditing) ...[
-                      const SizedBox(height: 24),
-                      _ActionTile(
-                        icon: Icons.palette_rounded,
-                        title: 'Appearance',
-                        subtitle: themeModeProvider.themeMode == ThemeMode.system
-                            ? 'Matches your device'
-                            : (themeModeProvider.themeMode == ThemeMode.dark ? 'Dark' : 'Light'),
-                        onTap: () {
-                          showModalBottomSheet(
-                            context: context,
-                            isScrollControlled: true,
-                            backgroundColor: Colors.transparent,
-                            elevation: 0,
-                            builder: (_) => const AppearanceSelector(isBottomSheet: true),
-                          );
-                        },
+                          const SizedBox(height: 120),
+                        ],
                       ),
-                      const SizedBox(height: 16),
-                      Consumer<HabitsProvider>(
-                        builder: (context, habitsProvider, _) {
-                          final count = habitsProvider.archivedHabits.length +
-                              habitsProvider.archivedGroups.length;
-                          return _ActionTile(
-                            icon: Icons.archive_rounded,
-                            title: 'Archived Habits & Groups',
-                            subtitle: count > 0
-                                ? '$count archived items'
-                                : 'View or restore deleted habits & groups',
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => const ArchivedItemsScreen(),
-                                ),
-                              );
-                            },
-                          );
-                        },
-                      ),
-                      const SizedBox(height: 24),
-                      _ProSection(
-                        state: subscriptionState,
-                        subscriptionProvider: subscriptionProvider,
-                      ),
-                    ],
-                    if (!profileProvider.isEditing) ...[
-                      const SizedBox(height: 48),
-                    ],
-                    if (!profileProvider.isEditing) ...[
-                      const SizedBox(height: 24),
-                      ElevatedButton.icon(
-                        icon: const Icon(Icons.logout),
-                        label: const Text('Sign Out'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.red.shade900.withValues(
-                            alpha: 0.3,
-                          ),
-                          foregroundColor: Colors.redAccent,
-                          elevation: 0,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 32,
-                            vertical: 16,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                        ),
-                        onPressed: () async {
-                          await AuthService().signOut();
-                          if (context.mounted) {
-                            Navigator.of(
-                              context,
-                            ).popUntil((route) => route.isFirst);
-                          }
-                        },
-                      ),
-                    ],
-                    const SizedBox(height: 120),
-                  ],
-                ),
+                    ),
+                  );
+                },
               ),
-            );
-          },
-        ),
       ),
     );
   }
@@ -619,7 +642,9 @@ class _ProSection extends StatelessWidget {
         boxShadow: hasProAccess
             ? [
                 BoxShadow(
-                  color: AppTheme.proAmber.withValues(alpha: isDark ? 0.1 : 0.06),
+                  color: AppTheme.proAmber.withValues(
+                    alpha: isDark ? 0.1 : 0.06,
+                  ),
                   blurRadius: 14,
                   spreadRadius: 1,
                 ),
@@ -639,14 +664,20 @@ class _ProSection extends StatelessWidget {
                 ),
                 decoration: BoxDecoration(
                   gradient: hasProAccess ? AppTheme.proBadgeGradient : null,
-                  color: hasProAccess ? null : scheme.onSurface.withValues(alpha: 0.06),
+                  color: hasProAccess
+                      ? null
+                      : scheme.onSurface.withValues(alpha: 0.06),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     if (hasProAccess) ...[
-                      const Icon(Icons.workspace_premium_rounded, size: 14, color: Colors.black),
+                      const Icon(
+                        Icons.workspace_premium_rounded,
+                        size: 14,
+                        color: Colors.black,
+                      ),
                       const SizedBox(width: 4),
                     ],
                     Text(
@@ -679,7 +710,9 @@ class _ProSection extends StatelessWidget {
 
           // ── Current plan label ──────────────────────────────────
           Text(
-            hasProAccess ? 'Pro Membership Unlocked' : 'Supercharge Trackly with Pro',
+            hasProAccess
+                ? 'Pro Membership Unlocked'
+                : 'Supercharge Trackly with Pro',
             style: GoogleFonts.outfit(
               fontSize: 20,
               fontWeight: FontWeight.w800,

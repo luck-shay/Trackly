@@ -111,24 +111,24 @@ class _FriendsScreenState extends State<FriendsScreen> {
                                     ),
                                   )
                                 : provider.hasActiveQuery
-                                    ? IconButton(
-                                        key: const ValueKey('clear'),
-                                        tooltip: 'Clear search',
-                                        icon: const Icon(Icons.close_rounded),
-                                        onPressed: () {
-                                          _searchController.clear();
-                                          context
-                                              .read<FriendsProvider>()
-                                              .clearSearch();
-                                        },
-                                      )
-                                    : Icon(
-                                        key: const ValueKey('idle'),
-                                        Icons.person_search_rounded,
-                                        color: scheme.onSurface.withValues(
-                                          alpha: 0.58,
-                                        ),
-                                      ),
+                                ? IconButton(
+                                    key: const ValueKey('clear'),
+                                    tooltip: 'Clear search',
+                                    icon: const Icon(Icons.close_rounded),
+                                    onPressed: () {
+                                      _searchController.clear();
+                                      context
+                                          .read<FriendsProvider>()
+                                          .clearSearch();
+                                    },
+                                  )
+                                : Icon(
+                                    key: const ValueKey('idle'),
+                                    Icons.person_search_rounded,
+                                    color: scheme.onSurface.withValues(
+                                      alpha: 0.58,
+                                    ),
+                                  ),
                           ),
                         ),
                         textInputAction: TextInputAction.search,
@@ -155,9 +155,7 @@ class _FriendsScreenState extends State<FriendsScreen> {
                               '${provider.searchResults.length} found',
                               style: GoogleFonts.inter(
                                 fontSize: 12,
-                                color: scheme.onSurface.withValues(
-                                  alpha: 0.58,
-                                ),
+                                color: scheme.onSurface.withValues(alpha: 0.58),
                               ),
                             ),
                         ],
@@ -335,7 +333,8 @@ class _FriendsScreenState extends State<FriendsScreen> {
                                       if (!context.mounted) return;
                                       await showPremiumUpgradeSheet(
                                         context,
-                                        feature: PremiumFeature.unlimitedSharedHabits,
+                                        feature: PremiumFeature
+                                            .unlimitedSharedHabits,
                                       );
                                       if (!context.mounted) return;
                                       ScaffoldMessenger.of(
@@ -710,6 +709,14 @@ class _FriendsScreenState extends State<FriendsScreen> {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
                 }
+                if (snapshot.hasError) {
+                  return Text(
+                    'Could not load friends. Please refresh and try again.',
+                    style: GoogleFonts.inter(
+                      color: scheme.onSurface.withValues(alpha: 0.68),
+                    ),
+                  );
+                }
                 final friends = snapshot.data ?? [];
 
                 if (friends.isEmpty) {
@@ -735,10 +742,11 @@ class _FriendsScreenState extends State<FriendsScreen> {
                           backgroundColor: Theme.of(
                             context,
                           ).colorScheme.primary.withValues(alpha: 0.2),
-                          backgroundImage: friend.photoUrl != null
-                              ? NetworkImage(friend.photoUrl!)
+                          backgroundImage:
+                              friend.photoUrl?.trim().isNotEmpty == true
+                              ? NetworkImage(friend.photoUrl!.trim())
                               : null,
-                          child: friend.photoUrl == null
+                          child: friend.photoUrl?.trim().isNotEmpty != true
                               ? Icon(Icons.person, color: scheme.onPrimary)
                               : null,
                         ),
