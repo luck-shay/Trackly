@@ -28,6 +28,25 @@ Trackly is a Flutter habit-tracking app with Google sign-in, Firebase-backed per
 	- `export GEMINI_MODEL=gemini-1.5-flash`
 5. Run `flutter run`.
 
+### Web
+
+The web build uses a desktop-oriented shell with a sidebar and constrained content area. The existing mobile shell remains the default on mobile platforms.
+
+Run locally with:
+
+```bash
+flutter run -d chrome
+```
+
+Build and deploy to Firebase Hosting with:
+
+```bash
+flutter build web
+firebase deploy --only hosting
+```
+
+Firebase Hosting is configured as a single-page application, so browser refreshes and future deep-linked web routes fall back to the Flutter entry point. Use `--base-href` when deploying Trackly below a non-root path.
+
 ## Quality Checks
 
 - `flutter analyze`

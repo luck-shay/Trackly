@@ -25,6 +25,7 @@ import 'providers/mood_provider.dart';
 import 'providers/achievement_provider.dart';
 import 'package:trackly/theme/color_scheme.dart';
 import 'services/avatar_cache.dart';
+import 'web/web_main_layout_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -354,7 +355,7 @@ class _AuthBootstrapGateState extends State<_AuthBootstrapGate> {
           final profile = snapshot.data!;
           if (profile.onboardingCompleted) {
             unawaited(NotificationService().initialize());
-            return MainLayoutScreen();
+            return kIsWeb ? const WebMainLayoutScreen() : MainLayoutScreen();
           } else {
             return const OnboardingScreen(
               startStep: OnboardingStep.chooseUsername,

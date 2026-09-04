@@ -1,12 +1,12 @@
 {
-    "name": "trackly",
-    "short_name": "trackly",
+    "name": "Trackly - Habit Tracking",
+    "short_name": "Trackly",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
-    "orientation": "portrait-primary",
+    "background_color": "#0B0F0C",
+    "theme_color": "#22C55E",
+    "description": "Build better routines and stay accountable with Trackly.",
+    "orientation": "any",
     "prefer_related_applications": false,
     "icons": [
         {
